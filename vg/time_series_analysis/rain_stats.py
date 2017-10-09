@@ -1,0 +1,193 @@
+from __future__ import division
+from builtins import range
+from past.utils import old_div
+import warnings
+import numpy as np
+import matplotlib.pyplot as plt
+from vg import helpers as my
+
+
+def trans_prob(rain, thresh=.0001):
+    """Estimates transition probabilities.
+
+    Parameter
+    --------
+    rain : 1d array
+    thresh : float, optional
+        threshold a value must exceed to be interpreted as rain [m]
+
+    Returns
+    -------
+    trans : (2, 2) ndarray
+        Transition probabilities.
+        [[P(no rain -> no rain), P(no rain -> rain],
+         [P(rain -> no rain),    P(rain -> rain)]]
+    """
+    rain_mask = rain >= thresh
+    n = float(len(rain))
+    diffs = np.diff(rain_mask.astype(int))
+    no_change_mask = diffs == 0
+    p11 = np.sum(rain_mask[:-1] & no_change_mask)
+    p00 = np.sum(~rain_mask[:-1] & no_change_mask)
+    p10 = np.sum(diffs == -1)
+    p01 = np.sum(diffs == 1)
+    return (np.array([[p00, p01],
+                      [p10, p11]]) / n)
+
+
+def spell_lengths(rain, thresh=.001):
+    """Calculate dry and wet spell lenghts.
+
+    Parameter
+    ---------
+    rain : 1d array
+    thresh : float, optional
+        threshold a value must exceed to be interpreted as rain [m]
+
+    Returns
+    -------
+    dry : 1d int array
+    wet : 1d int array
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        rain_mask = rain >= thresh
+    dry = np.array([stop_i - start_i + 1
+                    for start_i, stop_i in my.gaps(~rain_mask)])
+    wet = np.array([stop_i - start_i + 1
+                    for start_i, stop_i in my.gaps(rain_mask)])
+    return dry, wet
+
+
+def plot_exceedance(obs, sim=None, kind="depth", thresh=.001,
+                    fig=None, axs=None, lkwds=None):
+    """Plot exceedance probability.
+
+    Parameter
+    --------
+    obs : 1-dim ndarray
+        observations
+    sim : 1 or 2-dim ndarray, optional
+        simulated values. If 2-dimensional, median, and range of those values
+        will be plotted.
+    kind : "depth", "dry", "wet" or "all", optional
+        What to plot:
+        - depth: rain intensity
+        - dry: lengths of dry spells
+        - wet: lengths of wet spells
+        - all
+    thresh : float, optional
+        threshold a value must exceed to be interpreted as rain [m].
+        only needed if kind != "depth".
+    """
+    if kind == "all":
+        if fig is None:
+            fig, axs = plt.subplots(ncols=3, subplot_kw=dict(aspect="equal"))
+        kinds = "depth", "dry", "wet"
+    else:
+        if fig is None or axs is None:
+            fig, axs = plt.subplots(subplot_kw=dict(aspect="equal"))
+            axs = axs,
+        kinds = kind,
+    if lkwds is None:
+        lkwds = {}
+
+    def rel_ranks(n):
+        return (np.arange(float(n)) - .5) / n
+
+    def plot_sim_single(ax, sim):
+        sim_conv = conv(sim)
+        ranks = rel_ranks(len(sim_conv))
+        sim_sorted = np.sort(sim_conv)[::-1]
+        ax.loglog(sim_sorted, ranks, color="grey")
+
+    for ax_i, kind in enumerate(kinds):
+        ax = axs[ax_i]
+
+        if kind == "depth":
+            def conv(x):
+                valid_x = x[np.isfinite(x)]
+                return valid_x[valid_x >= thresh]
+
+            ax.set_xlabel("depth [mm]")
+        elif kind == "dry":
+            def conv(x):
+                return spell_lengths(x, thresh)[0]
+
+            ax.set_xlabel("dry spell length")
+        elif kind == "wet":
+            def conv(x):
+                return spell_lengths(x, thresh)[1]
+
+            ax.set_xlabel("wet spell length")
+
+        if np.ndim(sim) == 1:
+            plot_sim_single(ax, sim)
+
+        if np.ndim(sim) == 2:
+            sim = np.asarray(sim)
+            for sim_ in sim:
+                plot_sim_single(ax, sim_)
+
+        obs_conv = conv(obs)
+        ranks = rel_ranks(len(obs_conv))
+        obs_sorted = np.sort(obs_conv)[::-1]
+        ax.scatter(obs_sorted, ranks, marker="o", edgecolor="black",
+                   facecolor=(0, 0, 0, 0), **lkwds)
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_ylim(ranks[0], ranks[-1])
+        ax.grid()
+    axs[0].set_ylabel("F(X)")
+    fig.tight_layout(rect=(0, .1, 1, 1))
+    return fig, axs
+
+
+def richardson_model(T, trans_pp):
+    """Simulate rain occurrence with Richardson's (1981) model (2 state, first
+    order Markov Chain).
+
+    Parameter
+    ---------
+    T : int
+        Length of simulated time series
+    trans_pp : (2, 2) ndarray
+        Transition probabilities (see trans_prob).
+        [[P(no rain -> no rain), P(no rain -> rain],
+         [P(rain -> no rain),    P(rain -> rain)]]
+
+    Returns
+    -------
+    occs : (T,) bool ndarray
+        Rain occurrences.
+
+    References
+    ----------
+    Richardson, C. W. (1981). Stochastic simulation of daily precipitation,
+    temperature, and solar radiation. Water Resources Research, 17(1),
+    182-190. doi:10.1029/WR017i001p00182
+
+    See also
+    --------
+    trans_prob : Estimates transition probabilities given a time series.
+    """
+    pp = trans_pp
+    T = int(round(T))
+    occs = np.full(T, False, dtype=bool)
+    rr = np.random.rand(T)
+    # decide on the first occurrence with unconditional probability
+    occs[0] = rr[0] < pp[0].sum()
+    for t in range(1, T):
+        occs[t] = rr[t] < (old_div(pp[int(occs[t - 1]), 1],
+                                   pp[:, int(occs[t - 1])].sum()))
+    return occs
+
+
+if __name__ == "__main__":
+
+    import vg
+    vg.conf = vg.config_konstanz
+    met_vg = vg.VG(("R", "theta"))
+    rain = old_div(met_vg.data_raw[0], 24)
+    plot_exceedance(rain, kind="all")
+    plt.show()
