@@ -1,0 +1,14 @@
+include MANIFEST.in
+include *.txt
+include distribute_setup.py
+include setup.py
+include vg/sample.met
+include vg/core/dyresm_header_template
+include vg/time_series_analysis/cresample.pyx
+include vg/ctimes.pyx
+include vg/*.py
+
+include doc/Makefile doc/conf.py doc/index.rst
+recursive-include doc/source *
+exclude doc/source/generated
+recursive-include doc/sphinxext *

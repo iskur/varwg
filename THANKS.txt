@@ -1,0 +1,3 @@
+Magdalena Eder for contributingcore/monty, meteo/meteox2y and more.
+    Also for validation.
+Marieke Frassl and Karsten Rinke for sharp eyes and intelligent questions.
