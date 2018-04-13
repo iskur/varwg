@@ -137,7 +137,7 @@ dists_kwds = {"R": dict(threshold=threshold,
 # this is a helper function for the definition of par_known
 # functions that return known parameters to fix those values during fitting
 def array_gen(scalar):
-    return lambda tt: scalar * np.ones_like(tt)
+    return lambda tt: np.full_like(tt, scalar)
 
 
 # unomment the following decorator to cache results of max_qsw on the
