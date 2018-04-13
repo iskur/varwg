@@ -3,24 +3,24 @@ from __future__ import division, print_function
 import copy
 import datetime
 import os
-import re
 import shelve
+import re
 import shlex
 import sys
 import warnings
 from builtins import object, range, zip
 from past.builtins import basestring
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 from past.utils import old_div
 from scipy import interpolate, stats
 
-from vg.time_series_analysis import seasonal_distributions as sd
 import vg.time_series_analysis.seasonal_kde as skde
 from vg import helpers as my, times
 from vg.meteo import avrwind, meteox2y
-from vg.time_series_analysis import distributions
+from vg.time_series_analysis import (distributions,
+    seasonal_distributions as sd)
 
 
 try:
@@ -30,8 +30,8 @@ except ImportError:
     conf_filepath = conf.__file__
     if conf_filepath.endswith(".pyc"):
         conf_filepath = conf_filepath[:-1]
-    # warnings.warn('Could not import "config.py".\n' +
-    #               'Edit "%s" and rename it to "config.py"' % conf_filepath)
+    warnings.warn('Could not import "config.py".\n' +
+                  'Edit "%s" and rename it to "config.py"' % conf_filepath)
 
 
 PY2 = sys.version_info.major == 2
@@ -691,33 +691,34 @@ class VGBase(object):
             data[self.var_names.index("U")] = \
                 daily_wind(self.met, self.sum_interval_dict["U"])[1]
 
-#        if "nao" in self.var_names:
-#            import nao
-#            nao_dates, naoi = nao.read_nao()
-#            self.met["nao"] = naoi[np.where(nao_dates == times_[0])[0]:
-#                              np.where(nao_dates == times_[-1])[0] + 1]
-#            var_row = self.var_names.index("nao")
-#            summed_nao = my.sumup(self.met["nao"], self.sum_interval[var_row])
-#            if summed_nao.shape[1] < data.shape[1]:
-#                shape_diff = data.shape[1] - summed_nao.shape[1]
-#                summed_nao = np.concatenate((np.zeros((1, shape_diff)),
-#                                             summed_nao), axis=1)
-#            data = np.insert(data, var_row, summed_nao, axis=0)
+        # if "nao" in self.var_names:
+        #     import nao
+        #     nao_dates, naoi = nao.read_nao()
+        #     self.met["nao"] = naoi[np.where(nao_dates == times_[0])[0]:
+        #                            np.where(nao_dates == times_[-1])[0] + 1]
+        #     var_row = self.var_names.index("nao")
+        #     summed_nao = my.sumup(self.met["nao"], self.sum_interval[var_row])
+        #     if summed_nao.shape[1] < data.shape[1]:
+        #         shape_diff = data.shape[1] - summed_nao.shape[1]
+        #         summed_nao = np.concatenate((np.zeros((1, shape_diff)),
+        #                                      summed_nao), axis=1)
+        #         data = np.insert(data, var_row, summed_nao, axis=0)
 
-        # check if we are supposed to simulate water temperatures - they are
-        # stored someplace else
-#        if "wtemp" in "".join(self.var_names):
-#            met_rivers = read_met(conf.hyd_file)[1]
-#            self.met.update(met_rivers)
-#            for var_name in met_rivers.keys():
-#                if var_name in self.var_names:
-#                    var_row = self.var_names.index(var_name)
-#                    new_data = my.sumup(self.met[var_name],
-#                                        self.sum_interval[var_row])
-# the last measurement of data was dropped in sumup! so
-# loose it also here
-#                    new_data = new_data[:, :data.shape[1]]
-#                    data = np.insert(data, var_row, new_data, axis=0)
+        # # check if we are supposed to simulate water temperatures - they are
+        # # stored someplace else
+        # if "wtemp" in "".join(self.var_names):
+        #     met_rivers = read_met(conf.hyd_file)[1]
+        #     self.met.update(met_rivers)
+        #     for var_name in met_rivers.keys():
+        #         if var_name in self.var_names:
+        #             var_row = self.var_names.index(var_name)
+        #             new_data = my.sumup(self.met[var_name],
+        #                                self.sum_interval[var_row])
+        #             # the last measurement of data was dropped in
+        #             # sumup! so loose it also here
+        #             new_data = new_data[:, :data.shape[1]]
+        #             data = np.insert(data, var_row, new_data, axis=0)
+
         return times_, data
 
     def _prepare_fixed_data(self):
@@ -795,11 +796,11 @@ class VGBase(object):
             end_date = times.str2datetime(stop_str)
             t_diff_seconds = (end_date - self.start_date).total_seconds()
             T = int(old_div(t_diff_seconds, (60 ** 2 * 24)))
-#         interval_secs = 60. ** 2 * output_resolution
-#
-#         times_out = np.cumsum([0] + (T - 1) * [interval_secs])
-#         times_out += times.datetime2unix(self.start_date)
-#         times_out = times.unix2datetime(times_out)
+        # interval_secs = 60. ** 2 * output_resolution
+
+        # times_out = np.cumsum([0] + (T - 1) * [interval_secs])
+        # times_out += times.datetime2unix(self.start_date)
+        # times_out = times.unix2datetime(times_out)
         resolution_timedelta = \
             datetime.timedelta(hours=float(output_resolution))
         times_out = np.array([self.start_date + t * resolution_timedelta
@@ -813,7 +814,6 @@ class VGBase(object):
         elif refit == "all" or refit is True:
             refit = self.var_names
         sh = shelve.open(self.seasonal_cache_file, 'c')
-        # keys = list(sh.keys())
         try:
             keys = list(sh.keys())
         # except bsddb.db.DBPageNotFoundError:
@@ -831,12 +831,12 @@ class VGBase(object):
         for var_ii, var in enumerate(values):
             var_name = self.var_names[var_ii]
 
-            # weird py2/3 incompatibilities...
+            # py2/3 incompatibilities...
             solution_key = str(var_name)
 
-            # the fitting was originially done for daily sums of hourly values
-            # we can have different aggregation lengths so we trigger a fitting
-            # if we come across one of these
+            # the fitting was originially done for daily sums of
+            # hourly values we can have different aggregation lengths
+            # so we trigger a fitting if we come across one of these
             sum_interval = self.sum_interval_dict[var_name]
             plain_solution_key = solution_key
             if sum_interval != 24:

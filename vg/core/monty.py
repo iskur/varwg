@@ -19,7 +19,6 @@ DYRESM-CAEDYM and ELCOM.
 """
 from __future__ import print_function
 from __future__ import division
-# Der Witz stammt vom Ferdi. Nicht dass mich hier irgendwer Karl-Theodor nennt.
 from builtins import zip
 from builtins import str
 from builtins import range
@@ -40,9 +39,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import stats as sp_stats
 try:
-    from IPython.parallel import Client
-except ImportError:
     from ipyparallel import Client
+except ImportError:
+    from IPython.parallel import Client
 
 import vg
 from vg import helpers as my
@@ -189,17 +188,20 @@ class Monty(object):
 
 def _init(vg_config_name, vg_kwds, fit_kwds):
     """This is run on a cluster node."""
+    import importlib
     import vg
-    try:
-        from importlib import reload
-    except ImportError:
-        pass
-    # import sys
-    # PY2 = sys.version_info.major == 2
-    # if not PY2:
-    #     reload = importlib.reload
+    # try:
+    #     from importlib import reload
+    # except ImportError:
+    #     pass
+    import sys
+    PY2 = sys.version_info.major == 2
+    if not PY2:
+        reload = importlib.reload
+    else:
+        importlib.reload = reload
     vg.conf = importlib.import_module(vg_config_name)
-    reload(vg.conf)
+    importlib.reload(vg.conf)
     vg_kwds["dump_data"] = False
     met_vg = vg.VG(**vg_kwds)
     met_vg.fit(**fit_kwds)
