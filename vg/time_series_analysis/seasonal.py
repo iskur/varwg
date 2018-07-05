@@ -23,8 +23,9 @@ class Seasonal(object):
                                                        self.timestep))
         # we could have timestamps like "2004-01-01T00:30:00", so we
         # might need an offset for the unique doys
-        doy0_diff = self.doys[0] - self.doys_unique[0]
+        doy0_diff = self.doys.min() - self.doys_unique[0]
         self.doys_unique += doy0_diff
+        assert np.max(self.doys_unique) <= 366
         self.dt = self.doys_unique[1] - self.doys_unique[0]
         self.n_doys = len(self.doys_unique)
         if kill_leap:
@@ -43,6 +44,24 @@ class Seasonal(object):
         self.doys_unique = np.unique(my.round_to_float(self.doys,
                                                        self.timestep))
         self.n_doys = len(self.doys_unique)
+
+    def duplicate_feb28(self, doys):
+        """Put doys in the range [1, 365] by duplicating February 28th and
+        decrementing all following doys of the year.
+        """
+        doys_new = []
+        doys_splitted = np.split(doys, np.where(doys.astype(int) == 1)[0])
+        # the first element is empty when we split on doy==1 if first
+        # element of doys is 1!
+        if len(doys_splitted[0]) == 0:
+            doys_splitted = doys_splitted[1:]
+        for doys_one_year in doys_splitted:
+            if np.isclose(doys_one_year[-1], 366):
+                doys_one_year[doys_one_year >= 29] -= 1
+            doys_new += [doys_one_year]
+        doys_new = np.concatenate(doys_new)
+        assert len(doys_new) == len(doys)
+        return doys_new
 
     @property
     def n_years(self):
