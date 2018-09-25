@@ -16,8 +16,8 @@ from vg import helpers as my, times
 def distance_array(x_vec, y_vec, mask=None):
     """creating a matrix with residuals (x:horizontal,y:vertical)"""
     x_vec, y_vec = np.atleast_1d(x_vec, y_vec)
-    x_slice = y_vec.ndim * [None] + [Ellipsis]
-    y_slice = [Ellipsis] + x_vec.ndim * [None]
+    x_slice = tuple(y_vec.ndim * [None] + [Ellipsis])
+    y_slice = tuple([Ellipsis] + x_vec.ndim * [None])
     if mask is None:
         # return x_vec[None, :] - y_vec[:, None]
         return x_vec[x_slice] - y_vec[y_slice]
