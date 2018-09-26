@@ -549,7 +549,7 @@ class SeasonalDist(seasonal.Seasonal):
             ax1 = ax[ii]
 
             # the histogram of the data
-            bins = ax1.hist(values, n_classes, normed=True, facecolor='grey',
+            bins = ax1.hist(values, n_classes, density=True, facecolor='grey',
                             alpha=0.75)[1]
 
             class_middles = 0.5 * (bins[1:] + bins[:-1])

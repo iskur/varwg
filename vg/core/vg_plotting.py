@@ -922,7 +922,7 @@ class VGPlotting(vg_base.VGBase):
                 dat = data[var_i, month_ii[month]]
                 if self.sim_sea is not None:
                     dat = [dat, self.sim_sea[var_i, sim_month_ii[month]]]
-                axs[month].hist(dat, bins, normed=True)
+                axs[month].hist(dat, bins, density=True)
                 if self.sim_sea is None:
                     dat = dat,
                 ax_cdf = axs[month].twinx()
@@ -971,9 +971,9 @@ class VGPlotting(vg_base.VGBase):
                 amplitudes += [amplitudes_sim]
 
             fig, axes = plt.subplots(2, 1)
-            axes[0].hist(durations, 30, normed=True)
+            axes[0].hist(durations, 30, density=True)
             axes[0].set_xlabel("Duration [days]")
-            axes[1].hist(amplitudes, 30, normed=True)
+            axes[1].hist(amplitudes, 30, density=True)
             axes[1].set_xlabel("Deviation %s" % conf.units[var_name])
 
             legend1 = (r"observed $\overline{x}=%.2f$" %

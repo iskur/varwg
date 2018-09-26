@@ -680,7 +680,7 @@ def splom(data, variable_names=None, f_kwds=None, h_kwds=None, s_kwds=None,
                     axes[ii, jj].hist(np.where(np.isnan(data[ii]), 0,
                                                data[ii]),
                                       min(20, int(len(data[ii]) ** .5)),
-                                      picker=5, normed=True,
+                                      picker=5, density=True,
                                       # want to achieve red when inverting
                                       facecolor=cc.to_rgba(facecolor, alpha=0),
                                       **h_kwds)
@@ -902,7 +902,7 @@ def hist(values, n_bins, dist=None, pdf=None, kde=False, fig=None,
             ax1.vlines(bins, 0, freqs, linewidth=3)
             ax1.set_xlim(bins[0] - 1, bins[-1] + 1)
     else:
-        bins = ax1.hist(values, n_bins, normed=True, facecolor='grey',
+        bins = ax1.hist(values, n_bins, density=True, facecolor='grey',
                         alpha=0.75, *args, **kwds)[1]
 
     ax1.set_ylabel("relative frequency")

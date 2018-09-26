@@ -286,7 +286,7 @@ def windrose(wind_dirs, n_sectors=32, speed=None, speed_bins=6, fig=None,
         # sectors
         # we do not need the speeds anymore! continue with the histogram
         speed = np.array(s_hists, dtype=float)
-        # normalize by hand and not with normed=True in np.histogram, because
+        # normalize by hand and not with density=True in np.histogram, because
         # "Note that the sum of the histogram values will not be equal to 1
         # unless bins of unity width are chosen; it is not a probability mass
         # function" (numpy documentation)

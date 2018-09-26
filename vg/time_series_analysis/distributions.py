@@ -414,7 +414,7 @@ class Frozen(object):
 
         # the histogram of the data
         bins = ax1.hist(
-            values, n_classes, normed=True, facecolor='green', alpha=0.75)[1]
+            values, n_classes, density=True, facecolor='green', alpha=0.75)[1]
 
         class_middles = 0.5 * (bins[1:] + bins[:-1])
         density = self.pdf(class_middles)
