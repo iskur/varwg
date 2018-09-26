@@ -467,7 +467,7 @@ def plothist(x, legend):
     rects1 = plot.bar(color='r')
     rects2 = plot.bar(color='b')
 
-    plot.hist(x, normed=True, bins=30)
+    plot.hist(x, density=True, bins=30)
     plot.legend((rects1[0], rects2[0])(legend[0], legend[1]))
     plot.show()
 

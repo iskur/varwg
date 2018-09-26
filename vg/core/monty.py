@@ -707,7 +707,7 @@ def plot_elcom_meteo(meteofile, windfile=None, ma=None, simdict=True):
 
 def plot_wind(sp, dr):
     plt.figure()
-    _ = plt.hist(sp, bins=41, range=(0, 24), normed=True)
+    _ = plt.hist(sp, bins=41, range=(0, 24), density=True)
     plt.title('wind speed vg generated wind')
     plt.grid()
     windrose.windrose(dr, n_sectors=36)
