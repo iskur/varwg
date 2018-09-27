@@ -8,7 +8,10 @@ from past.utils import old_div
 from collections import namedtuple
 
 import numpy as np
-import picos
+try:
+    import picos
+except ImportError:
+    print("PICOS not found.")
 from scipy import optimize
 from tqdm import tqdm
 
