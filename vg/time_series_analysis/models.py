@@ -38,6 +38,7 @@ from tqdm import tqdm
 from vg import helpers as my
 from vg.time_series_analysis import time_series as ts
 from vg.time_series_analysis.distributions import MDFt
+from vg.time_series_analysis import phase_randomization
 
 
 mgarch_param_factory = namedtuple("mgarch_params",
@@ -441,6 +442,8 @@ def SVAR_LS_sim(Bs, sigma_us, doys, m=None, ia=None, m_trend=None,
     K = Bs.shape[0]
     p = (Bs.shape[1] - 1) // K
     Y = np.zeros((K, len(doys) + p))
+    if u is not None:
+        u = phase_randomization.randomize2d(u)
     for date_i, doy_i in enumerate(doys_ii):
         Y[:, date_i + p] = \
             VAR_LS_sim(Bs[..., doy_i], sigma_us[..., doy_i], 1,
@@ -448,6 +451,7 @@ def SVAR_LS_sim(Bs, sigma_us, doys, m=None, ia=None, m_trend=None,
                        None if ia is None else ia[:, date_i, None],
                        m_trend, n_presim_steps=0,
                        u=None if u is None else u[:, date_i, None],
+                       # u=u[:, date_i, None],
                        prev_data=Y[:, date_i:date_i + p]).ravel()
     return Y[:, p:]
 
@@ -738,7 +742,6 @@ def VAR_LS_sim(B, sigma_u, T, m=None, ia=None, m_trend=None, u=None,
             # fixing what's asked to be held constant
             Y[:, t] = np.where(np.isnan(fixed_data[:, t - start_t]),
                                Y[:, t], fixed_data[:, t - start_t])
-
     return np.asarray(Y[:, -T:])
 
 
