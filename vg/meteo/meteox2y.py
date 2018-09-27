@@ -41,8 +41,13 @@ from past.utils import old_div
 from datetime import datetime, timedelta
 import warnings
 import numpy as np
+from timezonefinder import TimezoneFinder
+import pytz
+# from math import sin, cos, radians, degrees, asin, acos
 from vg import times
 from vg import helpers as my
+
+tzf = TimezoneFinder()
 
 
 def sat_vap_p(at):
@@ -878,6 +883,21 @@ def pot_s_rad_daily(date, lat=48.738, longt=9.099, in_format='%Y-%m-%d',
     return np.average(pot_h.reshape(-1, 24), axis=1)
 
 
+def sunshine_pot(doys, lat=48.738, longt=9.099, tz_mer=15.0, wog=-1):
+    """Maximum daily sunshine hours based on evaluating pot_s_rad per minute.
+    """
+    mins_per_day = 24 * 60
+    # doys = doys.astype(float)
+    doys = doys[doys == doys.astype(int)]
+    doys_minutes = doys.repeat(mins_per_day).reshape(-1, mins_per_day)
+    doys_minutes += (np.arange(mins_per_day) / float(mins_per_day))[None, :]
+    doys_minutes = doys_minutes.ravel()
+    smax = pot_s_rad(doys_minutes, lat, longt, tz_mer=tz_mer, wog=wog)
+    smax = smax.reshape(-1, mins_per_day)
+    sun_hours = np.sum(smax > 0, axis=1) / 60.
+    return sun_hours
+
+
 def sunshine(sw, date, lat=48.738, longt=9.099, in_format='%Y-%m-%dT%H:%M',
              tz_mer=15.0, wog=-1):
     """sunshine or not?
@@ -943,10 +963,99 @@ def sonnenscheindauer(date, sw, del_t=60):
     """
 
     sunshine_min = sunshine(sw, date)
- ##   sunshine_sum = np.sum(sunshine_min)
-    sunshine_hour = old_div(sunshine_min,float(del_t))
+    # sunshine_sum = np.sum(sunshine_min)
+    sunshine_hour = sunshine_min / float(del_t)
 
     return sunshine_hour
+
+
+def sunshine_hours(dates, longitude, latitude, tz_offset=0):
+    """Calculates hours from sunrise to sunset.
+
+    Notes
+    -----
+    see:
+    https://en.wikipedia.org/wiki/Sunrise_equation
+    https://michelanders.blogspot.com/2010/12/calulating-sunrise-and-sunset-in-python.html
+
+    Examples
+    --------
+    >>> from datetime import date
+    >>> sunshine_hours([date(2018, 6, 1)], 8.848, 48.943)  # mühlacker
+    array([15.89961046])
+    """
+    J_rise, J_set = sunshine_riseset(dates, longitude, latitude, tz_offset)
+    return J_set - J_rise
+
+
+def max_sunshine_minutes(dates, longitude, latitude, tz_offset=0):
+    hour_of_day = np.array([date.hour for date in dates])
+    sun_rise, sun_set = sunshine_riseset(dates, longitude, latitude,
+                                         tz_offset)
+    minutes = np.zeros_like(dates, dtype=float)
+    minutes[(hour_of_day > sun_rise) &
+            (hour_of_day < sun_set)] = 60
+    # if sunrise happens in the hour_of_day, we have to make minutes
+    # smaller
+    dawn_mask = ((hour_of_day < sun_rise) &
+                 (sun_rise < hour_of_day + 1))
+    minutes[dawn_mask] = 60 * (sun_rise[dawn_mask] -
+                               hour_of_day[dawn_mask])
+    # equivalent for the evening
+    twilight_mask = ((hour_of_day < sun_set) &
+                     (sun_set < hour_of_day + 1))
+    minutes[twilight_mask] = 60 * (hour_of_day[twilight_mask] + 1
+                                   - sun_set[twilight_mask])
+    assert np.all(minutes >= 0)
+    assert np.all(minutes <= 60)
+    return minutes
+
+
+def sunshine_riseset(dates, longitude, latitude, tz_offset=0):
+    """Calculates sunrise and sunset hours."""
+    jdn = times.date2jdn(dates)
+
+    if tz_offset is None:
+        # from tzwhere import tzwhere
+        # import pytz
+        # tzw = tzwhere.tzwhere()
+        # timezone offset
+        # timezone_str = tzw.tzNameAt(latitude, longitude)
+        timezone_str = tzf.timezone_at(lat=float(latitude),
+                                       lng=float(longitude))
+        timezone = pytz.timezone(timezone_str)
+        dts = [datetime(date.year, date.month, date.day)
+               for date in dates]
+        tz_offset = np.array([timezone.utcoffset(dt).total_seconds()
+                              for dt in dts]) / 86400
+
+    n = jdn - 2451545.0008  # current julian day
+    J_star = n - longitude / 360 + tz_offset  # mean solar noon
+    M = (357.5291 + .98560028 * J_star) % 360  # solar mean anomaly
+    M_radians = np.radians(M)
+    # equation of the center
+    C = (1.9148 * np.sin(M_radians)
+         + .02 * np.sin(2 * M_radians)
+         + .0003 * np.sin(3 * M_radians))
+    # ecliptic longitude
+    lambda_radians = np.radians((M + C + 282.9372) % 360)
+    # solar transit
+    J_transit = (2451545.5 + J_star
+                 + .0053 * np.sin(M_radians)
+                 - .0069 * np.sin(2 * lambda_radians))
+    # declination of the sun
+    sin_del = np.sin(lambda_radians) * np.sin(np.radians(23.44))
+    cos_del = np.cos(np.arcsin(sin_del))
+    # hour angle
+    latitude_radians = np.radians(latitude)
+    cos_omega0 = ((np.sin(np.radians(-.83))
+                   - np.sin(latitude_radians) * sin_del)
+                  / (np.cos(latitude_radians) * cos_del))
+    omega0 = np.degrees(np.arccos(cos_omega0)) / 360
+    J_transit = J_transit - J_transit.astype(int)
+    J_rise = 24 * (J_transit - omega0)
+    J_set = 24 * (J_transit + omega0)
+    return J_rise, J_set
 
 
 def blackbody_rad(rad=None, temp=None, eps=1.0):
@@ -1161,8 +1270,11 @@ def slope_sat_p(at):
 
 
 if __name__ == "__main__":
-    doys = times.datetime2doy(times.str2datetime(500 * ["2011-09-28T11:27"]))
-    pot_s_rad(doys)
+    # doys = times.datetime2doy(times.str2datetime(500 * ["2011-09-28T11:27"]))
+    # # pot_s_rad(doys)
+    # sunshine_pot(doys)
+    # from datetime import date
+    # sunshine_riseset(date(2018, 6, 1), 8.848, 48.943)
 
-    # import doctest
-    # doctest.testmod()
+    import doctest
+    doctest.testmod(optionflags=doctest.NORMALIZE_WHITESPACE)
