@@ -114,7 +114,11 @@ def silvermans_rule(x):
 def optimal_kernel_width(x):
     x0 = silvermans_rule(x)
     res = optimize.minimize(sum_log_density, x0, args=(x,),
-                            bounds=([1e-4, None],))
+                            bounds=([1e-2, None],),
+                            method="L-BFGS-B",
+                            # method="TNC",
+                            # method="SLSQP",
+                            )
     if res.success and not np.isclose(res.x, 1e-6):
         return np.squeeze(res.x)
     warnings.warn("Recursing in optimal_kernel_width")
