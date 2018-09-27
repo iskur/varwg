@@ -69,9 +69,9 @@ def sat_vap_p(at):
 
     >>> at = np.array((0.0, 2.5, 5.0, 7.5, 10.0))
     >>> sat_vap_p(at[:3])
-    array([ 6.11      ,  7.31533365,  8.72596589])
+    array([6.11      ,  7.31533365,  8.72596589])
     >>> sat_vap_p(at[3:])
-    array([ 10.3711941 ,  12.28364703])
+    array([10.3711941 ,  12.28364703])
     """
     at = np.array(at)
     e0 = 6.11
@@ -104,7 +104,7 @@ def rel2vap_p(rh, at):
     >>> rh = np.array((0.9, 0.8, 0.7, 0.6, 0.5))
     >>> at = np.array((0.0, 2.5, 5.0, 7.5, 10.0))
     >>> rel2vap_p(rh,at)
-    array([ 5.499     ,  5.85226692,  6.10817613,  6.22271646,  6.14182351])
+    array([5.499     ,  5.85226692,  6.10817613,  6.22271646,  6.14182351])
 
     """
     rh, at = np.array(rh), np.array(at)
@@ -136,7 +136,7 @@ def vap_p2rel(e, at):
     >>> e = np.array((5.5, 5.8, 6.1, 6.2, 6.3))
     >>> at = np.array((0.0, 2.5, 5.0, 7.5, 10.0))
     >>> vap_p2rel(e,at)
-    array([ 0.90016367,  0.79285516,  0.69906301,  0.59780966,  0.512877  ])
+    array([0.90016367, 0.79285516, 0.69906301, 0.59780966, 0.512877  ])
     """
     e, at = np.array(e), np.array(at)
     c_e = sat_vap_p(at)
@@ -173,10 +173,10 @@ def dewpoint(at, rh=None, e=None):
     Examples
     --------
     >>> dewpoint(20.,rh=0.5)
-    9.2696286371249084
+    9.269628637124908
 
     >>> dewpoint(20.,e=10.0)
-    6.9681968406881376
+    6.968196840688138
 
     >>> at = np.array((0.0, 2.5, 5.0, 7.5, 10.0))
     >>> rh = np.array((0.9, 0.8, 0.7, 0.6, 0.5))
@@ -224,7 +224,7 @@ def dew2rel(dew, at):
     >>> at = np.array((0.0, 2.5, 5.0, 7.5, 10.0))
     >>> dew = np.array((0.0, 3., 5.0, 7.7, 10.0))
     >>> dew2rel(at,dew)
-    array([ 1.        ,  0.96506519,  1.        ,  0.98642692,  1.        ])
+    array([1.        ,  0.96506519,  1.        ,  0.98642692,  1.        ])
     """
     dew, at = np.array(dew), np.array(at)
     e = sat_vap_p(dew)
@@ -267,7 +267,7 @@ def norm_pressure(p, at, h=454.0):
     >>> at = np.array((0.0, 2.5, 5.0, 7.5, 10.0))
     >>> p = np.array((925, 930, 935, 932, 931))
     >>> norm_pressure(p,at,h=765)
-    array([ 1016.98077228,  1021.60706988,  1026.24032953,  1022.10690872,
+    array([1016.98077228,  1021.60706988,  1026.24032953,  1022.10690872,
             1020.18583111])
     """
     tk = at + 273.16  # T in Kelvin
@@ -330,7 +330,7 @@ def iziomon(temp, clouds, rh=None, dew=None, e=None, site='low'):
     >>> clouds = np.array((0.0, 0.1, 0.8, 0.5, 1.0))
     >>> e = np.array((5.5, 5.8, 6.1, 6.2, 6.3))
     >>> iziomon(temp,clouds,e=e)
-    array([ 225.34414848,  235.0777488 ,  279.01405432,  267.25348612,
+    array([225.34414848,  235.0777488 ,  279.01405432,  267.25348612,
             321.15448959])
     """
     # iziomon-parameter lowland site:
@@ -432,7 +432,7 @@ def lw2clouds(lw, temp, rh=None, dew=None, e=None, site='low'):
     >>> temp = np.array((0.0, 2.5, 5.0, 7.5, 10.0))
     >>> e = np.array((5.5, 5.8, 6.1, 6.2, 6.5))
     >>> lw2clouds(lw,temp,e=e)
-    array([ 0.0555659 ,  0.1020956 ,  0.79983929,  0.49550839,  0.99289638])
+    array([0.0555659 ,  0.1020956 ,  0.79983929,  0.49550839,  0.99289638])
     """
     lw, temp = np.atleast_1d(lw, temp)
     # iziomon-parameter lowland site:
@@ -530,19 +530,19 @@ def haude(svp, vp, mon):
     Examples
     --------
     >>> haude(12.28,8.83,5)
-    1.0004999999999999
+    1.0005
 
     >>> haude(12.28,8.83,12)
-    0.75900000000000001
+    0.759
 
-    >>> svp = np.array([ 11.87809345,  12.28364703,  12.70132647])
-    >>> vp = np.array([ 8.55222728,  8.84422586,  9.14495506])
+    >>> svp = np.array([11.87809345,  12.28364703,  12.70132647])
+    >>> vp = np.array([8.55222728,  8.84422586,  9.14495506])
     >>> haude(svp,vp,12)
-    array([ 0.73169056,  0.75667266,  0.78240171])
+    array([0.73169056,  0.75667266,  0.78240171])
 
     >>> mon = np.array([2,3,4])
     >>> haude(svp,vp,mon)
-    array([ 0.73169056,  0.75667266,  1.03134771])
+    array([0.73169056,  0.75667266,  1.03134771])
     """
     mon = mon - 1
     hfs = (0.0022, 0.0022, 0.0022, 0.0029, 0.0029, 0.0028, 0.0026, 0.0029,
@@ -815,13 +815,13 @@ def pot_s_rad(date, lat=48.738, longt=9.099, in_format='%Y-%m-%dT%H:%M',
     --------
     >>> date_str = np.array(["2011-09-28T11:27"])
     >>> pot_s_rad(date_str)
-    array([ 855.35624182])
+    array([855.35624182])
     >>> from vg import times
     >>> dt = times.str2datetime(date_str, "%Y-%m-%dT%H:%M")
     >>> pot_s_rad(dt)
-    array([ 855.35624182])
+    array([855.35624182])
     >>> pot_s_rad(times.datetime2doy(dt))
-    array([ 855.35624182])
+    array([855.35624182])
     """
     s0 = 1373  # Solarkonstante W/m^2
     # once upon a time there was a latitude
@@ -1110,11 +1110,11 @@ def psychro2e(t_dry, t_wet, p=None):
     Examples
     --------
     >>> psychro2e(np.array([17.5,18.9]),np.array([12.3,12.1]))
-    array([ 10.82619823,   9.56701424])
+    array([10.82619823,   9.56701424])
 
     >>> p = np.array([800,800])
     >>> psychro2e(np.array([17.5,18.9]),np.array([12.3,12.1]),p=p)
-    array([ 11.57630294,  10.54309631])
+    array([11.57630294,  10.54309631])
     """
     p = np.array(p)
     if p.any():
