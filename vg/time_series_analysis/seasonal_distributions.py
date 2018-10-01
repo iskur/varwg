@@ -107,22 +107,45 @@ class SeasonalDist(seasonal.Seasonal):
         # copy (!) the fixed_values into params
         params = {key: val for key, val in
                   list(self.fixed_values_dict(doys).items())}
-        if doys is not None:
-            doys = np.copy(doys) * 2 * np.pi / 365
+        if doys is None:
+            _T = None
+        else:
+            _T = np.copy(doys) * 2 * np.pi / 365
         params.update(
             {param_name: values for param_name, values
              in zip(self.non_fixed_names,
-                    self.trig2pars(trig_pars, _T=doys))})
+                    self.trig2pars(trig_pars, _T=_T))})
+
         if self.supplements is not None:
             params.update({param_name: values for param_name, values
                            in self.all_supplements_dict(doys).items()})
+
+        # fft_approx can produce values outside of valid parameter
+        # values.
+        par_names_ordered = self.dist.parameter_names
+        T = len(params[par_names_ordered[0]])
+        invalid_mask = np.zeros(T, dtype=bool)
+        for t in range(T):
+            param_args = [np.atleast_1d(params[name])[t]
+                          for name in par_names_ordered]
+            invalid_mask[t] = not self.dist._constraints(1, *param_args)
+        # interpolate over invalid values
+        if np.any(invalid_mask):
+            for name in self.non_fixed_names:
+                par = params[name]
+                par[invalid_mask] = np.nan
+                half = T // 2
+                par_pad = np.concatenate((par[-half:], par, par[:half]))
+                params[name] = my.interp_nan(par_pad)[half:-half]
         return params
 
     def all_supplements_dict(self, doys=None):
         """Dictionary of all supplements assembled by doy distance."""
-        if doys is not None:
-            doys = np.copy(doys) * 2 * np.pi / 365
-        else:
+        # if doys is not None:
+        #     doys = np.copy(doys) * 2 * np.pi / 365
+        # else:
+        #     doys = self.doys
+        if doys is None:
             doys = self.doys
         doys_ii = self.doys2doys_ii(doys)
         supplement_names = self.dist.supplements_names
