@@ -29,8 +29,9 @@ def array_gen(scalar):
 
 class SeasonalKDE(seasonal.Seasonal):
 
-    def __init__(self, data, datetimes, solution=None, doy_width=15, nx=1e3,
-                 fixed_pars=None, verbose=True, freibord=0, kill_leap=False):
+    def __init__(self, data, datetimes, solution=None, doy_width=15,
+               nx=1e3, fixed_pars=None, verbose=True, freibord=0,
+               smooth_len=None, kill_leap=False):
         """
         nx is the number of data points used to estimate the quantiles.
         lower- and upper bound must be functions that accept a doy. If None
@@ -54,13 +55,15 @@ class SeasonalKDE(seasonal.Seasonal):
             returns lower and upper bounds.
         verbose : boolean
         """
-        # super(SeasonalKDE, self).__init__(data, datetimes, kill_leap)
         seasonal.Seasonal.__init__(self, data, datetimes, kill_leap)
         self.doy_width = doy_width
         self.nx = int(nx)
         self.verbose = verbose
         self.freibord = freibord
-        self.smooth_len = int(self.doy_width / self.timestep)
+        if smooth_len is None:
+            self.smooth_len = 3 * self.doy_width
+        else:
+            self.smooth_len = smooth_len
 
         # those will be populated by cached properties
         self._doy_mask = self._doy_mask_dict = self._kernel_widths = None
