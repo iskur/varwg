@@ -36,10 +36,9 @@ class SeasonalDist(seasonal.Seasonal):
         # super(SeasonalDist, self).__init__(x, datetimes, kill_leap=kill_leap)
         seasonal.Seasonal.__init__(self, x, datetimes, kill_leap=kill_leap)
         self.verbose = verbose
-        # check if this is a generalized truncated distribution
-        try:
+        if isinstance(distribution, collections.Iterable):
             self.dist = distribution[0](distribution[1], **kwds)
-        except TypeError:
+        else:
             self.dist = distribution
         self.fixed_pars = {} if fixed_pars is None else fixed_pars
         if not hasattr(self.dist, "parameter_names"):
@@ -47,7 +46,7 @@ class SeasonalDist(seasonal.Seasonal):
             self.dist.parameter_names = ["loc", "scale"]
             if self.dist.shapes is not None:
                 self.dist.parameter_names += self.dist.shapes.split(",")
-            self.dist.__bases__ = distributions.MyDist
+            self.dist.__bases__ = distributions.Dist
             self.dist.scipy_ = True
         if par_ntrig is None:
             self.par_ntrig = [3] * len(self.dist.parameter_names)
@@ -187,14 +186,22 @@ class SeasonalDist(seasonal.Seasonal):
     def monthly_params(self):
         """These are the distribution parameters per month. Returns a
         12xn_distribution_parameters array."""
-        return np.array([self.dist.fit(
-            sub_x,
-            **dict((par_name,
-                    np.average(func(self.doys[times.time_part(self.datetimes,
-                                                              self.time_form)
-                                              == month])))
-                   for par_name, func in list(self.fixed_pars.items())))
-            for month, sub_x in zip(*self.monthly_grouped)])
+        pars = []
+        for month, sub_x in zip(*self.monthly_grouped):
+            doys = self.doys[times.time_part(self.datetimes,
+                                             self.time_form) == month]
+            fixed = {par_name: np.average(func(doys))
+                     for par_name, func in self.fixed_pars.items()}
+            fitted_pars = self.dist.fit(sub_x, **fixed)
+
+            if self.dist.supplements_names is not None:
+                # remove supplements from pars_month
+                fitted_pars = [par for name, par in
+                               zip(self.dist.parameter_names,
+                                   fitted_pars)
+                               if name not in self.dist.supplements_names]
+            pars += [fitted_pars]
+        return np.array(pars)
 
     @property
     def monthly_supplements(self):
@@ -274,7 +281,7 @@ class SeasonalDist(seasonal.Seasonal):
         according functions of the underlying distribution."""
         params = self.all_parameters_dict(trig_pars, doys)
         params.update(kwds)
-        x = self.data if x is None else x
+        x = np.atleast_1d(self.data if x is None else x)
         if broadcast:
             xx = x[np.newaxis, :]
             params = dict((par_name, val[:, np.newaxis])
@@ -415,7 +422,7 @@ class SeasonalDist(seasonal.Seasonal):
         chi_test = np.sum(old_div((observed - expected) ** 2, expected))
         # degrees of freedom:
         dof = k - n_parameters - 1
-        return stats.chisqprob(chi_test, dof)
+        return stats.chi2.sf(chi_test, dof)
 
     def scatter_cdf(self, trig_pars=None, figsize=None, title=None, *args,
                     **kwds):
@@ -579,9 +586,20 @@ class SeasonalDist(seasonal.Seasonal):
             if self.dist.scipy_:
                 density = self.dist.pdf(class_middles, *monthly_params[ii])
             else:
-                monthly_dict = dict((par_name, pars) for par_name, pars in
-                                    zip(self.dist.parameter_names,
+                parameter_names = self.dist.parameter_names
+                if self.dist.supplements_names is not None:
+                    parameter_names = [name
+                                       for name in parameter_names
+                                       if name not in
+                                       self.dist.supplements_names]
+                monthly_dict = dict((par_name, pars)
+                                    for par_name, pars in
+                                    zip(parameter_names,
                                         monthly_params[ii]))
+                monthly_dict.update(monthly_fixed[ii])
+                if self.dist.supplements_names is not None:
+                    f_thresh = monthly_dict["f_thresh"]
+                    monthly_dict["kernel_data"] = values[values >= f_thresh]
                 density = self.dist.pdf(class_middles, **monthly_dict)
             ax1.plot(class_middles, density, 'r--')
 
@@ -668,7 +686,7 @@ class SlidingDist(SeasonalDist):
 
     def doys2doys_ii(self, doys):
         """Doys indices from doy values."""
-        # doys_ii = np.where(my.isclose(self.doys_unique, doys[:, None]))[1]
+        doys = np.atleast_1d(doys)
         # use the parameters of 28. feb for 29.feb
         year_end_ii = np.where(np.diff(doys) < 0)[0] + 1
         year_end_ii = np.concatenate(([0], year_end_ii, [len(doys)]))
@@ -687,8 +705,10 @@ class SlidingDist(SeasonalDist):
     @property
     def sliding_pars(self):
         if self._sliding_pars is None:
-            n_pars = (self.dist.n_pars -
-                      len(list(self.dist._clean_kwds(self.fixed_pars).keys())))
+            n_fixed_pars = len(list(self.dist
+                                    ._clean_kwds(self.fixed_pars)
+                                    .keys()))
+            n_pars = (self.dist.n_pars - n_fixed_pars)
             self._sliding_pars = np.ones((self.n_doys, n_pars))
             if self.dist.supplements_names:
                 # we need to save supplements also (needed for method
@@ -711,10 +731,13 @@ class SlidingDist(SeasonalDist):
                     x0 = (self._sliding_pars[doy_ii - 1]
                           if doy_ii > 0
                           else self.dist.fit(data, **fixed))
-                    # result = self.dist.fit(data, weights=weights, x0=x0,
-                    #                        method='Powell', **fixed)
                     result = self.dist.fit_ml(data, weights=weights, x0=x0,
                                               method='Powell', **fixed)
+                    if result.success and not np.any(np.isnan(result.x)):
+                        self._sliding_pars[doy_ii] = result.x
+                    else:
+                        x0 = self.dist.fit(data, **fixed)
+                        self._sliding_pars[doy_ii] = x0
                     self._sliding_pars[doy_ii] = \
                         result.x if result.success else [np.nan] * len(x0)
                     if result.supplements:
