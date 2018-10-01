@@ -1950,30 +1950,17 @@ class RainMix(_KDE, _Rain):
         self.dist = distribution
         self.thresh = threshold
         self.q_thresh = q_threshold
-        self.f_thresh = None  # see _gen_sample_data
 
+        # this enables testing
         sample_data = self._gen_sample_data()
         self.sample_data = sample_data
-        rain_mask = sample_data >= threshold
-        kde_mask = sample_data >= self.f_thresh
-        par_mask = rain_mask & ~kde_mask
-        # sample_data[~rain_mask] = 0
-        rain_prob = np.mean(rain_mask)
-        kernel_width = self.fit_kde(np.log(sample_data[kde_mask]))
-        dist_params = distribution.fit(sample_data[par_mask] - self.thresh)
-        # dist_params = distribution.fit(sample_data)
-        # dist_params = distribution.fit(sample_data[par_mask])
-        self.parameter_names = tuple(["rain_prob", "kernel_width",
-                                      "kernel_data"
-                                      ] +
-                                     list(distribution.parameter_names))
+        self._feasible_start = self.fit(sample_data)
+        # parameter_names exists because of the DistMeta class
+        self.parameter_names = (self.parameter_names +
+                                distribution.parameter_names)
         # n_pars is set in class construction time with the Dist metaclass
         self.n_pars += self.dist.n_pars
-        self._feasible_start = ((rain_prob, kernel_width,
-                                 sample_data[kde_mask])
-                                + tuple(dist_params))
         self.name = "rainmix " + distribution.name
-        self.x = sample_data
 
     def _gen_sample_data(self):
         # the following solves problems that arise during testing
@@ -1984,26 +1971,41 @@ class RainMix(_KDE, _Rain):
         sample_data = self.dist.ppf(sample_quantiles,
                                     *self.dist._feasible_start)
         rain_mask = sample_data > self.thresh
-        self.f_thresh = np.percentile(sample_data,
-                                      100 * self.q_thresh)
-        kde_mask = sample_data >= self.f_thresh
+        f_thresh = np.percentile(sample_data, 100 * self.q_thresh)
+        kde_mask = sample_data >= f_thresh
         sample_data[kde_mask] *= 1.25
         sample_data[~rain_mask] = 0
         return sample_data
 
-    def _pdf(self, x, rain_prob, kernel_width, kernel_data, *args, **kwds):
-        x, rain_prob, kernel_width = np.atleast_1d(x, rain_prob,
-                                                   kernel_width)
+    def _pdf(self, x, rain_prob, kernel_width, kernel_data, f_thresh,
+             *args, **kwds):
+        x, rain_prob, kernel_width, f_thresh = np.atleast_1d(x,
+                                                             rain_prob,
+                                                             kernel_width,
+                                                             f_thresh)
         if len(rain_prob) == 1:
             rain_prob = np.broadcast_to(rain_prob, x.shape)
         if len(kernel_width) == 1:
             kernel_width = np.broadcast_to(kernel_width, x.shape)
         if len(kernel_data) != len(x):
+            # # this means we have to broadcast everything to 2d
+            # kernel_data = [np.broadcast_to(dat, (x.size, len(dat)))
+            #                for dat in kernel_data]
+            # shape2d = len(kernel_data), x.size
+            # broadcast = partial(np.broadcast_to, shape=shape2d)
+            # (x, rain_prob,
+            #  kernel_width, f_thresh) = map(broadcast,
+            #                                (x, rain_prob,
+            #                                 kernel_width, f_thresh))
+            # kernel_data = np.broadcast_to(kernel_data,
+            #                               (len(x), len(kernel_data)))
             kernel_data = np.broadcast_to(kernel_data,
-                                          (len(x), len(kernel_data)))
+                                          (x.size, kernel_data.size))
+        if len(f_thresh) == 1:
+            f_thresh = np.broadcast_to(f_thresh, x.shape)
         rain_mask = x >= self.thresh
-        par_mask = (x <= self.f_thresh) & rain_mask
-        kde_mask = x > self.f_thresh
+        par_mask = (x < f_thresh) & rain_mask
+        kde_mask = x >= f_thresh
         # the following tries to catch broadcast ambiguities, but might not
         # be the most parsimonious formulation in terms of memory
         dens = np.empty_like(rain_prob + rain_mask)
@@ -2018,7 +2020,7 @@ class RainMix(_KDE, _Rain):
             p0 = 1 - rain_prob[par_mask]
             p1 = self.q_thresh
             Fx0 = self.dist.cdf(self.thresh, *args, **kwds_rain)
-            Fx1 = self.dist.cdf(self.f_thresh, *args, **kwds_rain)
+            Fx1 = self.dist.cdf(f_thresh[par_mask], *args, **kwds_rain)
             dens_par_raw = self.dist.pdf(x_par, *args, **kwds_rain)
             dens_par = (p0 - p1) * dens_par_raw / (Fx0 - Fx1)
             if dens.shape == par_mask.shape:
@@ -2037,9 +2039,12 @@ class RainMix(_KDE, _Rain):
 
         return dens
 
-    def _cdf(self, x, rain_prob, kernel_width, kernel_data, *args, **kwds):
-        x, rain_prob, kernel_width = np.atleast_1d(x, rain_prob,
-                                                   kernel_width)
+    def _cdf(self, x, rain_prob, kernel_width, kernel_data, f_thresh,
+             *args, **kwds):
+        x, rain_prob, kernel_width, f_thresh = np.atleast_1d(x,
+                                                             rain_prob,
+                                                             kernel_width,
+                                                             f_thresh)
         if len(rain_prob) == 1:
             rain_prob = np.broadcast_to(rain_prob, x.shape)
         if len(kernel_width) == 1:
@@ -2047,41 +2052,61 @@ class RainMix(_KDE, _Rain):
         if len(kernel_data) != len(x):
             kernel_data = np.broadcast_to(kernel_data,
                                           (len(x), len(kernel_data)))
+        if len(f_thresh) == 1:
+            f_thresh = np.broadcast_to(f_thresh, x.shape)
+
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", category=RuntimeWarning)
             rain_mask = x >= self.thresh
-            kde_mask = x > self.f_thresh
+            kde_mask = x >= f_thresh
             par_mask = ~kde_mask & rain_mask
-        qq = np.zeros_like(x, dtype=float)
+        # fill with middle quantile of non-rain
+        # qq = np.full_like(x, (1 - rain_prob) / 2., dtype=float)
+        # qq = np.zeros_like(x, dtype=float)
+        qq = (1 - rain_prob) * np.random.random_sample(x.size)
 
         # parametric part
         if np.any(par_mask):
-            x_par = x[par_mask]
-            # subtracting self.thresh from x has the unwanted side-effect of
-            # shifting x to possibly out-of-bound values. so this should not be
-            # done with values where ~rain_mask.
-            # as we mask x, we also have to mask the parameters given in **kwds
-            kwds_rain = self._mask_kwds(par_mask, kwds)
+            x_par = x[par_mask]  # - self.thresh
+            # subtracting self.thresh from x has the unwanted
+            # side-effect of shifting x to possibly out-of-bound
+            # values. so this should not be done with values where
+            # ~rain_mask. as we mask x, we also have to mask the
+            # parameters given in **kwds
+            kwds_par = self._mask_kwds(par_mask, kwds)
             p0 = (1 - rain_prob)[par_mask]
             p1 = self.q_thresh
-            Fx0 = self.dist.cdf(self.thresh, *args, **kwds_rain)
-            Fx1 = self.dist.cdf(self.f_thresh, *args, **kwds_rain)
-            q_par = self.dist.cdf(x_par, *args, **kwds_rain)
+            Fx0 = self.dist.cdf(self.thresh, *args, **kwds_par)
+            Fx1 = self.dist.cdf(f_thresh[par_mask], *args, **kwds_par)
+            q_par = self.dist.cdf(x_par, *args, **kwds_par)
             q_par = p0 + (p1 - p0) * (q_par - Fx0) / (Fx1 - Fx0)
+            # fig, ax = plt.subplots(nrows=1, ncols=1)
+            # ax.plot(q_par)
+            # ax.plot(p0)
+            # ax.axhline(p1)
+            # fig, ax = plt.subplots(nrows=1, ncols=1)
+            # ax.hist(q_par)
+            # plt.show()
+            # import ipdb; ipdb.set_trace()
             qq[par_mask] = q_par
 
         # non-parametric (KDE) part
         if np.any(kde_mask):
+            assert np.all(kernel_width[kde_mask] > 0)
             q_kde = self._kde_cdf(x[kde_mask],
                                   kernel_width[kde_mask],
-                                  kernel_data[kde_mask])
+                                  kernel_data[kde_mask],
+                                  f_thresh[kde_mask])
             qq[kde_mask] = q_kde
 
         return qq
 
-    def _ppf(self, qq, rain_prob, kernel_width, kernel_data, *args, **kwds):
-        qq, rain_prob, kernel_width = np.atleast_1d(qq, rain_prob,
-                                                    kernel_width)
+    def _ppf(self, qq, rain_prob, kernel_width, kernel_data, f_thresh,
+             *args, **kwds):
+        qq, rain_prob, kernel_width, f_thresh = np.atleast_1d(qq,
+                                                              rain_prob,
+                                                              kernel_width,
+                                                              f_thresh)
         if len(rain_prob) == 1:
             rain_prob = np.broadcast_to(rain_prob, qq.shape)
         if len(kernel_width) == 1:
@@ -2089,6 +2114,9 @@ class RainMix(_KDE, _Rain):
         if len(kernel_data) != len(qq):
             kernel_data = np.broadcast_to(kernel_data,
                                           (len(qq), len(kernel_data)))
+        if len(f_thresh) == 1:
+            f_thresh = np.broadcast_to(f_thresh, qq.shape)
+
         # we want to have zero rain where probability of rain is lower than
         # rain_prob
         x = np.zeros_like(qq, dtype=float)
@@ -2100,31 +2128,34 @@ class RainMix(_KDE, _Rain):
 
         # parametric part
         if np.any(par_mask):
-            kwds_rain = self._mask_kwds(par_mask, kwds)
+            kwds_par = self._mask_kwds(par_mask, kwds)
             q_par = qq[par_mask]
             p0 = 1 - rain_prob[par_mask]
             p1 = self.q_thresh
-            Fx0 = self.dist.cdf(self.thresh, *args, **kwds_rain)
-            Fx1 = self.dist.cdf(self.f_thresh, *args, **kwds_rain)
+            Fx0 = self.dist.cdf(self.thresh, *args, **kwds_par)
+            Fx1 = self.dist.cdf(f_thresh[par_mask], *args, **kwds_par)
             q_par = ((q_par - p0) * (Fx1 - Fx0)) / (p1 - p0)
             q_par += Fx0
-            x_par = self.dist.ppf(q_par, *args, **kwds_rain)
-            x[par_mask] = x_par
+            x_par = self.dist.ppf(q_par, *args, **kwds_par)
+            x[par_mask] = x_par  # + self.thresh
 
         # non-parametric (KDE) part
         if np.any(kde_mask):
             x_kde = self._kde_ppf(qq[kde_mask],
                                   kernel_width[kde_mask],
-                                  kernel_data[kde_mask])
+                                  kernel_data[kde_mask],
+                                  f_thresh[kde_mask])
             x[kde_mask] = x_kde
 
         return x
 
-    def _kde_integral(self, kernel_width, kernel_data):
-        x_eval_log = np.log(np.linspace(self.f_thresh,
-                                        self.x.max() +
-                                        10 * np.max(kernel_width),
-                                        500))
+    def _kde_integral(self, kernel_width, kernel_data, f_thresh):
+        lower_eval = max(1e-9,
+                         f_thresh - 10 * kernel_width)
+        upper_eval = (2 * kernel_data.max()
+                      + 10 * kernel_width)
+        x_eval_log = np.log(np.linspace(lower_eval, upper_eval, 500))
+        assert np.all(np.isfinite(x_eval_log))
         dens_kde_eval = kde.kernel_density(
             kernel_width, np.log(kernel_data), eval_points=x_eval_log)
 
@@ -2134,57 +2165,62 @@ class RainMix(_KDE, _Rain):
         # fill only the quantile range [q_thresh, 1]
         q_kde_eval = self.q_thresh + (1. - self.q_thresh) * q_kde_eval
         q_kde_eval = np.concatenate((q_kde_eval, [1.]))
-        x_eval_log = np.concatenate(([np.log(self.f_thresh)],
-                                     x_eval_log))
+        x_eval_log = np.concatenate((x_eval_log,
+                                     [np.log(upper_eval * 100)]))
+        # x_eval_log = np.concatenate(([np.log(f_thresh)],
+        #                              x_eval_log))
         return q_kde_eval, x_eval_log
 
-    def _kde_cdf(self, x, kernel_width, kernel_data):
+    def _kde_cdf(self, x, kernel_width, kernel_data, f_thresh):
         x, kernel_width = np.atleast_1d(x, kernel_width)
-        if x.max() > self.x.max():
-            self.x = np.concatenate((self.x, [1.5 * x.max()]))
+        # if x.max() > self.x.max():
+        #     self.x = np.concatenate((self.x, [1.5 * x.max()]))
         qq_kde = np.empty_like(x)
         for i in range(len(x)):
             q_kde_eval, x_eval_log = self._kde_integral(kernel_width[i],
-                                                        kernel_data[i])
+                                                        kernel_data[i],
+                                                        f_thresh[i])
             q_kde_interp = interpolate.interp1d(np.exp(x_eval_log),
                                                 q_kde_eval, kind="linear",
-                                                assume_sorted=True)
+                                                assume_sorted=True,
+                                                # bounds_error=False,
+                                                # fill_value=(f_thresh[i],
+                                                #             x.max())
+                                                )
             qq_kde[i] = q_kde_interp(x[i])
         return qq_kde
 
-    def _kde_ppf(self, q, kernel_width, kernel_data):
-        q, kernel_width = np.atleast_1d(q, kernel_width)
-        xx_kde = np.empty_like(q)
-        for i in range(len(q)):
+    def _kde_ppf(self, qq, kernel_width, kernel_data, f_thresh):
+        qq, kernel_width = np.atleast_1d(qq, kernel_width)
+        xx_kde = np.empty_like(qq)
+        for i in range(len(qq)):
             q_kde_eval, x_eval_log = self._kde_integral(kernel_width[i],
-                                                        kernel_data[i])
+                                                        kernel_data[i],
+                                                        f_thresh[i])
             x_kde_interp = interpolate.interp1d(q_kde_eval,
                                                 np.exp(x_eval_log),
                                                 kind="linear",
                                                 assume_sorted=True)
-            xx_kde[i] = x_kde_interp(q[i])
+            xx_kde[i] = x_kde_interp(qq[i])
         return xx_kde
 
     def _fit(self, x, x0=None, *args, **kwds):
-        self.x = x
         rain_mask = x >= self.thresh
-        self.f_thresh = np.percentile(x, 100 * self.q_thresh)
-        kde_mask = x >= self.f_thresh
+        f_thresh = np.percentile(x, 100 * self.q_thresh)
+        kde_mask = x >= f_thresh
         rain_prob = np.mean(rain_mask)
-        par_mask = rain_mask & ~kde_mask
-        par_kwds = self._mask_kwds(par_mask, kwds)
-        # ml_result = self.dist.fit_ml(x[par_mask] - self.thresh, **par_kwds)
-        # par_solution = ml_result.x
-        # self.success = ml_result.success
-        par_solution = self.dist.fit(x[par_mask] - self.thresh, **par_kwds)
+        rain_kwds = self._mask_kwds(rain_mask, kwds)
+        par_solution = self.dist.fit(x[rain_mask],   # - self.thresh,
+                                     **rain_kwds)
         self.success = True     # haha!
         kernel_data = x[kde_mask]
         if len(kernel_data) > 0:
             kernel_width = self.fit_kde(np.log(kernel_data))
         else:
-            # kernel_width = 1.
             kernel_width = np.nan
-        return (rain_prob, kernel_width, kernel_data) + tuple(par_solution)
+        assert kernel_width > 0
+        return ((rain_prob, kernel_width, kernel_data, f_thresh)
+                + tuple(par_solution))
 
     def fit_ml(self, x, x0=None, *args, **kwds):
         params = self._fit(x, x0, *args, **kwds)
@@ -2197,6 +2233,21 @@ class RainMix(_KDE, _Rain):
                            supplements=supplements,
                            success=self.success)
 
+    def _constraints(self, x, rain_prob, kernel_width, kernel_data,
+                     f_thresh, *args):
+        (x,
+         rain_prob,
+         kernel_width,
+         kernel_data,
+         f_thresh) = map(np.asarray, (x, rain_prob, kernel_width,
+                                      kernel_data, f_thresh))
+        if np.any(not (0 < rain_prob < 1)):
+            return False
+        if np.any(kernel_width <= 0):
+            return False
+        if np.any(f_thresh <= 0):
+            return False
+        return True
 
 rainmix_expon = RainMix(expon)
 # rainmix_weibull = RainMix(weibull)
@@ -2219,7 +2270,7 @@ class Rain(_Rain):
         x, rain_prob = np.atleast_1d(x, rain_prob)
         rain_mask = x >= self.thresh
         if len(rain_prob) == 1:
-            rain_prob = np.full_like(x, rain_prob)
+            rain_prob = np.broadcast_to(rain_prob, x.shape)
         # the following tries to catch broadcast ambiguities, but might not
         # be the most parsimonious formulation in terms of memory
         dens = np.empty_like(rain_prob + rain_mask, dtype=float)
