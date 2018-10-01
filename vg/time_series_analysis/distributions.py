@@ -1392,7 +1392,7 @@ class Weibull(Dist):
         return 1 - np.exp(-alpha * x**beta)
 
     def _ppf(self, qq, alpha, beta):
-        return (old_div(-np.log(1 - qq), alpha))**(old_div(1, beta))
+        return (-np.log(1 - qq) / alpha)**(1. / beta)
 
     def _fit(self, values, beta_start=10, *args, **kwds):
         """Implements a semi-analytical method of moments. beta is found by
@@ -2341,7 +2341,7 @@ rain_weibull = Rain(weibull, threshold=.002)
 if __name__ == "__main__":
     import vg
     from vg import vg_base, vg_plotting
-    from vg import config_konstanz_disag as conf
+    import config_konstanz_disag as conf
     vg.conf = vg_base.conf = vg_plotting.conf = conf
     # times_hourly, met = vg.read_met(vg.conf.met_file)
     # rain, times = vg.my.sumup(met["R"], 24, times_hourly)
@@ -2356,8 +2356,9 @@ if __name__ == "__main__":
     # rain_dist.plot_monthly_params()
     rain_dist.plot_fourier_fit()
     rain_dist.plot_monthly_fit(solution,
-                               dists_alt=(Rain(gamma, threshold=.015),
-                                          expon))
+                               # dists_alt=(Rain(gamma, threshold=.015),
+                               #            expon)
+                               )
     quantiles = rain_dist.cdf(solution)
     my.hist(quantiles, 20)
     my.hist(met_vg.data_trans[0], 20, dist=norm)
