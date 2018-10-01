@@ -32,55 +32,58 @@ standard_library.install_aliases()
 try:
     from vg.time_series_analysis import owens
 except ImportError:
-    import urllib.request, urllib.error, urllib.parse
-    import socket
-    socket.setdefaulttimeout(10)
-    warn = False
-    url = "http://people.sc.fsu.edu/~jburkardt/f_src/owens/owens.f90"
-    try:
-        src_dir = os.path.dirname(__file__)
-    except NameError:
-        src_dir = os.path.abspath(".")
-    # if os.path.exists(os.path.join(src_dir, "owens.f90")):
-    #     warn = True
-    if not warn:
-        with my.chdir(src_dir):
-            with open("owens.f90", "w") as owens_file:
+    if sys.platform != "win32":
+        import urllib.request, urllib.error, urllib.parse
+        import socket
+        socket.setdefaulttimeout(10)
+        warn = False
+        url = "http://people.sc.fsu.edu/~jburkardt/f_src/owens/owens.f90"
+        try:
+            src_dir = os.path.dirname(__file__)
+        except NameError:
+            src_dir = os.path.abspath(".")
+        # if os.path.exists(os.path.join(src_dir, "owens.f90")):
+        #     warn = True
+        if not warn:
+            with my.chdir(src_dir):
+                with open("owens.f90", "w") as owens_file:
+                    try:
+                        content_full = (urllib.request
+                                        .urlopen(url)
+                                        .read()
+                                        .decode("utf-8"))
+                        # under python 3: "character ( len = 9 )" causes
+                        # f2py to fail, so we cut out the subroutine
+                        # timestep, which is not needed for owens-t
+                        content = []
+                        keep_line = True
+                        for line in content_full.split("\n"):
+                            if line.startswith("subroutine timestamp"):
+                                keep_line = False
+                            if keep_line:
+                                content += [line]
+                            if not keep_line and line == "end":
+                                keep_line = True
+                        content = os.linesep.join(content)
+                        owens_file.write(content + os.linesep)
+                    except urllib.error.URLError:
+                        warn = True
                 try:
-                    content_full = (urllib.request
-                                    .urlopen(url)
-                                    .read()
-                                    .decode("utf-8"))
-                    # under python 3: "character ( len = 9 )" causes
-                    # f2py to fail, so we cut out the subroutine
-                    # timestep, which is not needed for owens-t
-                    content = []
-                    keep_line = True
-                    for line in content_full.split("\n"):
-                        if line.startswith("subroutine timestamp"):
-                            keep_line = False
-                        if keep_line:
-                            content += [line]
-                        if not keep_line and line == "end":
-                            keep_line = True
-                    content = os.linesep.join(content)
-                    owens_file.write(content + os.linesep)
-                except urllib.error.URLError:
+                    subprocess.call("f2py -L$PREFIX$/lib -c -m owens owens.f90",
+                                    shell=True)
+                    from vg.time_series_analysis import owens
+                    warn = False
+                except:
                     warn = True
-            try:
-                subprocess.call("f2py -c -m owens owens.f90",
-                                shell=True)
-                from vg.time_series_analysis import owens
-                warn = False
-            except:
-                warn = True
-    if warn:
-        warnings.warn("""Could not import owens t function.
-            Try (if on linux):
-            wget {url}
-            f2py -c -m owens owens.f90
-            cp owens.so {src_dir}/
-            """.format(url=url, src_dir=src_dir))
+        if warn:
+            warnings.warn("""Could not import owens t function.
+                Try (if on linux):
+                wget {url}
+                f2py -c -m owens owens.f90
+                cp owens.so {src_dir}/
+                """.format(url=url, src_dir=src_dir))
+            owens = False
+    else:
         owens = False
 if owens:
     owens_t = np.vectorize(lambda h, a: owens.t(h, a))
