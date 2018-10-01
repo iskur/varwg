@@ -1068,7 +1068,9 @@ class VGPlotting(vg_base.VGBase):
         return figs
 
     def plot_daily_cycles(self, var_names=None, rain_thresh=None, **fig_kw):
-        """Climbing Mt. Allon.
+        """Plot cycle of hourly means over the year.
+
+        Climbing Mt. Allon.
 
         Parameter
         ---------
