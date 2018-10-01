@@ -1,14 +1,16 @@
 from __future__ import division, print_function
 
 import os
-import warnings
+import sys
 import subprocess
+import warnings
 from abc import ABCMeta, abstractmethod
 from builtins import map, object, range, zip
 from collections import namedtuple
+from contextlib import suppress
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import scipy.optimize as sp_optimize
 from future import standard_library
 from future.backports import urllib
@@ -102,8 +104,8 @@ stdtrit = np.vectorize(lambda df, qq: special.stdtrit(df, qq))
 
 
 def max_likelihood(density_func, x0, values=None, opt_func=None,
-                   disp=False, weights=None, method="BFGS", *args,
-                   **kwds):
+                 disp=False, weights=None, method="BFGS",
+                 bounds=None, *args, **kwds):
     """Fits parameters of a density function to data, using the log-maximum-
     likelihood approach."""
     if opt_func is None:
@@ -111,9 +113,9 @@ def max_likelihood(density_func, x0, values=None, opt_func=None,
         opt_func = optimize.minimize
     if weights is None and values is not None:
         weights = np.ones_like(values)
-    # i hereby define the unlikelihood function as the negative log-likelihood
-    # function, so that i can maximize the likelihood by minimizing the
-    # unlikelihood
+    # i hereby define the unlikelihood function as the negative
+    # log-likelihood function, so that i can maximize the likelihood
+    # by minimizing the unlikelihood
     if values is None:
         args = ()
 
@@ -123,11 +125,12 @@ def max_likelihood(density_func, x0, values=None, opt_func=None,
         args = values,
 
         def unlikelihood(params, values):
-            # we have to express fixed values in terms of kwds, because there
-            # could be collisions otherwise...
+            # we have to express fixed values in terms of kwds,
+            # because there could be collisions otherwise...
 
-            # first come, first serve: interpret the first n elements of params
-            # as the first n variables in dist.parameter_names
+            # first come, first serve: interpret the first n elements
+            # of params as the first n variables in
+            # dist.parameter_names
             p_kwds = {
                 par_name: value
                 for par_name, value in zip(
@@ -135,15 +138,24 @@ def max_likelihood(density_func, x0, values=None, opt_func=None,
                 if par_name not in kwds
             }
             p_kwds.update(kwds)
-            inside = weights * density_func(values, **p_kwds)
-            inside[(inside <= 0) | np.isnan(inside)] = 1e-12
+            dens = density_func(values, **p_kwds)
+            try:
+                inside = weights * dens
+            except FloatingPointError:
+                inside = dens
+            inside[~np.isfinite(inside)] = 1e-9
+            inside[inside <= 0] = 1e-9
             return -np.sum(np.log(inside))
 
     return opt_func(
         unlikelihood,
         x0,
         args=args,
-        method=method,
+        # bounds=density_func._bounds,
+        bounds=bounds,
+        # method=method,
+        # method=("L-BFGS-B" if density_func._bounds else method),
+        method=("L-BFGS-B" if bounds else method),
         options={"maxiter": 1e4 * len(x0),
                  "disp": disp})
 
@@ -233,6 +245,8 @@ class DistMeta(ABCMeta):
             n_pars -= len(cls_dict["supplements_names"])
         else:
             new_cls.supplements_names = None
+        if "_bounds" not in new_cls.__dict__:
+            new_cls._bounds = None
         new_cls.parameter_names = tuple(varnames)
         new_cls.n_pars = n_pars
         return new_cls
@@ -271,7 +285,8 @@ class Dist(with_metaclass(DistMeta, object)):
         self.parameter_names."""
         return {
             key: value
-            for key, value in list(kwds.items()) if key in self.parameter_names
+            for key, value in list(kwds.items())
+            if key in self.parameter_names
         }
 
     def fit(self, *args, **kwds):
@@ -313,6 +328,8 @@ class Dist(with_metaclass(DistMeta, object)):
         quantiles_finite = np.where(finite_mask, qq, -1)
         x = np.atleast_1d(
             self._ppf(quantiles_finite, *args[1:], **self._clean_kwds(kwds)))
+        if quantiles_finite.size == 1:
+            quantiles_finite = np.full_like(x, quantiles_finite)
         x[(quantiles_finite < 0) | (quantiles_finite > 1)] = np.nan
         return x
 
@@ -322,7 +339,8 @@ class Dist(with_metaclass(DistMeta, object)):
     def fit_ml(self, values, x0=None, *args, **kwds):
         if x0 is None:
             x0 = (1, ) * len(self.parameter_names)
-        result = max_likelihood(self.pdf, x0, values, *args, **kwds)
+        result = max_likelihood(self.pdf, x0, values, bounds=self._bounds,
+                                *args, **kwds)
         return self.Result(x=result.x,
                            supplements=None,
                            success=result.success)
@@ -371,7 +389,12 @@ class Dist(with_metaclass(DistMeta, object)):
             lower = kwds.get(lower_key)
             if lower is None:
                 lower = args[self.parameter_names.index(lower_key)]
-            mask[x < lower] = True
+            if x.size == 1 and lower.size > 1:
+                x = np.full_like(lower, x)
+                mask = np.full_like(lower, mask)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                mask[x < lower] = True
 
         upper_key = ("uc" if "uc" in self.parameter_names else "u"
                      if "u" in self.parameter_names else None)
@@ -379,7 +402,12 @@ class Dist(with_metaclass(DistMeta, object)):
             upper = kwds.get(upper_key)
             if upper is None:
                 upper = args[self.parameter_names.index(upper_key)]
-            mask[x > upper] = True
+            if x.size == 1 and upper.size > 1:
+                x = np.full_like(upper, x)
+                mask = np.full_like(upper, mask)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                mask[x > upper] = True
 
         return np.squeeze(mask)
 
@@ -900,13 +928,14 @@ if owens:
 class TruncatedNormal(Dist):
     _feasible_start = (0, 1, -1, 1)
     _additional_kwds = {"lc": -1, "uc": 1}
+    _bounds = [(-np.inf, np.inf),
+               (1e-9, np.inf)]
 
     def _pdf(self, x, mu=0, sigma=1, lc=-np.inf, uc=np.inf):
         x, mu, sigma, lc, uc = np.atleast_1d(x, mu, sigma, lc, uc)
         un_trunc = np.atleast_1d(
-            old_div(
-                norm.pdf(x, mu, sigma), (norm.cdf(uc, mu, sigma) - norm.cdf(
-                    lc, mu, sigma))))
+            norm.pdf(x, mu, sigma) /
+            (norm.cdf(uc, mu, sigma) - norm.cdf(lc, mu, sigma)))
         un_trunc[(x < lc) | (x > uc)] = 0
         sigma_neg_mask = sigma <= 0
         if np.any(sigma_neg_mask):
