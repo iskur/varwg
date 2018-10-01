@@ -135,18 +135,15 @@ def seasonal_back(dist_sol, norm_data, var_names, doys=None,
     data = np.empty_like(norm_data)
     for var_ii, (var_name, var) in enumerate(zip(var_names, norm_data)):
         distribution, solution = dist_sol[solution_template % var_name]
-        # TODO: distribution is never distributions.norm. however the transform
-        # yields wrong results!
-        if distribution is distributions.norm:
-            # if (hasattr(distribution, "dist") and
-            #     type(distribution.dist) is distributions.Normal):
+        if (hasattr(distribution, "dist") and
+                isinstance(distribution.dist, distributions.Normal)):
             # in this case, we do not need a qenuine qq-transform, the normal
             # inverse Z transform suffices, AND is immune to producing nans
             # for "extreme" values in the standard-normal world!
             if doys is not None:
                 _T = (2 * np.pi / 365 * doys)[np.newaxis, :]
-            sigmas = distribution.trig2pars(solution, _T)[1]
-            data[var_ii] *= sigmas
+            mus, sigmas = distribution.trig2pars(solution, _T)
+            data[var_ii] = var * sigmas + mus
         else:
             quantiles = distributions.norm.cdf(var, 0, 1)
             data[var_ii] = distribution.ppf(solution, quantiles, doys=doys)
