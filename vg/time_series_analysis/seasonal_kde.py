@@ -269,37 +269,40 @@ class SeasonalKDE(seasonal.Seasonal):
         out"""
         densities = self.density_per_doy(np.abs(kernel_width), data, doys,
                                          doy_middle, leave_one_out=True)
-        return -np.nansum(np.log(densities))
+        return -np.sum(np.log(densities[densities > 0]))
 
-    def fit(self):
+    def fit(self, silverman=False):
         """This estimates the kernel widths per doy AND returns the
         interpolating functions for cdf and ppf."""
         kernel_widths = np.empty(len(self.doys_unique))
         # if the data is very coarse, add a little noise
         data = np.copy(self.data)
-        data_unique = np.unique(data)
-        if len(data) // len(data_unique) > 100:
-            mean_discretization = np.mean(np.diff(data_unique))
-            data += old_div(np.random.randn(len(data)), mean_discretization)
-            # but honour the bounds of the original data
-            data[data < data_unique[0]] = data_unique[0]
-            data[data > data_unique[-1]] = data_unique[-1]
-
         for doy_i, doy in tqdm(enumerate(self.doys_unique),
                                total=kernel_widths.size,
                                disable=(not self.verbose)):
             ii = self.doy_mask[doy_i]
+            data_ = data[ii]
+            if silverman:
+                kernel_widths[doy_i] = kde.silvermans_rule(data_)
+                continue
             if doy_i == 0:
-                x0 = old_div((data[ii].max() - data[ii].min()), 10.)
+                x0 = kde.silvermans_rule(data_) / 2
             else:
                 x0 = kernel_widths[doy_i - 1]
-            kernel_width = \
-                optimize.fmin(self.sum_log_density, x0,
-                              args=(data[ii], self.doys[ii], doy), disp=False)
+            result = \
+                optimize.minimize(self.sum_log_density, x0,
+                                  args=(data_, self.doys[ii], doy),
+                                  bounds=[(1e-9, None)],
+                                  # method="L-BFGS-B",
+                                  # method="TNC",
+                                  # method="SLSQP",
+                                  # options=dict(disp=True),
+                                  options=dict(disp=False),
+                                  )
+            kernel_width = result.x
             # we want to avoid very small kernel widths as that causes
             # problems later on
-            if kernel_width < 1e-6:
-                data_ = data[ii]
+            if kernel_width < 1e-8:
                 kernel_width = kde.silvermans_rule(data_)
             kernel_widths[doy_i] = kernel_width
 
@@ -387,17 +390,21 @@ class SeasonalKDE(seasonal.Seasonal):
                 elif x_single > self.upper_bound(self.doys_unique[doy_i]):
                     quantiles[ii] = np.nan
                     continue
-                raise e
+        if np.any(np.isnan(quantiles)):
+            quantiles = my.interp_nan(quantiles, max_interp=3)
         return quantiles
 
     def ppf(self, solution, quantiles, doys):
         if solution is not None:
             self.solution = solution
         quantiles, doys = np.atleast_1d(quantiles, doys)
+        # for the purpose of distribution parameters: assume February
+        # 29th behaves as February 28th
+        doys = self.duplicate_feb28(doys)
         x = np.empty_like(quantiles)
         for ii, (doy, quantile_single) in enumerate(zip(doys, quantiles)):
             # doy_i = my.val2ind(self.doys_unique, doy)
-            doy_i = int(old_div((doy - 1), self.dt))
+            doy_i = int((doy - 1) / self.dt)
             x[ii] = self.ppf_interp_per_day[doy_i](quantile_single)
         return x
 
@@ -493,7 +500,6 @@ def doy_hour_fft(data, dtimes, order=4):
         pars_below = np.argsort(np.abs(fft_par))[:len(fft_par) - order - 1]
         par = np.copy(fft_par)
         par[pars_below] = 0
-#        par = fft_par
         fft_pars += [par]
         xx[ii] -= np.fft.irfft(par, len(values))
     return xx, np.array(fft_pars)
@@ -557,8 +563,8 @@ class SeasonalHourlyKDE(SeasonalKDE, seasonal.Torus):
     """Estimates kernel densities for time series exhibiting seasonalities
     in daily cycles."""
 
-    def __init__(self, data, dtimes, doy_width=5, hour_neighbors=4, *args,
-                 **kwds):
+    def __init__(self, data, dtimes, solution=None, doy_width=5,
+               hour_neighbors=4, *args, **kwds):
         """see SeasonalKDE.__init__"""
         seasonal.Torus.__init__(self, hour_neighbors)
         super(SeasonalHourlyKDE, self).__init__(data, dtimes,
@@ -567,6 +573,8 @@ class SeasonalHourlyKDE(SeasonalKDE, seasonal.Torus):
                                                 *args, **kwds)
 
         self.smooth_len = hour_neighbors * 5
+        if solution is not None:
+            self.solution = solution
         # 1. make a 3d array with (hours, doys, years)-shape
         # 2. stack three of those 3d arrays with a daily
         #    time-shift on top of each other so that we have three
@@ -651,21 +659,21 @@ class SeasonalHourlyKDE(SeasonalKDE, seasonal.Torus):
         hour_index, doy_index = self._unpadded_index(doy)
         return self._upper_bound[hour_index, doy_index]
 
-    def fit(self, thumb=False, order=4):
+    def fit(self, silverman=False, order=4):
         """
         Parameter
         ---------
-        thumb : boolean or callable, optional
-            Use rule of thumb instead of leave-one-out maximum
+        silverman : boolean or callable, optional
+            Use rule of silverman instead of leave-one-out maximum
             likelihood estimation.
             Callable is executed with (n_data, n_dim).
         """
         hpd = self.hours_per_day
 
-        if thumb:
-            if not callable(thumb):
-                thumb = self.scotts_rule
-            kernel_width = thumb()
+        if silverman:
+            if not callable(silverman):
+                silverman = self.silvermans_rule
+            kernel_width = silverman()
             self.kernel_widths = np.full((hpd, 365), kernel_width)
             return self.kernel_widths, self.quantile_grid
 
