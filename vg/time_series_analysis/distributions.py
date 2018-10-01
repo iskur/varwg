@@ -971,14 +971,14 @@ class TruncatedNormal(Dist):
         return x
 
     def _fit(self, x, lc=-np.inf, uc=np.inf):
-        x0 = [x.mean(), x.std()]
+        x0 = [np.nanmean(x), np.nanstd(x)]
         kwds = {}
         if lc is None:  # or np.isneginf(lc):
-            x0 += [x.min()]
+            x0 += [np.nanmin(x)]
         else:
             kwds["lc"] = lc
         if uc is None:  # or np.isinf(uc):
-            x0 += [x.max()]
+            x0 += [np.nanmax(x)]
         else:
             kwds["uc"] = uc
         return self.fit_ml(x, x0=x0, method="Nelder-Mead", **kwds).x
