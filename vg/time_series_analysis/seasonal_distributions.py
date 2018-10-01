@@ -473,18 +473,18 @@ class SeasonalDist(seasonal.Seasonal):
             s_kwds = dict(marker="o")
         _T = self.doys_unique * 2 * np.pi / 365
         xx = np.linspace(self.data.min(), self.data.max(), 100)
-        dens = self.pdf(trig_pars, xx, self.doys_unique, broadcast=True)
+        try:
+            dens = self.pdf(trig_pars, xx, self.doys_unique, broadcast=True)
+        except ValueError:
+            dens = np.array([self.pdf(trig_pars, xx, doy) for doy in
+                             self.doys_unique])
         # dens[dens < 1e-12] = 0
         fig = plt.figure(figsize=figsize)
         ax1 = fig.gca()
         ax1.contourf(self.doys_unique, xx, dens.T, 15)
-#        plt.colorbar(co)
         plt.scatter(self.doys, self.data, facecolors=(0, 0, 0, 0),
                     edgecolors=(0, 0, 0, opacity), **s_kwds)
-#        if self.dist in (distributions.beta, distributions.kumaraswamy,
-#                         distributions.Kumaraswamy,
-#                         distributions.weibull, distributions.logitnormal,
-#                         distributions.lognormallu, distributions.rayleighlu):
+
         # plot lower and upper bounds
         for fixed_values in self.fixed_values_dict(self.doys_unique).values():
             plt.plot(self.doys_unique, fixed_values, "r")
@@ -498,31 +498,12 @@ class SeasonalDist(seasonal.Seasonal):
         except (IndexError, ValueError):
             pass
 
-#        if self.dist is distributions.norm:
-#            # do not plot the mean (boring!)
-#            ax = plt.gca().twinx()
-#            par = self.trig2pars(trig_pars[self.n_trig_pars:
-#                                           2 * self.n_trig_pars], _T)
-#            par = par.reshape(doys.shape)
-#            plt.plot(doys, par, "r", label=self.dist.parameter_names[1])
-#        else:
-        # plot the first two distribution parameters on a different yscale
-
-#        ax = plt.gca().twinx()
-#        for par_i, par in enumerate((trig_pars[:self.n_trig_pars],
-#                                     trig_pars[self.n_trig_pars:
-#                                               2 * self.n_trig_pars])):
-#            ax.plot(doys,
-#                    self.trig2pars(par, _T).reshape(doys.shape) / n_sumup,
-#                    label=self.dist.parameter_names[par_i])
         plt.xlim(0, 366)
         plt.ylim(xx.min(), xx.max())
         plt.xticks((1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335),
                    ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug',
                     'Sep', 'Oct', 'Nov', 'Dec'), rotation=45)
-#        plt.xlabel("Day of Year")
         plt.grid()
-#        plt.legend()
         if title is not None:
             plt.title(title)
         # plt.tight_layout()
@@ -558,19 +539,22 @@ class SeasonalDist(seasonal.Seasonal):
         plt.show()
 
     def plot_monthly_fit(self, solution=None, n_classes=30, dists_alt=None):
+        # get the doys of the middle of the months very roughly
+        month_doys = np.linspace(15, 367, 12,
+                                 endpoint=False).astype(np.int)
         if solution is None:
             monthly_params = self.monthly_params
         else:
-            # get the doys of the middle of the months very roughly
-            month_doys = np.linspace(15, 367, 12,
-                                     endpoint=False).astype(np.int)
             # get a parameter set per month
             monthly_params_dict = \
                 self.all_parameters_dict(solution, month_doys)
             monthly_params = my.list_transpose([monthly_params_dict[par_name]
                                                 for par_name in
                                                 self.dist.parameter_names])
-            
+        monthly_fixed = [{par_name: func(month_doy)
+                          for par_name, func in self.fixed_pars.items()}
+                         for month_doy in month_doys]
+
         fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(23, 12))
         ax = axes.ravel()
         plt.suptitle(self.dist.name)
@@ -611,13 +595,28 @@ class SeasonalDist(seasonal.Seasonal):
             ax2.plot(values_sort, ranks_emp)
             # theoretical cdf
             xx = np.linspace(values.min(), values.max(), 5e2)
+            ranks_gen = np.linspace(1e-6, 1 - 1e-6, 100)
             if self.dist.scipy_:
                 ranks_theory = self.dist.cdf(xx, *monthly_params[ii])
+                xx_from_ppf = self.dist.ppf(ranks_gen, *monthly_params[ii])
+                qq = self.dist.cdf(values, *monthly_params[ii])
             else:
                 ranks_theory = self.dist.cdf(xx, **monthly_dict)
+                xx_from_ppf = self.dist.ppf(ranks_gen, **monthly_dict)
+                qq = self.dist.cdf(values, **monthly_dict)
             ax2.plot(xx, ranks_theory, 'r--')
-            if hasattr(self.dist, "f_thresh"):
-                ax2.axvline(self.dist.f_thresh, linestyle="--",
+            ax2.plot(xx_from_ppf, ranks_gen, "g--")
+            # ax1.scatter(np.full_like(xx, 0), ranks_theory, 
+            #             marker="o", facecolor=(0, 0, 0, 0),
+            #             edgecolor="black", alpha=.3)
+            ax2.hist(qq[np.isfinite(qq)], 40, color="gray",
+                     density=True, histtype="step",
+                     orientation="horizontal")
+            if "f_thresh" in monthly_dict:
+                ax2.axvline(f_thresh, linestyle="--",
+                            linewidth=1, color="gray")
+            if hasattr(self.dist, "q_thresh"):
+                ax2.axhline(self.dist.q_thresh, linestyle="--",
                             linewidth=1, color="gray")
 
             if dists_alt:
@@ -642,7 +641,7 @@ class SeasonalDist(seasonal.Seasonal):
             ax1.set_yticklabels([])
             ax2.set_yticklabels([])
         plt.tight_layout()
-        return fig
+        return fig, ax
 
     def plot_monthly_params(self):
         for par_name, values in zip(self.dist.parameter_names,
