@@ -1,10 +1,13 @@
 from __future__ import division
-from builtins import zip
-from builtins import range
-from past.utils import old_div
+
+import collections
+from builtins import range, zip
+
 import numpy as np
-import scipy as sp
 import matplotlib.pyplot as plt
+import scipy as sp
+from past.utils import old_div
+
 from vg import helpers as my
 from vg.smoothing import smooth
 
@@ -122,9 +125,19 @@ def auto_cov(data, k):
 
 
 def auto_corr(data, k):
-    """Return the autocorrelation-vector for lag k. Variables are assumed to
-    be stored in rows, with time extending across the columns."""
-    return np.squeeze(old_div(auto_cov(data, k), auto_cov(data, 0)))
+    """Return the autocorrelation-vector for lag k.
+
+    Parameters
+    ----------
+    data : (K, T) array
+        K number of variables. T time steps.
+    k : int or iterable
+        time-lag or time lags if k is an iterable
+    """
+    if not isinstance(k, collections.Iterable):
+        k = k,
+    return np.squeeze([auto_cov(data, lag) / auto_cov(data, 0)
+                       for lag in k])
 
 
 def _partial_autocorr_uni(data, k):
@@ -246,13 +259,23 @@ def cross_cov(data, k, means=None):
 
 
 def cross_corr(data, k):
-    """Return the cross-correlation-coefficient matrix for lag k. Variables are
-    assumed to be stored in rows, with time extending across the columns."""
+    """Return the cross-correlation-coefficient matrix for lag k.
+
+    Parameters
+    ----------
+    data : (K, T) array
+        K number of variables. T time steps.
+    k : int or iterable
+        time-lag or time lags if k is an iterable
+    """
+    if not isinstance(k, collections.Iterable):
+        k = k,
     finite_ii = np.isfinite(data)
-    stds = [np.std(row[row_ii]) for row, row_ii in zip(data, finite_ii)]
+    stds = [np.nanstd(row[row_ii]) for row, row_ii in zip(data, finite_ii)]
     stds = np.array(stds)[:, np.newaxis]
     stds_dot = stds * stds.T  # dyadic product of row-vector stds
-    return old_div(cross_cov(data, k), stds_dot)
+    return np.squeeze([cross_cov(data, lag) / stds_dot
+                       for lag in k])
 
 
 def plot_cross_corr(data, var_names=None, max_lags=10, figsize=None, fig=None,
