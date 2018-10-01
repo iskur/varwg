@@ -112,7 +112,7 @@ def auto_cov(data, k):
     data = np.ma.array(data, mask=~finite_ii)
     data -= data.mean(axis=1)[:, None]
     k = np.atleast_1d(np.abs(k))
-    auto = np.empty((len(k), n_vars))
+    auto = np.empty((len(k), n_vars), dtype=float)
     for ii, lag in enumerate(k):
         if lag == 0:
             auto0 = [(row ** 2).mean() for row in data]
@@ -120,7 +120,7 @@ def auto_cov(data, k):
         else:
             data1, data2 = data[:, :-lag], data[:, lag:]
             auto[ii] = (data1 * data2).mean(axis=1)
-            auto[ii] *= np.ravel((old_div((n_data - lag), (n_data).astype(float))))
+            auto[ii] *= np.ravel(((n_data - lag) / (n_data).astype(float)))
     return np.squeeze(auto)
 
 
