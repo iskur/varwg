@@ -92,13 +92,13 @@ if owens:
 gamma_func = np.vectorize(lambda x: special.gamma(x))
 gammaln = np.vectorize(lambda x: special.gammaln(x))
 gammainc = np.vectorize(lambda a, x: special.gammainc(a, x))
-gammaincinv = np.vectorize(lambda a, q: special.gammaincinv(a, q))
+gammaincinv = np.vectorize(lambda a, qq: special.gammaincinv(a, qq))
 digamma = np.vectorize(lambda a: special.digamma(a))
 hyp1f1 = np.vectorize(lambda a, b, x: special.hyp1f1(a, b, x))
 nctdtr = np.vectorize(lambda x1, x2, x3: special.nctdtr(x1, x2, x3))
 nctdtrit = np.vectorize(lambda x1, x2, x3: special.nctdtrit(x1, x2, x3))
 stdtr = np.vectorize(lambda df, x: special.stdtr(df, x))
-stdtrit = np.vectorize(lambda df, q: special.stdtrit(df, q))
+stdtrit = np.vectorize(lambda df, qq: special.stdtrit(df, qq))
 
 
 def max_likelihood(density_func, x0, values=None, opt_func=None,
@@ -304,7 +304,11 @@ class Dist(with_metaclass(DistMeta, object)):
 
     @my.asscalar
     def ppf(self, *args, **kwds):
-        qq = np.atleast_1d(args[0])
+        if "qq" in kwds:
+            qq = kwds.pop("qq")
+        else:
+            qq = args[0]
+        qq = np.atleast_1d(qq)
         finite_mask = np.isfinite(qq)
         quantiles_finite = np.where(finite_mask, qq, -1)
         x = np.atleast_1d(
@@ -391,11 +395,11 @@ class Frozen(object):
     def pdf(self, x):
         return self.dist.pdf(x, *self.params)
 
-    def cdf(self, y):
-        return self.dist.cdf(y, *self.params)
+    def cdf(self, x):
+        return self.dist.cdf(x, *self.params)
 
-    def ppf(self, x):
-        return self.dist.ppf(x, *self.params)
+    def ppf(self, qq):
+        return self.dist.ppf(qq, *self.params)
 
     def sample(self, size):
         return self.dist.sample(size, *self.params)
@@ -693,8 +697,8 @@ class Normal(Dist):
 
     def _cdf(self, x, mu=0, sigma=1):
         x, mu, sigma = np.atleast_1d(x, mu, sigma)
-        q = .5 * (1 + special.erf(old_div((x - mu), (sigma * 2**.5))))
-        return q
+        qq = .5 * (1 + special.erf(old_div((x - mu), (sigma * 2**.5))))
+        return qq
 
     def _ppf(self, qq, mu=0, sigma=1):
         qq, mu, sigma = np.atleast_1d(qq, mu, sigma)
@@ -781,21 +785,21 @@ norm = Normal()
 #         return (norm.cdf((x - zeta) / omega) -
 #                 2 * SkewNormal._tOwen((x - zeta) / omega, alpha))
 #
-#     def _ppfInternal(self, q, shape):
-#         maxQ = np.sqrt(chi2.ppf(q, 1))
-#         minQ = -np.sqrt(chi2.ppf(1 - q, 1))
+#     def _ppfInternal(self, qq, shape):
+#         maxQ = np.sqrt(chi2.ppf(qq, 1))
+#         minQ = -np.sqrt(chi2.ppf(1 - qq, 1))
 #         if shape > 1e+5:
 #             return maxQ
 #         if shape < -1e+5:
 #             return minQ
-#         nan = np.isnan(q) | (q > 1) | (q < 0)
-#         zero = q == 0
-#         one = q == 1
-#         q[nan | zero | one] = 0.5
+#         nan = np.isnan(qq) | (qq > 1) | (qq < 0)
+#         zero = qq == 0
+#         one = qq == 1
+#         qq[nan | zero | one] = 0.5
 #         cum = SkewNormal._cumulants(shape, 4)
 #         g1 = cum[2] / cum[1] ** (3 / 2.0)
 #         g2 = cum[3] / cum[1] ** 2
-#         x = norm().ppf(q)
+#         x = norm().ppf(qq)
 #         x = (x + (x ** 2 - 1) * g1 / 6 + x * (x ** 2 - 3) * g2 / 24 -
 #              x * (2 * x ** 2 - 5) * g1 ** 2 / 36)
 #         x = cum[0] + np.sqrt(cum[1]) * x
@@ -803,7 +807,7 @@ norm = Normal()
 #         maxErr = 1
 #         while maxErr > tol:
 #             sn = skewnorm(shape)
-#             x1 = x - (sn.cdf(x) - q) / (sn.pdf(x))
+#             x1 = x - (sn.cdf(x) - qq) / (sn.pdf(x))
 #             x1 = np.minimum(x1, maxQ)
 #             x1 = np.maximum(x1, minQ)
 #             maxErr = np.amax(np.abs(x1 - x) / (1 + np.abs(x)))
@@ -813,13 +817,13 @@ norm = Normal()
 #         x[one] = np.Infinity
 #         return x
 #
-#     def _ppf(self, q, shape):
+#     def _ppf(self, qq, shape):
 #         if np.all(shape == shape[0]):
-#             return self._ppfInternal(q, shape[0])
+#             return self._ppfInternal(qq, shape[0])
 #         else:
-#             vec = np.vectorize(lambda q, shape:
-#                                 self._ppfInternal(np.array([q]), shape))
-#             return vec(q, shape)
+#             vec = np.vectorize(lambda qq, shape:
+#                                 self._ppfInternal(np.array([qq]), shape))
+#             return vec(qq, shape)
 #
 #     def _ppf(self, qq, zeta, omega, alpha):
 #         qq, zeta, omega, alpha = \
@@ -839,8 +843,8 @@ class SkewNormal(Dist):
     def _cdf(self, x, zeta=0, omega=1, alpha=0):
         x, zeta, omega, alpha = np.atleast_1d(x, zeta, omega, alpha)
         t = old_div((x - zeta), omega)
-        q = norm.cdf(t) - 2. * owens_t(t, alpha)
-        return q
+        qq = norm.cdf(t) - 2. * owens_t(t, alpha)
+        return qq
 
     def _ppf(self, qq, zeta=0, omega=1, alpha=0):
         qq, zeta, omega, alpha = \
@@ -914,12 +918,14 @@ class TruncatedNormal(Dist):
 
     def _cdf(self, x, mu=0, sigma=1, lc=-np.inf, uc=np.inf):
         x, mu, sigma, lc, uc = np.atleast_1d(x, mu, sigma, lc, uc)
-        q = (old_div((norm.cdf(x, mu, sigma) - norm.cdf(lc, mu, sigma)),
-                     (norm.cdf(uc, mu, sigma) - norm.cdf(lc, mu, sigma))))
-        q = np.atleast_1d(q)
-        q[q < 0] = 0
-        q[q > 1] = 1
-        return q
+        qq = ((norm.cdf(x, mu, sigma) - norm.cdf(lc, mu, sigma)) /
+              (norm.cdf(uc, mu, sigma) - norm.cdf(lc, mu, sigma)))
+        qq = np.atleast_1d(qq)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", RuntimeWarning)
+            qq[qq < 0] = 0
+            qq[qq > 1] = 1
+        return qq
 
     def _ppf(self, qq, mu=0, sigma=1, lc=-np.inf, uc=np.inf):
         qq, mu, sigma, lc, uc = \
@@ -1015,13 +1021,13 @@ class JohnsonSU(Dist):
 
     def _cdf(self, x, a, b, loc, scale):
         x = old_div(np.atleast_1d(x - loc), scale)
-        q = np.atleast_1d(norm.cdf(a + b * np.log(x + np.sqrt(x * x + 1))))
-        q[np.isneginf(x)] = 0
-        return q
+        qq = np.atleast_1d(norm.cdf(a + b * np.log(x + np.sqrt(x * x + 1))))
+        qq[np.isneginf(x)] = 0
+        return qq
 
-    def _ppf(self, q, a, b, loc, scale):
-        q, a, b, loc, scale = np.atleast_1d(q, a, b, loc, scale)
-        z = np.sinh(old_div((norm.ppf(q) - a), b))
+    def _ppf(self, qq, a, b, loc, scale):
+        qq, a, b, loc, scale = np.atleast_1d(qq, a, b, loc, scale)
+        z = np.sinh(old_div((norm.ppf(qq) - a), b))
         x = z * scale + loc
         return x
 
@@ -1049,8 +1055,8 @@ class Cauchy(Dist):
     def _cdf(self, x, x0, gamma):
         return (old_div(1, np.pi)) * np.arctan2(x - x0, gamma) + .5
 
-    def _ppf(self, q, x0, gamma):
-        return x0 + gamma * np.tan(np.pi * (q - .5))
+    def _ppf(self, qq, x0, gamma):
+        return x0 + gamma * np.tan(np.pi * (qq - .5))
 
     def _fit(self, x):
         x0 = np.median(stats.trimboth(x, .38))
@@ -1078,14 +1084,14 @@ class StudentT(Dist):
         return Px
 
     def _cdf(self, x, mu=0, df=1):
-        q = stdtr(df, np.atleast_1d(x) - mu)
-        return q
+        qq = stdtr(df, np.atleast_1d(x) - mu)
+        return qq
 
-    def _ppf(self, q, mu=0, df=1):
-        q = np.atleast_1d(q)
-        x = stdtrit(df, q) + mu
-        x[q == 0] = -np.inf
-        x[q == 1] = np.inf
+    def _ppf(self, qq, mu=0, df=1):
+        qq = np.atleast_1d(qq)
+        x = stdtrit(df, qq) + mu
+        x[qq == 0] = -np.inf
+        x[qq == 1] = np.inf
         return x
 
     def _fit(self, x):
@@ -1146,14 +1152,15 @@ class NoncentralT(Dist):
     def _cdf(self, x, df, nc, mu=0):
         x, df, nc, mu = (np.atleast_1d(var).astype(float)
                          for var in (x, df, nc, mu))
-        q = nctdtr(df, nc, x - mu)
-        return q
+        qq = nctdtr(df, nc, x - mu)
+        return qq
 
-    def _ppf(self, q, df, nc, mu=0):
-        q, df, nc = (np.atleast_1d(var).astype(float) for var in (q, df, nc))
-        x = nctdtrit(df, nc, q) + mu
-        x[q == 0] = -np.inf
-        x[q == 1] = np.inf
+    def _ppf(self, qq, df, nc, mu=0):
+        qq, df, nc = (np.atleast_1d(var).astype(float)
+                      for var in (qq, df, nc))
+        x = nctdtrit(df, nc, qq) + mu
+        x[qq == 0] = -np.inf
+        x[qq == 1] = np.inf
         return x
 
     def _fit(self, x):
@@ -1190,7 +1197,7 @@ noncentral_t = NoncentralT()
 #        logit = self.logit(x_normed)
 #        return norm_cdf(logit, mu, sigma)
 #
-#    def _ppf(self, q, mu, sigma, l=0, u=1):
+#    def _ppf(self, qq, mu, sigma, l=0, u=1):
 #        raise NotImplementedError
 #
 #    def _fit(self, x, l=None, u=None):
@@ -1475,8 +1482,8 @@ class Beta(Dist):
         # incomplete beta function
         return special.betainc(alpha, beta, old_div((x - l), (u - l)))
 
-    def _ppf(self, q, alpha, beta, l=0, u=1):
-        return (u - l) * special.betaincinv(alpha, beta, q) + l
+    def _ppf(self, qq, alpha, beta, l=0, u=1):
+        return (u - l) * special.betaincinv(alpha, beta, qq) + l
 
     def _fit(self, x, l=None, u=None):
         """stolen from
@@ -1549,14 +1556,14 @@ class Gamma(Dist):
 
     def _cdf(self, x, k, theta):
         x = np.atleast_1d(x)
-        q = gammainc(k, x / theta) / gamma_func(k)
-        q[np.isinf(x)] = 1
-        return q
+        qq = gammainc(k, x / theta) / gamma_func(k)
+        # qq[np.isinf(x)] = 1
+        return qq
 
-    def _ppf(self, q, k, theta):
-        q = np.atleast_1d(q)
-        x = theta * gammaincinv(k, q * gamma_func(k))
-        x[q == 1] = np.inf
+    def _ppf(self, qq, k, theta):
+        qq = np.atleast_1d(qq)
+        x = theta * gammaincinv(k, qq * gamma_func(k))
+        # x[qq == 1] = np.inf
         return x
 
     def _fit(self, x, rel_change=1e-6):
@@ -1625,14 +1632,14 @@ class Gamma1(Dist):
     def _cdf(self, x, a, loc, scale):
         x, a, loc, scale = np.atleast_1d(x, a, loc, scale)
         z = old_div((x - loc), scale)
-        q = gammainc(a, z)
-        q[np.isinf(x)] = 1
-        return q
+        qq = gammainc(a, z)
+        qq[np.isinf(x)] = 1
+        return qq
 
-    def _ppf(self, q, a, loc, scale):
-        q, a, loc, scale = np.atleast_1d(q, a, loc, scale)
-        x = gammaincinv(a, q) * scale + loc
-        x[q == 1] = np.inf
+    def _ppf(self, qq, a, loc, scale):
+        qq, a, loc, scale = np.atleast_1d(qq, a, loc, scale)
+        x = gammaincinv(a, qq) * scale + loc
+        x[qq == 1] = np.inf
         return x
 
     def _fit(self, x):
@@ -1664,8 +1671,8 @@ class Expon(Dist):
                         1 - np.exp(-lambd * (x - x0)),
                         0)
 
-    def _ppf(self, q, x0, lambd):
-        return -np.log(1 - q) / lambd + x0
+    def _ppf(self, qq, x0, lambd):
+        return -np.log(1 - qq) / lambd + x0
 
     def _fit(self, x):
         x_noninf = x[np.isfinite(x)]
@@ -1693,15 +1700,15 @@ class ExponTwo(Dist):
 
     def _cdf(self, x, x0, q0, lambda1, lambda2):
         x = np.atleast_1d(x)
-        q = np.where(x <= x0, q0 * (1 - expon.cdf(x0 - x, 0, lambda1)),
+        qq = np.where(x <= x0, q0 * (1 - expon.cdf(x0 - x, 0, lambda1)),
                      q0 + (1 - q0) * expon.cdf(x, x0, lambda2))
-        return q
+        return qq
 
-    def _ppf(self, q, x0, q0, lambda1, lambda2):
-        q = np.atleast_1d(q)
+    def _ppf(self, qq, x0, q0, lambda1, lambda2):
+        qq = np.atleast_1d(qq)
         x = np.where(
-            q <= q0, x0 + old_div(np.log(old_div(q, q0)), lambda1),
-            x0 - old_div(np.log(1 - old_div((q - q0), (1 - q0))), lambda2))
+            qq <= q0, x0 + old_div(np.log(old_div(qq, q0)), lambda1),
+            x0 - old_div(np.log(1 - old_div((qq - q0), (1 - q0))), lambda2))
         return x
 
     def _fit(self, x):
@@ -1742,16 +1749,16 @@ class NoncentralLaplace(Dist):
     def _cdf(self, x, x0, q0, lambd):
         lambda2 = lambd * q0 / (1 - q0)
         x = np.atleast_1d(x)
-        q = np.where(x <= x0, q0 * (1 - expon.cdf(x0 - x, 0, lambd)),
+        qq = np.where(x <= x0, q0 * (1 - expon.cdf(x0 - x, 0, lambd)),
                      q0 + (1 - q0) * expon.cdf(x, x0, lambda2))
-        return q
+        return qq
 
-    def _ppf(self, q, x0, q0, lambd):
+    def _ppf(self, qq, x0, q0, lambd):
         lambda2 = lambd * q0 / (1 - q0)
-        q = np.atleast_1d(q)
+        qq = np.atleast_1d(qq)
         x = np.where(
-            q <= q0, x0 + old_div(np.log(old_div(q, q0)), lambd),
-            x0 - old_div(np.log(1 - old_div((q - q0), (1 - q0))), lambda2))
+            qq <= q0, x0 + old_div(np.log(old_div(qq, q0)), lambd),
+            x0 - old_div(np.log(1 - old_div((qq - q0), (1 - q0))), lambda2))
         return x
 
     def _fit(self, x):
@@ -2220,14 +2227,14 @@ class Rain(_Rain):
         qq[~finite_mask] = np.nan
         return qq
 
-    def _ppf(self, q, rain_prob, *args, **kwds):
-        q, rain_prob = np.atleast_1d(q, rain_prob)
+    def _ppf(self, qq, rain_prob, *args, **kwds):
+        qq, rain_prob = np.atleast_1d(qq, rain_prob)
         if len(rain_prob) == 1:
-            rain_prob = np.full_like(q, rain_prob)
+            rain_prob = np.full_like(qq, rain_prob)
         # we want to have zero rain, where probability of rain is lower than
         # rain_prob
-        x = np.zeros_like(q, dtype=float)
-        rain_mask = q > 1 - rain_prob
+        x = np.zeros_like(qq, dtype=float)
+        rain_mask = qq > 1 - rain_prob
         if np.all(~rain_mask):
             return x
         # subtracting self.thresh from x has the unwanted side-effect of
@@ -2236,7 +2243,7 @@ class Rain(_Rain):
         # as we mask x, we also have to mask the parameters given in **kwds
         kwds_rain = self._mask_kwds(rain_mask, kwds)
         x[rain_mask] = self.thresh + self.dist.ppf(
-            (q[rain_mask] - 1.) / rain_prob[rain_mask] + 1, *args, **kwds_rain)
+            (qq[rain_mask] - 1.) / rain_prob[rain_mask] + 1, *args, **kwds_rain)
         return x
 
     def _fit(self, x, **kwds):
