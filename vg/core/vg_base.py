@@ -8,6 +8,7 @@ import re
 import shlex
 import sys
 import warnings
+from tqdm import tqdm
 from builtins import object, range, zip
 from past.builtins import basestring
 
@@ -439,36 +440,56 @@ class VGBase(object):
         if seasonal:
             pool0 = np.where(times.doy_distance(doys_out[0], doys_in) <=
                              doy_tolerance)[0]
-            pool_len = len(pool0)
+            # pool_len = len(pool0)
+
+        if nan_mask is not None:
+            finite_ii = np.where(~nan_mask)[0]
+            # shrink pool
+            pool0 = pool0[(pool0 >= (finite_ii[0] - mod0(0, tpd))) &
+                          (pool0 <= (finite_ii[-1] - mod0(0, tpd)))]
+            finite_ii = set(finite_ii)
+            # pool_len = len(pool0)
+        else:
+            finite_ii = set(np.arange(nn))
 
         def choose_chunk(dst_point):
             nan_in_output = True
             while nan_in_output:
                 if seasonal:
-                    pool = (pool0 + dst_point) % nn
-                    # pool = pool0 + dst_point
-                    src_point = pool[np.random.randint(pool_len)]
+                    # pool = (pool0 + dst_point) % nn
+                    doy_out = doys_out[dst_point % m]
+                    pool = np.where(ctimes.doy_distance(doy_out, doys_in)
+                                    <= doy_tolerance)[0]
+                    pool = list(set(pool) & finite_ii)
+                    src_point = pool[np.random.randint(len(pool))]
+                    # src_point = pool[np.random.randint(pool_len)]
                     while src_point >= (nn - autocorr_len):
-                        src_point = pool[np.random.randint(pool_len)]
+                        src_point = pool[np.random.randint(len(pool))]
+                        # src_point = pool[np.random.randint(pool_len)]
                 else:
-                    src_point = np.random.randint(nn - autocorr_len)
+                    # src_point = np.random.randint(nn - autocorr_len)
+                    src_point = np.random.choice(finite_ii[:-autocorr_len])
                 # hour of day from 0 to 23 in destination
                 hour_of_dst = mod0(dst_point, tpd)
                 # ensure the same hour of day in source
                 src_point += -mod0(src_point, tpd) + hour_of_dst
                 src_point = min(src_point, nn - autocorr_len)
-                chunk_ii = list(range(src_point, src_point + autocorr_len))
-                while np.any(nan_mask[chunk_ii]):
-                    if (max(chunk_ii) + tpd) > nn:
-                        break
-                    chunk_ii = list(np.array(chunk_ii) + tpd)
+                # chunk_ii = list(range(src_point, src_point + autocorr_len))
+                chunk_ii = np.arange(src_point, src_point + autocorr_len)
+                # while np.any(nan_mask[chunk_ii]):
+                #     import ipdb; ipdb.set_trace()
+                #     if (max(chunk_ii) + tpd) > nn:
+                #         break
+                #     chunk_ii = np.array(chunk_ii) + tpd
                 if not np.any(nan_mask[chunk_ii]):
                     nan_in_output = False
             return chunk_ii
 
         indices = np.array([choose_chunk(dst_point)
                             for dst_point
-                            in range(0, m + autocorr_len, autocorr_len)])
+                            in tqdm(range(0,
+                                         m + autocorr_len,
+                                         autocorr_len))])
         return indices.ravel()[:m]
 
     def _gen_deltas_input(self, var_names_dis, tpd):
