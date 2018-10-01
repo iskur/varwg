@@ -1137,7 +1137,7 @@ class VGPlotting(vg_base.VGBase):
                         mask = month_ii & hour_ii
                         if rain_comparison:
                             mask &= mask_mod(rain_mask_obs)
-                        data_obs = self.met[var_name][mask]
+                        data_obs = np.array(self.met[var_name])[mask]
                         month_ii = month_sim_iis[month - 1]
                         hour_ii = hour_sim_iis[hour]
                         data_sim = self.sim_sea_dis[var_i_dis]
