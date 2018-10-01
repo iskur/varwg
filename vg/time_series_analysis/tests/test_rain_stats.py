@@ -40,13 +40,16 @@ class Test(TestCase):
         assert_equal(wet, expected)
 
     def test_richardson_model(self):
+        np.random.seed(1)
         # trans_probs = np.array([[0.33020467, 0.16190849],
         #                         [0.16177813, 0.34597836]])
-        trans_probs = np.array([[0.330, 0.162],
-                                [0.162, 0.346]])
-        occurrences = rain_stats.richardson_model(1e5, trans_probs)
+        # trans_probs = np.array([[0.330, 0.162],
+        #                         [0.162, 0.346]])
+        trans_probs = np.array([[0.613, 0.145],
+                                [0.145, 0.096]])
+        occurrences = rain_stats.richardson_model_occ(1e5, trans_probs)
         emp_trans_probs = rain_stats.trans_prob(occurrences)
-        assert_almost_equal(trans_probs, emp_trans_probs, 2)
+        assert_almost_equal(trans_probs, emp_trans_probs, 3)
 
 
 if __name__ == "__main__":

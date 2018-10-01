@@ -4,8 +4,8 @@ import numpy as np
 import numpy.testing as npt
 from vg.time_series_analysis import (resample, time_series)
 import vg
-from vg import config_konstanz
-vg.conf = vg.vg_base.conf = config_konstanz
+# import config_konstanz
+# vg.conf = vg.vg_base.conf = config_konstanz
 
 
 class Test(npt.TestCase):
@@ -49,7 +49,7 @@ class Test(npt.TestCase):
         theta_i = self.met_vg.var_names.index("theta")
         means = []
         data_mean = np.mean(self.data[theta_i])
-        theta_incrs = np.linspace(0, 1.25, 15, endpoint=False)
+        theta_incrs = np.linspace(0, 1.1, 15, endpoint=False)
         for theta_incr in theta_incrs:
             ress = []
             for _ in range(2):

@@ -67,7 +67,7 @@ class Test(TestCase):
     def test_autocorr_plt_acorr(self):
         """do we get the same as matplotlib.pyplot.acorr?"""
         corr_exp = plt.acorr(self.sim, maxlags=5)[1]
-        corr = [time_series.auto_corr(self.sim, k) for k in range(-5, 6)]
+        corr = time_series.auto_corr(self.sim, range(-5, 6))
         assert_almost_equal(corr_exp, corr, decimal=4)
 
     def test_autocorr_box1(self):
