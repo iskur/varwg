@@ -912,7 +912,8 @@ class VG(vg_plotting.VGPlotting):
         if factors is not None:
             factors = np.asarray(factors)[:, None]
 
-        deltas_input, sim_interps = self._gen_deltas_input(var_names_dis, tpd)
+        deltas_input, sim_interps = self._gen_deltas_input(var_names_dis,
+                                                           tpd)
         deltas_drawn, sim_sea_dis = \
             self._add_deltas(deltas_input, sim_interps, var_names_dis,
                              tpd, event_dt=event_dt, factors=factors,
@@ -924,10 +925,33 @@ class VG(vg_plotting.VGPlotting):
             limits = copy.copy(conf.par_known[var_name])
             if var_name.startswith("Qsw"):
                 def pot_s(doys):
-                    hourly = meteox2y.pot_s_rad(doys, lat=conf.latitude,
-                                                longt=conf.longitude)
+                    hourly = pot_s_rad(doys,
+                                       lat=conf.latitude,
+                                       longt=conf.longitude)
                     return hourly * self.sum_interval[var_i]
                 limits["u"] = pot_s
+            elif var_name.startswith("sun"):
+                def sun_hours(doys):
+                    dtimes = times.doy2datetime(doys)
+                    sunrise, sunset = sunshine_riseset(dtimes,
+                                                       conf.longitude,
+                                                       conf.latitude,
+                                                       tz_offset=None)
+                    doy_hours = (doys - doys.astype(int)) * 24
+                    max_hours = np.full_like(doys, 60)
+                    max_hours[(doy_hours < sunrise) &
+                              (doy_hours > sunset)] = 0
+                    sunrise_dist = 60 * (sunrise - doy_hours)
+                    sunset_dist = 60 * (sunset - doy_hours)
+                    sunrise_mask = ((sunrise_dist > 0) &
+                                    (sunrise_dist < 60))
+                    sunset_mask = ((sunset_dist < 0) &
+                                   (sunset_dist > -60))
+                    max_hours[sunrise_mask] = sunrise_dist[sunrise_mask]
+                    max_hours[sunset_mask] = 60 + sunset_dist[sunset_mask]
+                    return max_hours * self.sum_interval[var_i]
+ 
+                limits["u"] = sun_hours
 
             sim_interp = sim_interps[var_i]
             pos_mask = deltas_drawn[var_i] > 0
@@ -960,6 +984,7 @@ class VG(vg_plotting.VGPlotting):
                 lower_perc = deltas_drawn[var_i, neg_mask]
                 interps = sim_interp[neg_mask]
                 lower_dis = interps + lower_perc * (interps - lower)
+                lower_dis = np.where(lower_dis < lower, lower, lower_dis)
                 sim_sea_dis[var_i, neg_mask] = lower_dis
 
         # fig, ax = plt.subplots()
