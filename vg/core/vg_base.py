@@ -21,7 +21,14 @@ import vg.time_series_analysis.seasonal_kde as skde
 from vg import helpers as my, times
 from vg.meteo import avrwind, meteox2y
 from vg.time_series_analysis import (distributions,
-    seasonal_distributions as sd)
+                                     seasonal_distributions as sd)
+
+import pyximport
+pyximport.install(setup_args={'include_dirs': np.get_include(),
+                              # 'gdb_debug': True
+                              },
+                  reload_support=True)
+from vg import ctimes
 
 
 try:
@@ -541,7 +548,8 @@ class VGBase(object):
                 if limits is None:
                     limits = {}
                 # limits["l"] = conf.array_gen(seas_dist.dist.thresh)
-                limits["l"] = conf.array_gen(0.)
+                limits["l"] = conf.array_gen(conf.threshold)
+                # limits["l"] = conf.array_gen(0.)
                 # limits["u"] = conf.array_gen(1.e12)
 
             if limits is not None and ("l" in limits or "lc" in limits):
@@ -658,28 +666,28 @@ class VGBase(object):
         if not os.path.exists(self.cache_dir):
             os.makedirs(self.cache_dir)
 
-        # try:
-        # get the data
-        # this covers the case that a non-default met filename was given
-        # that exists in the data_dir but not in the working path
-        if ((self.met_file is not None) and
-                (not os.path.exists(self.met_file))):
-            self.met_file = os.path.join(self.data_dir, self.met_file)
-        self.times_orig, self.met = \
-            read_met(self.met_file, delimiter=delimiter,
-                     verbose=self.verbose, **met_kwds)
-        # except TypeError as exc:
-        #     warnings.warn("While reading met-file:\n%s" % exc.message)
-        #     try:
-        #         # could be a pandas DataFrame
-        #         self.times_orig = self.met_file.index.to_pydatetime()
-        #         self.met = self.met_file.to_dict("list")
-        #     except AttributeError:
-        #         # or just a dict
-        #         self.times_orig = self.met_file["datetimes"]
-        #         self.met = {key: val for key, val
-        #                     in list(self.met_file.items())
-        #                     if key != "datetime"}
+        try:
+            # get the data
+            # this covers the case that a non-default met filename was given
+            # that exists in the data_dir but not in the working path
+            if ((self.met_file is not None) and
+                    (not os.path.exists(self.met_file))):
+                self.met_file = os.path.join(self.data_dir, self.met_file)
+            self.times_orig, self.met = \
+                read_met(self.met_file, delimiter=delimiter,
+                         verbose=self.verbose, **met_kwds)
+        except TypeError as exc:
+            # warnings.warn("While reading met-file:\n%s" % exc)
+            try:
+                # could be a pandas DataFrame
+                self.times_orig = self.met_file.index.to_pydatetime()
+                self.met = self.met_file.to_dict("list")
+            except AttributeError:
+                # or just a dict
+                self.times_orig = self.met_file["datetimes"]
+                self.met = {key: val for key, val
+                            in list(self.met_file.items())
+                            if key != "datetime"}
 
         # convert the dictionary into an array.
         # mind the order: alpha-numeric according to var_names
@@ -703,7 +711,9 @@ class VGBase(object):
                                                self.sum_interval[var_i],
                                                self.times_orig,
                                                middle_time=False,
-                                               sum_to_nan=False)
+                                               sum_to_nan=False,
+                                               acceptable_nans=12,
+                                               )
             else:
                 data[var_i] = self.met[key]
                 times_ = self.times_orig
@@ -838,8 +848,7 @@ class VGBase(object):
         sh = shelve.open(self.seasonal_cache_file, 'c')
         try:
             keys = list(sh.keys())
-        # except bsddb.db.DBPageNotFoundError:
-        except:
+        except Exception:
             print("Cache file corrupted, refitting...")
             os.remove(self.seasonal_cache_file)
             sh = shelve.open(self.seasonal_cache_file, 'c')
@@ -877,7 +886,9 @@ class VGBase(object):
                     dist = seas_class(var, self.times,
                                       fixed_pars=conf.par_known[var_name],
                                       verbose=self.verbose, **kwds)
-                    solution = dist.fit()
+                    solution = dist.fit(
+                        silverman=(var_name == "sun")
+                    )
                     sh[solution_key] = [seas_class, None, solution]
                 else:
                     dist = seas_class(conf.dists[var_name], var, self.times,
@@ -896,21 +907,24 @@ class VGBase(object):
 
             else:
                 if self.verbose:
-                    print("\tRecover previous fit from shelve for: ", var_name)
+                    print("\tRecover previous fit from shelve for: ",
+                          var_name)
                 seas_class, dist_class, solution = sh[solution_key]
                 try:
                     supplements = sh[solution_key + "suppl"]
                 except KeyError:
                     supplements = None
                     sh[solution_key + "suppl"] = None
-                if len(self.times) > len(var):
-                    # we assume we were called from predict in which case
-                    # we have to pass the past data in here and not the
-                    # passed data, hehe
-                    var_ = self.data_raw[var_ii]
-                else:
-                    var_ = var
-                if (seas_class is skde.SeasonalKDE or
+
+                # if len(self.times) > len(var):
+                #     # we assume we were called from predict in which case
+                #     # we have to pass the past data in here and not the
+                #     # passed data, hehe
+                #     var_ = self.data_raw[var_ii]
+                # else:
+                #     var_ = var
+                var_ = var
+                if (issubclass(seas_class, skde.SeasonalKDE) or
                         seas_class == "empirical"):
                     dist = seas_class(var_, self.times, solution,
                                       fixed_pars=conf.par_known[var_name],
@@ -928,6 +942,8 @@ class VGBase(object):
                 print("\tp-value of chi2 goodness-of-fit %.4f" %
                       dist.chi2_test())
             quantiles = dist.cdf(solution, x=var, doys=doys)
+            assert np.nanmin(quantiles) >= 0
+            assert np.nanmax(quantiles) <= 1
             data_trans[var_ii] = distributions.norm.ppf(quantiles)
             dist_sol[var_name] = dist, solution
         sh.close()
@@ -937,7 +953,7 @@ class VGBase(object):
             data_trans_finite = np.where(np.isfinite(data_trans),
                                          data_trans, 1e300)
             data_trans[np.abs(data_trans_finite) >= 1e300] = np.nan
-            data_trans = my.interp_nan(data_trans)
+            data_trans = my.interp_nan(data_trans, max_interp=3)
         return data_trans, dist_sol
 
     def _fit_seasonal_hourly(self, refit=None):
@@ -1149,8 +1165,8 @@ if __name__ == '__main__':
     vg.conf = vg.vg_base.conf = vg.vg_plotting.conf = conf
     met_vg = vg.VG(("R", "theta", "ILWR", "Qsw", "rh", "u", "v"),
                    refit="R",
-                   verbose=True)
+                   verbose=True, plot=True)
     met_vg.fit(p=3)
     simt, sim = met_vg.simulate()
-    met_vg.plot_exceedance_daily()
+    # met_vg.plot_exceedance_daily()
     plt.show()
