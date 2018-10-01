@@ -59,6 +59,8 @@ def dump_data(times_, data, var_names, p, q, extra="", random_state=None,
     a pickle file."""
     if out_dir is None:
         out_dir = conf.out_dir
+    if p is None:
+        p = 0
     if conversions:
         for conversion in list(conversions):
             times_, data, var_names = conversion(times_, data, var_names)
@@ -773,11 +775,17 @@ class VG(vg_plotting.VGPlotting):
         self.sim, self.sim_sea = sim, sim_sea
 
         if self.dump:
+            extra = "" if self.station_name is None else self.station_name
             self.outfilepath = \
-                dump_data(self.sim_times, self.sim_sea, self.var_names, self.p,
+                dump_data(self.sim_times,
+                          self.sim_sea,
+                          self.var_names,
+                          self.p,
                           0 if self.q is None else self.q,
+                          extra=extra,
                           random_state=pre_sim_random_state,
-                          out_dir=self.data_dir, conversions=conf.conversions)
+                          out_dir=self.data_dir,
+                          conversions=conf.conversions)
 
         return self.sim_times, sim_sea
 
@@ -903,8 +911,8 @@ class VG(vg_plotting.VGPlotting):
         # how many timesteps are there per day in the input data?
         # we assume that the data is not finer than hours
         hours_unique = np.unique([dtime.hour for dtime in self.times_orig])
-        # read timesteps per day (abbreviation, because it is used a lot as an
-        # index modifier below
+        # read timesteps per day (abbreviation, because it is used a
+        # lot as an index modifier below)
         tpd = len(hours_unique)
 
         self.dis_times = self._gen_sim_times((self.T - 1) * tpd,
@@ -1298,7 +1306,7 @@ class VG(vg_plotting.VGPlotting):
                                  n_prev_steps - shift, 1)
                 col = plt.cm.jet(1 -
                                  old_div(float(shift - self.p - 1),
-                                 (n_prev_steps - self.p - 1)),
+                                         (n_prev_steps - self.p - 1)),
                                  alpha=.5)
                 for var_i, ax in enumerate(axes):
                     ax.plot(hindcast_dtimes, hindcast[var_i], "-",
@@ -1598,7 +1606,7 @@ if __name__ == "__main__":
                  "Qsw", "rh", "u", "v"
                  ),
                 # non_rain=("theta", "Qsw", "rh"),
-                # refit=True,
+                refit=True,
                 verbose=True, dump_data=True)
     simt, sim = met_vg.simulate()
     met_vg.disaggregate()
