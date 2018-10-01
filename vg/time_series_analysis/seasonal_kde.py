@@ -148,8 +148,8 @@ class SeasonalKDE(seasonal.Seasonal):
             # we have to lift the smoothed maxs above the actual data maxs
             diffs = data_maxs - data_maxs_smooth
             # ideal would be a kernel width, but we do not have those yet
-            diff_thresh = (old_div((data_maxs.mean() - data_mins.mean()),
-                           (old_div(len(self.data), len(self.doys_unique)))))
+            diff_thresh = ((data_maxs.mean() - data_mins.mean()) /
+                           (len(self.data) / len(self.doys_unique)))
             while np.any(diffs > -diff_thresh):
                 add = np.zeros_like(diffs)
                 argmax = np.argmax(diffs)
@@ -337,7 +337,7 @@ class SeasonalKDE(seasonal.Seasonal):
         chi_test = np.sum(old_div((observed - expected) ** 2, expected))
         # degrees of freedom:
         dof = k - 1
-        return stats.chisqprob(chi_test, dof)
+        return stats.chi2.sf(chi_test, dof)
 
     @property
     def kernel_widths(self):
@@ -418,13 +418,8 @@ class SeasonalKDE(seasonal.Seasonal):
         ax1 = fig.gca()
         ax1.contourf(doys, self.x_grid / n_sumup, self.density_grid, 15)
         plt.set_cmap("coolwarm")
-#        plt.colorbar(co)
         plt.scatter(self.doys, self.data / n_sumup, facecolors=(0, 0, 0, 0),
                     edgecolors=(0, 0, 0, opacity), **s_kwds)
-#        plt.plot(self.doys_unique, self.lower_bound(self.doys_unique), "r",
-#                 label="lower bound")
-#        plt.plot(self.doys_unique, self.upper_bound(self.doys_unique), "r",
-#                 label="upper bound")
         ax1.set_ylim(self.x_grid.min() / n_sumup, self.x_grid.max() / n_sumup)
 
         if plot_kernel_width:
@@ -438,12 +433,9 @@ class SeasonalKDE(seasonal.Seasonal):
                    ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug',
                     'Sep', 'Oct', 'Nov', 'Dec'), rotation=45)
 
-#        plt.xlabel("Day of Year")
         plt.grid()
-        # plt.legend()
         if title is not None:
             plt.title(title)
-        # plt.tight_layout()
         return fig, ax1
 
     def scatter_cdf(self, solution, n_sumup=1, figsize=None, title=None):
@@ -454,10 +446,6 @@ class SeasonalKDE(seasonal.Seasonal):
         plt.colorbar(co)
         plt.scatter(self.doys, old_div(self.data, n_sumup), marker="o",
                     facecolors=(0, 0, 0, 0), edgecolors=(0, 0, 0, .5))
-#        plt.plot(self.doys_unique, self.lower_bound(self.doys_unique), "r",
-#                 label="lower bound")
-#        plt.plot(self.doys_unique, self.upper_bound(self.doys_unique), "r",
-#                 label="upper bound")
         ax1.set_ylim(self.x_grid.min(), self.x_grid.max())
         ax2 = plt.gca().twinx()
         ax2.plot(self.doys_unique, self.kernel_widths, label="Kernel width")
@@ -489,7 +477,6 @@ def doy_hour_fft(data, dtimes, order=4):
         fast fourier parameters for each hour.
     """
     xx = np.copy(data)
-#    doys_int = times.time_part(dtimes, "%Y")
     hours_int = np.array([dtime.hour for dtime in dtimes])
     fft_pars = []
     # approximate cycles of values for a given hour
