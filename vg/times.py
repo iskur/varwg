@@ -172,6 +172,26 @@ def datetime2cwr(dt):
         return datetime2cwr_single(dt)
 
 
+def date2jdn(dates):
+    """Converts date object to julian day number (without hours!)
+    """
+    def date2jdn_single(date):
+        a = (14 - date.month) // 12
+        y = date.year + 4800 - a
+        m = date.month + 12 * a - 3
+
+        return (date.day
+           + (153 * m + 2) // 5
+           + 365 * y
+           + y // 4
+           - y // 100
+           + y // 400 - 32045)
+    try:
+        return np.array([date2jdn_single(date) for date in dates])
+    except TypeError:
+        return date2jdn_single(dates)
+
+    
 def datetime2cwr_old(dt):
     return unix2cwr(datetime2unix(dt))
 
@@ -804,7 +824,7 @@ def periodic_distance(x1, x2, period):
     """
     period = float(period)
     dist = (x1 - x2) % period
-    return np.where(dist > old_div(period, 2), period - dist, dist)
+    return np.where(dist > period / 2, period - dist, dist)
 
 
 def doy_distance(doy1, doy2):
