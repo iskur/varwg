@@ -137,6 +137,11 @@ class Spectral(object):
         return ((np.real(self.ifft_func(rand)) * self.npoints)[self.mslice] *
                 self.sigma)
 
+    def sim_white(self, epsilon):
+        rand = epsilon * self.sqrt_fft_covs
+        return ((np.real(self.ifft_func(rand)) * self.npoints)[self.mslice] *
+                self.sigma)
+
     def sim_n(self, n):
         """Return (n x *size) array of simulations.  Will return a random
         sample of a pool, if a pool_size was given in initialization.
