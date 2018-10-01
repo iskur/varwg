@@ -47,10 +47,12 @@ class VGPlotting(vg_base.VGBase):
     Caching features will be disabled to not overwrite anything more useful.
     """
 
-    def __init__(self, var_names, met_file=None, sum_interval=24, plot=False,
-                 separator="\t", refit=None, detrend_vars=None, verbose=False,
-                 data_dir=None, cache_dir=None, seasonal_fitting=False,
-                 dump_data=False, non_rain=None, **met_kwds):
+    def __init__(self, var_names, met_file=None, sum_interval=24,
+                 plot=False, separator="\t", refit=None,
+                 detrend_vars=None, verbose=False, data_dir=None,
+                 cache_dir=None, seasonal_fitting=False,
+                 dump_data=False, non_rain=None, rain_method=None,
+                 **met_kwds):
         # signal for VGBase to not do the seasonal fitting, which takes time
         # and the reason to initiate VGPlotting might be that you just plot
         # something quickly
@@ -66,6 +68,7 @@ class VGPlotting(vg_base.VGBase):
                                          cache_dir=cache_dir,
                                          dump_data=dump_data,
                                          non_rain=non_rain,
+                                         rain_method=rain_method,
                                          **met_kwds)
 
     def plot_all(self, *args, **kwds):
@@ -114,7 +117,8 @@ class VGPlotting(vg_base.VGBase):
         return [conf.units[var] if var in conf.units else "[?]"
                 for var in self.var_names]
 
-    def plot_exceedance_daily(self, thresh=None):
+    def plot_exceedance_daily(self, thresh=None, fig=None, axs=None,
+                            *args, **kwds):
         if "R" not in self.var_names:
             warnings.warn("No R in var_names, no plot_exceedance_daily")
             return
@@ -123,11 +127,22 @@ class VGPlotting(vg_base.VGBase):
         rain_i = self.var_names.index("R")
         sim = self.sim_sea[rain_i]
         obs = self.data_raw[rain_i] / self.sum_interval[rain_i]
-        return rain_stats.plot_exceedance(obs, sim, kind="all", thresh=thresh)
+        fig, axs = rain_stats.plot_exceedance(obs, sim, kind="all",
+                                              thresh=thresh, fig=fig,
+                                              axs=axs, *args, **kwds)
+        title_str = "Precipitation exceedance"
+        if self.station_name is not None:
+            title_str = "%s %s" % (title_str, self.station_name)
+        fig.suptitle(title_str)
+        return fig, axs
 
-    def plot_exeedance_hourly(self, thresh=None):
+    def plot_exeedance_hourly(self, thresh=None, fig=None, axs=None,
+                            *args, **kwds):
         if "R" not in self.var_names:
             warnings.warn("No R in var_names, no plot_exceedance_hourly")
+            return
+        if self.sim_sea is None:
+            warnings.warn("Call simulate first.")
             return
         if self.sim_sea_dis is None:
             warnings.warn("No hourly simulation available")
@@ -137,17 +152,9 @@ class VGPlotting(vg_base.VGBase):
         rain_i = self.var_names.index("R")
         sim = self.sim_sea_dis[rain_i]
         obs = self.met["R"]
-        return rain_stats.plot_exceedance(obs, sim, kind="all", thresh=thresh)
-
-    def plot_transformed_daily(self, var_names=None):
-        return self.plot_meteogramm(var_names=var_names, trans=True)
-
-    def plot_transformed_hourly(self, var_names=None):
-        if hasattr(self, "data_trans_hourly"):
-            return self.plot_meteogramm(var_names=var_names, trans=True,
-                                        hourly=True)
-        else:
-            warnings.warn("No disaggregation, no plot_transformed_hourly")
+        return rain_stats.plot_exceedance(obs, sim, kind="all",
+                                     thresh=thresh, fig=None,
+                                     axs=None, *args, **kwds)
 
     def plot_psd(self, var_names=None, hourly=False, *args, **kwds):
         """Plots power spectral density using matplotlib.pyplot.psd.
@@ -192,6 +199,8 @@ class VGPlotting(vg_base.VGBase):
             axs[var_i].set_xscale('log')
             axs[var_i].set_ylabel("%s [dB/Hz]" % var_name)
         axs[0].legend(loc="best")
+        if self.station_name is not None:
+            suptitle = "%s %s" % (self.station_name, suptitle)
         fig.suptitle(suptitle)
         fig.name = name
 
@@ -220,54 +229,55 @@ class VGPlotting(vg_base.VGBase):
         # when given a string, this does not separate the letters, as tuple()
         # or list does
         var_names = np.atleast_1d(var_names)
-        figs = []
-        for var_name in var_names:
+        fig, axs = plt.subplots(nrows=len(var_names))
+        for ax, var_name in zip(axs, var_names):
             var_ii = self.var_names.index(var_name)
-            fig = plt.figure()
-            figs.append(fig)
             if hourly:
-                plt.scatter(times.datetime2doy(self.times_orig),
-                            self.met[var_name],
-                            marker="o", edgecolors=(0, 0, 1, opacity),
-                            facecolors=(0, 0, 0, 0), label="measured"
-                            )
+                ax.scatter(times.datetime2doy(self.times_orig),
+                           self.met[var_name],
+                           marker="o", edgecolors=(0, 0, 1, opacity),
+                           facecolors=(0, 0, 0, 0), label="measured")
             else:
-                plt.scatter(self.data_doys,
-                            old_div(self.data_raw[var_ii], self.sum_interval[var_ii]),
-                            marker="o", edgecolors=(0, 0, 1, opacity),
-                            facecolors=(0, 0, 0, 0), label="measured")
+                ax.scatter(self.data_doys,
+                           self.data_raw[var_ii] / self.sum_interval[var_ii],
+                           marker="o", edgecolors=(0, 0, 1, opacity),
+                           facecolors=(0, 0, 0, 0), label="measured")
 
             if self.sim_sea is not None:
                 if hourly:
-                    plt.scatter(self.dis_doys, self.sim_sea_dis[var_ii],
-                                marker="o", edgecolors=(1, 0, 0, opacity),
-                                facecolors=(0, 0, 0, 0),
-                                label="simulated backtransformed")
+                    ax.scatter(self.dis_doys, self.sim_sea_dis[var_ii],
+                               marker="o", edgecolors=(1, 0, 0, opacity),
+                               facecolors=(0, 0, 0, 0),
+                               label="simulated backtransformed")
                 else:
-                    plt.scatter(self.sim_doys, self.sim_sea[var_ii],
-                                marker="o", edgecolors=(1, 0, 0, opacity),
-                                facecolors=(0, 0, 0, 0),
-                                label="simulated backtransformed")
-            plt.xlabel("doy")
-            plt.ylabel("%s %s" % (var_names_greek(self.var_names)[var_ii],
-                                  conf.units[var_name]))
-            plt.legend(loc="best")
-            plt.grid()
-            title_str = "Seasonal scatter %s" % conf.long_var_names[var_name]
-            plt.xlim(0, 366)
-            plt.title(title_str)
-            fig.canvas.set_window_title("%s (%d)" %
-                                        (title_str, fig.canvas.manager.num))
-        return figs
+                    ax.scatter(self.sim_doys, self.sim_sea[var_ii],
+                               marker="o", edgecolors=(1, 0, 0, opacity),
+                               facecolors=(0, 0, 0, 0),
+                               label="simulated backtransformed")
+            ax.set_xlabel("doy")
+            ax.set_ylabel("%s %s" %
+                          (var_names_greek(self.var_names)[var_ii],
+                           conf.units[var_name]))
+            ax.legend(loc="best")
+            ax.grid(True)
+            ax.set_xlim(0, 366)
+            ax.set_title(conf.long_var_names[var_name])
+        title_str = "Seasonal scatter"
+        if self.station_name is not None:
+            title_str = "%s %s" % (self.station_name, title_str)
+        fig.suptitle(title_str)
+        fig.canvas.set_window_title("%s (%d)" %
+                                    (title_str, fig.canvas.manager.num))
+        return fig
 
-    def plot_meteogramm(self, var_names=None, hourly=False,
-                        trans=False, **f_kwds):
-        """All variables over time in subplots.
-        (Not as nice as the meteogramm from vg.meteo)
-        """
-        def meteogramm(time, data, suptitle, var_names):
+    def _meteogramm(self, time, data, suptitle, var_names,
+                    station_name=None, fig=None, axs=None, **f_kwds):
+        if fig is None:
             fig = plt.figure(**f_kwds)
-            K = data.shape[0]
+        if var_names is None:
+            var_names = self.var_names
+        K = data.shape[0]
+        if axs is None:
             gs = gridspec.GridSpec(K, 2, width_ratios=[8, 1])
             axs = np.empty((K, 2), dtype=object)
             for i in range(K):
@@ -277,25 +287,34 @@ class VGPlotting(vg_base.VGBase):
                     axs[i, 0] = plt.subplot(gs[i, 0], sharex=axs[i - 1, 0])
                 axs[i, 1] = plt.subplot(gs[i, 1], sharey=axs[i, 0])
 
-            for var_i, var_name in enumerate(var_names):
-                plt.xticks(rotation=70)
-                axs[var_i, 0].plot(time, data[var_i], label=var_name)
-                axs[var_i, 0].grid(True)
-                axs[var_i, 0].set_ylabel("%s %s" % (conf.ygreek[var_name],
-                                                    conf.units[var_name]))
-                finite_mask = np.isfinite(data[var_i])
-                try:
-                    axs[var_i, 1].hist(data[var_i, finite_mask], 40,
-                                       normed=True,
-                                       orientation="horizontal")
-                except TypeError:
-                    pass
-                if var_i != K - 1:
-                    axs[var_i, 0].set_xticklabels("")
-                axs[var_i, 1].set_xticklabels("")
-            plt.suptitle(suptitle)
-            return fig, axs
+        for var_i, var_name in enumerate(var_names):
+            plt.xticks(rotation=70)
+            axs[var_i, 0].plot(time, data[var_i], label=var_name)
+            axs[var_i, 0].grid(True)
+            axs[var_i, 0].set_ylabel("%s %s" % (conf.ygreek[var_name],
+                                                conf.units[var_name]))
+            finite_mask = np.isfinite(data[var_i])
+            try:
+                axs[var_i, 1].hist(data[var_i, finite_mask], 40,
+                                   density=True, histtype="step",
+                                   orientation="horizontal")
+            except TypeError:
+                pass
+            if var_i != (K - 1):
+                axs[var_i, 0].set_xticklabels("")
+            axs[var_i, 1].set_xticklabels("")
+        if station_name is not None:
+            suptitle = "%s %s" % (self.station_name, suptitle)
+        plt.suptitle(suptitle)
+        return fig, axs
 
+    def plot_meteogramm_daily(self, var_names=None, figs=None,
+                              axss=None, plot_sim_sea=True,
+                            **f_kwds):
+        if figs is None:
+            figs = 2 * [None]
+        if axss is None:
+            axss = 2 * [None]
         if self.ex_in is None:
             data = old_div(self.data_raw, self.sum_interval)
             var_names = self.var_names
@@ -305,55 +324,79 @@ class VGPlotting(vg_base.VGBase):
                 R_index = var_names.index("R")
                 data[R_index] *= self.sum_interval[R_index]
             var_names = list(self.var_names) + ["external"]
-        if not trans:
-            fig, axs = meteogramm(self.times, data, "Measured daily",
-                                  var_names)
-            fig.name = "meteogramm_measured_daily"
 
-        if self.sim_sea is not None and not trans:
+        fig, axs = self._meteogramm(self.times, data,
+                                    "Measured daily",
+                                    var_names, fig=figs[0],
+                                    axs=axss[0],
+                                    station_name=self.station_name)
+        fig.name = "meteogramm_measured_daily"
+
+        if plot_sim_sea and self.sim_sea is not None:
             if self.ex_out is None:
                 data = self.sim_sea
                 var_names = self.var_names
             else:
                 data = np.vstack((self.sim_sea, self.ex_out))
                 var_names = list(self.var_names) + ["external"]
-            fig_, axs_ = meteogramm(self.sim_times, data, "Simulated daily",
-                                    var_names)
+            fig_, axs_ = self._meteogramm(self.sim_times, data,
+                                          "Simulated daily",
+                                          var_names, fig=figs[1],
+                                          axs=axss[1],
+                                          station_name=self.station_name)
             fig_.name = "meteogramm_sim_daily"
             fig, axs = [fig, fig_], [axs, axs_]
+        return fig, axs
 
-        if trans:
-            if not hourly:
-                fig, axs = meteogramm(self.times, self.data_trans,
-                                      "Observed transformed", var_names)
-                fig.name = "meteogramm_measured_daily_trans"
-                if self.sim is not None:
-                    fig_, axs_ = meteogramm(self.sim_times, self.sim,
-                                            "Simulated std-normal", var_names)
-                    fig_.name = "meteogramm_sim_trans"
-                    fig = [fig, fig_]
-                    axs = [axs, axs_]
-            if hourly:
-                fig, axs = meteogramm(self.times_orig, self.data_trans_hourly,
-                                      "Observed transformed hourly",
-                                      var_names)
-                fig.name = "meteogramm_measured_hourly_trans"
+    def plot_meteogramm_trans(self, var_names=None, figs=None,
+                              axss=None, **f_kwds):
+        if figs is None:
+            figs = 2 * [None]
+        if axss is None:
+            axss = 2 * [None]
+        fig, axs = self._meteogramm(self.times, self.data_trans,
+                                    "Observed transformed", var_names,
+                                    fig=figs[0], axs=axss[0],
+                                    station_name=self.station_name)
+        fig.name = "meteogramm_measured_daily_trans"
+        if self.sim is not None:
+            fig_, axs_ = self._meteogramm(self.sim_times, self.sim,
+                                          "Simulated std-normal",
+                                          var_names, fig=figs[1],
+                                          axs=axss[1],
+                                          station_name=self.station_name)
+            fig_.name = "meteogramm_sim_trans"
+            fig, axs = [fig, fig_], [axs, axs_]
+        return fig, axs
 
-        if hourly or self.sim_sea_dis is not None:
-            met_array = \
-                vg_base.met_as_array(self.met, var_names=self.var_names)
-            fig1, axs1 = meteogramm(self.times_orig, met_array,
-                                    "Measured hourly", var_names)
-            fig1.name = "meteogramm_measured_houry"
-            fig = [fig, fig1]
-            axs = [axs, axs1]
-            if self.sim_sea_dis is not None:
-                fig2, axs2 = meteogramm(self.dis_times, self.sim_sea_dis,
-                                        "Simulated hourly", var_names)
-                fig2.name = "meteogramm_sim_hourly"
-                fig += [fig2]
-                axs += [axs2]
+    def plot_meteogramm_hourly(self, var_names=None, figs=None,
+                               axss=None, **f_kwds):
+        """All variables over time in subplots.
+        (Not as nice as the meteogramm from vg.meteo)
+        """
+        # fig, axs = meteogramm(self.times_orig, self.data_trans_hourly,
+        #                       "Observed transformed hourly",
+        #                       var_names)
+        # fig.name = "meteogramm_measured_hourly_trans"
+        if figs is None:
+            figs = 2 * [None]
+        if axss is None:
+            axss = 2 * [None]
+        met_array = \
+            vg_base.met_as_array(self.met, var_names=self.var_names)
+        fig, axs = self._meteogramm(self.times_orig, met_array,
+                                    "Measured hourly", var_names,
+                                    fig=figs[0], axs=axss[0],
+                                    station_name=self.station_name)
+        fig.name = "meteogramm_measured_houry"
 
+        if self.sim_sea_dis is not None:
+            fig_, axs_ = self._meteogramm(self.dis_times, self.sim_sea_dis,
+                                          "Simulated hourly", var_names,
+                                          fig=figs[1], axs=axss[1],
+                                          station_name=self.station_name)
+            fig_.name = "meteogramm_sim_hourly"
+            fig, axs = [fig, fig_], [axs, axs_]
         return fig, axs
 
     def plot_doy_scatter_residuals(self, var_names=None, opacity=.4):
@@ -568,10 +611,14 @@ class VGPlotting(vg_base.VGBase):
             fig.name = "scatter_pdf_%s_%s" % (var_name, discr_str)
             plt.ylabel(conf.units[var_name]
                        if var_name in conf.units else "[?]")
-            fig.canvas.set_window_title("Scatter pdf %s (%d) %s"
-                                        % (var_name,
-                                           fig.canvas.manager.num,
-                                           discr_str))
+            title_str = ("Scatter pdf %s (%d) %s"
+                         % (var_name,
+                            fig.canvas.manager.num,
+                            discr_str))
+            if self.station_name is not None:
+                title_str = "%s %s" % (self.station_name, title_str)
+            ax.set_title(title_str)
+            fig.canvas.set_window_title(title_str)
             figs += [fig]
             axes += [ax]
 
@@ -579,20 +626,27 @@ class VGPlotting(vg_base.VGBase):
                 fig = plt.figure(*args, **kwds)
                 var_ii = self.var_names.index(var_name)
                 quantiles = dist.cdf(solution, x=values, doys=doys)
-                my.hist(quantiles, n_bins, fig=fig, kde=kde)
-                plt.title("Quantiles %s" % var_name)
-                fig.canvas.set_window_title("Quantiles %s (%d) %s"
-                                            % (var_name,
-                                               fig.canvas.manager.num,
-                                               discr_str))
+                my.hist(quantiles[np.isfinite(quantiles)],
+                        n_bins, fig=fig, kde=kde)
+                title_str = ("Quantiles %s (%d) %s"
+                             % (var_name,
+                                fig.canvas.manager.num,
+                                discr_str))
+                if self.station_name is not None:
+                    title_str = "%s %s" % (self.station_name, title_str)
+                plt.title(title_str)
+                fig.canvas.set_window_title(title_str)
                 fig.name = ("scatter_pdf_quantiles_%s_%s" %
                             (var_name, discr_str))
                 figs += [fig]
 
+            suptitle = "%s %s" % (var_name, discr_str)
+            if self.station_name is not None:
+                suptitle = "%s %s" % (self.station_name, suptitle)
             if plot_fourier:
                 if isinstance(dist, sd.SeasonalDist):
                     fig, _ = dist.plot_fourier_fit()
-                    fig.suptitle("%s %s" % (var_name, discr_str))
+                    fig.suptitle(suptitle)
                     fig.name = "scatter_pdf_fft_%s_%s" % (var_name, discr_str)
                     figs += [fig]
 
@@ -601,9 +655,9 @@ class VGPlotting(vg_base.VGBase):
                     fig = dist.plot_monthly_fit()
                     try:
                         for f in fig:
-                            f.suptitle("%s %s" % (var_name, discr_str))
+                            f.suptitle(suptitle)
                     except TypeError:
-                        fig.suptitle("%s %s" % (var_name, discr_str))
+                        fig.suptitle(suptitle)
                     figs += [fig]
         return figs, axes
 
@@ -644,7 +698,8 @@ class VGPlotting(vg_base.VGBase):
                 self.var_names_dis is not None and
                     var_name in self.var_names_dis):
 
-                obs_dis_all = self.met[var_name][:self.sim_sea_dis.shape[1]]
+                obs_dis_all = np.array(self.met[var_name]
+                                       )[:self.sim_sea_dis.shape[1]]
                 finite_obs = np.isfinite(obs_dis_all)
                 var_i_dis = self.var_names_dis.index(var_name)
                 obs_dis = np.sort(np.copy(obs_dis_all[finite_obs]))
@@ -672,7 +727,11 @@ class VGPlotting(vg_base.VGBase):
             for ax in axes[n_axes:]:
                 fig.delaxes(ax)
             plt.draw()
-        fig.canvas.set_window_title("QQ-plots")
+        title_str = "QQ-plots"
+        if self.station_name is not None:
+            title_str = "%s %s" % (title_str, self.station_name)
+        fig.suptitle(title_str)
+        fig.canvas.set_window_title(title_str)
         fig.name = "qq"
         return fig, axes
 
@@ -793,7 +852,7 @@ class VGPlotting(vg_base.VGBase):
             if self.sim_sea_dis is not None:
                 fig_ = ts.corr_img(self.sim_sea_dis, 0, "Simulated hourly",
                                    greek_short, *args, **kwds)
-                fig_.name = "corr_sim_daily"
+                fig_.name = "corr_sim_hourly"
                 fig += [fig_]
         return fig
 
@@ -864,7 +923,10 @@ class VGPlotting(vg_base.VGBase):
         if self.sim_sea is not None:
             fig, axs = ts.plot_cross_corr(self.sim_sea, linestyle="--",
                                           fig=fig, axs=axs, **kwds)
-        plt.suptitle("Daily")
+        suptitle = "Daily"
+        if self.station_name is not None:
+            suptitle = "%s %s" % (self.station_name, suptitle)
+        plt.suptitle(suptitle)
 
         if self.sim_sea_dis is not None:
             met_array = vg_base.met_as_array(self.met,
@@ -873,7 +935,10 @@ class VGPlotting(vg_base.VGBase):
             fig1, axs1 = ts.plot_cross_corr(met_array, figsize=figsize, **kwds)
             fig1, axs1 = ts.plot_cross_corr(self.sim_sea_dis, linestyle="--",
                                             fig=fig1, axs=axs1, **kwds)
-            plt.suptitle("Hourly")
+            suptitle = "Hourly"
+            if self.station_name is not None:
+                suptitle = "%s %s" % (self.station_name, suptitle)
+            plt.suptitle(suptitle)
             fig = [fig, fig1]
             axs = [axs, axs1]
 
@@ -933,7 +998,11 @@ class VGPlotting(vg_base.VGBase):
                 axs[month].set_title(month + 1)
             if self.sim_sea is not None:
                 axs[0].legend(("observed", "simulated"), loc="best")
-            fig.suptitle(var_name)
+
+            suptitle = var_name
+            if self.station_name is not None:
+                suptitle = "%s %s" % (self.station_name, suptitle)
+            fig.suptitle(suptitle)
             fig.tight_layout(rect=(0, 0, 1, .95))
             figs += [fig]
         if len(figs) == 1:
@@ -990,9 +1059,11 @@ class VGPlotting(vg_base.VGBase):
             axes[0].legend(legend1, loc="best")
             axes[1].legend(legend2, loc="best")
 
-            title = "Episode statistics %s" % var_name
-            fig.suptitle(title)
-            fig.canvas.set_window_title(title)
+            suptitle = "Episode statistics %s" % var_name
+            if self.station_name is not None:
+                suptitle = "%s %s" % (self.station_name, suptitle)
+            fig.suptitle(suptitle)
+            fig.canvas.set_window_title(suptitle)
             figs += [fig]
         return figs
 

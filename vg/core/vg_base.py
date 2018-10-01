@@ -243,9 +243,10 @@ class VGBase(object):
 
     """Handle everything except plotting."""
 
-    def __init__(self, var_names, met_file=None, sum_interval=24, plot=False,
-                 separator="\t", refit=None, detrend_vars=None, verbose=False,
-                 data_dir=None, cache_dir=None, dump_data=True, non_rain=None,
+    def __init__(self, var_names, met_file=None, sum_interval=24,
+                 plot=False, separator="\t", refit=None, detrend_vars=None,
+                 verbose=False, data_dir=None, cache_dir=None,
+                 dump_data=True, non_rain=None, rain_method=None,
                  **met_kwds):
         # external_var_names=None,
         # external_var_names : sequence of str, optional
@@ -323,7 +324,8 @@ class VGBase(object):
             self.data_trans = self._negative_rain(self.data_trans,
                                                   rain,
                                                   self.data_doys,
-                                                  non_rain)
+                                                  non_rain,
+                                                  method=rain_method)
 
     @property
     def sum_interval_dict(self):
@@ -434,7 +436,6 @@ class VGBase(object):
             return x % y if y != 0 else 0
 
         seasonal = doys_in is not None and doys_out is not None
-
         if seasonal:
             pool0 = np.where(times.doy_distance(doys_out[0], doys_in) <=
                              doy_tolerance)[0]
@@ -502,7 +503,8 @@ class VGBase(object):
             limits = copy.copy(conf.par_known[var_name])
             if var_name.startswith("Qsw"):
                 def pot_s(doys):
-                    hourly = meteox2y.pot_s_rad(doys, lat=conf.latitude,
+                    hourly = meteox2y.pot_s_rad(doys,
+                                                lat=conf.latitude,
                                                 longt=conf.longitude)
                     return hourly * self.sum_interval[var_i]
                 limits["u"] = pot_s
@@ -632,7 +634,6 @@ class VGBase(object):
     def _load_and_prepare_data(self, delimiter="\t", **met_kwds):
         """Loading the data from the met_file and aggregate it according to
         sum_interval (both defined in __init__). Plus plotting if requested."""
-
         if not os.path.exists(self.cache_dir):
             os.makedirs(self.cache_dir)
 
@@ -1009,7 +1010,8 @@ class VGBase(object):
         dry_doys = times.datetime2doy(self.times[~rain_mask])
         return doy_means.ix[dry_doys].as_matrix().T
 
-    def _negative_rain(self, data_trans, rain, doys, var_names=None):
+    def _negative_rain(self, data_trans, rain, doys, var_names=None,
+                       method="regression"):
         """
         Transform rain-gaps to standard-normal by distance to wet conditions.
 
@@ -1029,27 +1031,41 @@ class VGBase(object):
         non_rain_i = [self.var_names.index(var_name)
                       for var_name in var_names
                       if var_name != "R"]
-        non_rain = data_trans[non_rain_i]
-        threshold = conf.dists_kwds["R"]["threshold"]
+        threshold = (conf.dists_kwds["R"]["threshold"] /
+                     self.sum_interval_dict["R"])
         rain_finite = np.where(np.isfinite(rain), rain, 0)
         rain_mask = ((rain_finite / self.sum_interval_dict["R"])
                      >= threshold)
-        # calculate means of non-rain variables during wet conditions
-        non_rain_finite = np.where(np.isfinite(rain), non_rain, np.nan)
-        # wet_means = np.nanmean(non_rain_finite[:, rain_mask], axis=1)[:, None]
-        wet_means = self._wet_means_by_doy(non_rain_finite, rain_mask)
-        # distance between current vector of non-rain variables and mean of
-        # wet conditions
-        distances = np.sum(wet_means - non_rain[:, ~rain_mask], axis=0)
-        # qq-transform the inverse distances to the lower tail of the gaussian
-        dist_ranks = my.rel_ranks(-distances)
 
-        X = np.matrix(np.array([data_trans[i, rain_mask]
-                                for i in non_rain_i]).T)
-        y = np.matrix(data_trans[rain_i, rain_mask]).T
-        beta = (X.T * X).I * X.T * y
-        rain_reg = np.array(data_trans[non_rain_i].T * beta)  # [:, rain_i]
-        dist_ranks = my.rel_ranks(rain_reg[~rain_mask])
+        def calc_dist_ranks_distance():
+            # calculate means of non-rain variables during wet conditions
+            non_rain = data_trans[non_rain_i]
+            non_rain_finite = np.where(np.isfinite(rain), non_rain, np.nan)
+            wet_means = self._wet_means_by_doy(non_rain_finite, rain_mask)
+            # distance between current vector of non-rain variables and mean of
+            # wet conditions
+            distances = np.sum(wet_means - non_rain[:, ~rain_mask], axis=0)
+            # qq-transform the inverse distances to the lower tail of
+            # the gaussian
+            return my.rel_ranks(-distances)
+
+
+        def calc_dist_ranks_regression():
+            X = np.matrix(np.array([my.interp_nan(data_trans[i, rain_mask],
+                                                  max_interp=2)
+                                    for i in non_rain_i]).T)
+            X[~np.isfinite(X)] = 0
+            assert np.all(np.isfinite(X))
+            y = np.matrix(data_trans[rain_i, rain_mask]).T
+            beta = (X.T * X).I * X.T * y
+            rain_reg = np.array(data_trans[non_rain_i].T * beta)  #[:, rain_i]
+            return my.rel_ranks(rain_reg[~rain_mask])
+
+
+        if method == "distance":
+            dist_ranks = calc_dist_ranks_distance()
+        elif method == "regression":
+            dist_ranks = calc_dist_ranks_regression()
 
         # dryness probability in the standard-normal domain
         if doys[1] - doys[0] < 1:
@@ -1057,51 +1073,49 @@ class VGBase(object):
         else:
             rain_dist, sol = self.dist_sol["R"]
         rain_prob = rain_dist.all_parameters_dict(sol, doys)["rain_prob"]
-        # trying something less deterministic
-        # dry_prob = (1 - rain_prob) * np.random.random(size=len(rain_prob))
         dry_prob = 1 - rain_prob
         neg_rain = distributions.norm.ppf(dist_ranks * dry_prob[~rain_mask])
         data_trans[rain_i, ~rain_mask] = neg_rain
 
-        # if self.verbose:
-        #     import matplotlib.pyplot as plt
-        #     X = np.matrix(np.array([data_trans[i, rain_mask]
-        #                             for i in non_rain_i]).T)
-        #     y = np.matrix(data_trans[rain_i, rain_mask]).T
-        #     beta = (X.T * X).I * X.T * y
-        #     rain_reg = np.array(data_trans[non_rain_i].T * beta)  # [:, rain_i]
-        #     # data_trans[rain_i, ~rain_mask] = np.squeeze(rain_reg[~rain_mask])
+        if self.plot:
+            import matplotlib.pyplot as plt
+            print("Wet means in std-n:")
+            # calculate means of non-rain variables during wet conditions
+            non_rain = data_trans[non_rain_i]
+            non_rain_finite = np.where(np.isfinite(rain), non_rain, np.nan)
+            wet_means = self._wet_means_by_doy(non_rain_finite, rain_mask)
 
-        #     print("Wet means in std-n:")
-        #     non_rain_var_names = (var_name for var_name in var_names
-        #                           if var_name != "R")
-        #     for var_name, wet_mean in zip(non_rain_var_names, wet_means):
-        #         print("\t%s: %.3f" % (var_name, wet_mean.mean()))
+            non_rain_var_names = (var_name for var_name in var_names
+                                  if var_name != "R")
+            for var_name, wet_mean in zip(non_rain_var_names, wet_means):
+                print("\t%s: %.3f" % (var_name, wet_mean.mean()))
 
-        #     fig, axs = plt.subplots(nrows=2)
-        #     axs[0].plot(self.times, data_trans[rain_i], "-x",
-        #                 label="rain trans")
-        #     axs[0].plot(self.times[~rain_mask], neg_rain, "-x",
-        #                 label="neg rain")
-        #     axs[0].plot(self.times, distributions.norm.ppf(1 - rain_prob))
-        #     # dists_wet = np.sum(wet_means - non_rain[:, rain_mask], axis=0)
-        #     # dists_ranks_wet = my.rel_ranks(-dists_wet)
-        #     # neg_rain_wet = distributions.norm.ppf(dry_prob[rain_mask] +
-        #     #                                       rain_prob[rain_mask] *
-        #     #                                       dists_ranks_wet)
-        #     # axs[0].plot(self.times[rain_mask], neg_rain_wet, "-x")
-        #     # axs[0].plot(self.times, rain_reg)
-        #     axs[0].legend(loc="best")
+            fig, axs = plt.subplots(nrows=2)
+            axs[0].plot(self.times, data_trans[rain_i], "-x",
+                        label="rain trans")
+            axs[0].plot(self.times[~rain_mask], neg_rain, "-x",
+                        label="neg rain")
+            axs[0].plot(self.times, distributions.norm.ppf(1 - rain_prob))
+            # dists_wet = np.sum(wet_means - non_rain[:, rain_mask], axis=0)
+            # dists_ranks_wet = my.rel_ranks(-dists_wet)
+            # neg_rain_wet = distributions.norm.ppf(dry_prob[rain_mask] +
+            #                                       rain_prob[rain_mask] *
+            #                                       dists_ranks_wet)
+            # axs[0].plot(self.times[rain_mask], neg_rain_wet, "-x")
+            # axs[0].plot(self.times, rain_reg)
+            axs[0].legend(loc="best")
 
-        #     # axs[1].scatter(data_trans[rain_i, rain_mask],
-        #     #                neg_rain_wet, marker="x")
+            # axs[1].scatter(data_trans[rain_i, rain_mask],
+            #                neg_rain_wet, marker="x")
+            X = np.matrix(np.array([data_trans[i, rain_mask]
+                                    for i in non_rain_i]).T)
+            y = np.matrix(data_trans[rain_i, rain_mask]).T
+            beta = (X.T * X).I * X.T * y
+            rain_reg = np.array(data_trans[non_rain_i].T * beta)  #[:, rain_i]
+            axs[1].scatter(data_trans[rain_i, rain_mask], rain_reg[rain_mask],
+                           marker="+", facecolor="green")
 
-        #     axs[1].scatter(data_trans[rain_i, rain_mask],
-        #                    rain_reg[rain_mask], marker="+", edgecolor="green")
-
-        #     axs[1].set_aspect("equal")
-        #     # plt.show()
-
+            axs[1].set_aspect("equal")
         return data_trans
 
 
@@ -1110,7 +1124,7 @@ if __name__ == '__main__':
     warnings.simplefilter("error", RuntimeWarning)
     import matplotlib.pyplot as plt
     import vg
-    import config_konstanz_disag as conf
+    import config_konstanz as conf
     vg.conf = vg.vg_base.conf = vg.vg_plotting.conf = conf
     met_vg = vg.VG(("R", "theta", "ILWR", "Qsw", "rh", "u", "v"),
                    refit="R",

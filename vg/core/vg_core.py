@@ -10,7 +10,7 @@ import shutil
 import pickle
 from builtins import range, str, zip
 from collections import namedtuple
-from past.builtins import basestring
+from six import string_types as basestring
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -19,6 +19,7 @@ from past.utils import old_div
 from vg.time_series_analysis import seasonal_distributions as sd
 from vg import helpers as my, times
 from vg.meteo import avrwind, meteox2y
+from vg.meteo.meteox2y import pot_s_rad, sunshine_riseset
 from vg.time_series_analysis import (conditional_sim as
                                      csim, distributions,
                                      models,
@@ -239,10 +240,11 @@ class VG(vg_plotting.VGPlotting):
     """
 
     def __init__(self, var_names, met_file=None, sum_interval=24,
-                 plot=False, separator="\t", refit=None,
-                 detrend_vars=None, verbose=True, data_dir=None,
-                 cache_dir=None, dump_data=True, non_rain=None,
-                 **met_kwds):
+               plot=False, separator="\t", refit=None,
+               detrend_vars=None, verbose=True, data_dir=None,
+               cache_dir=None, dump_data=True, non_rain=None,
+               rain_method="regression", conf_update=None,
+               station_name=None, **met_kwds):
         """A vector autoregressive moving average (VARMA) weather generator.
         Initializing a VG-object does the following:
             - read input data from a met-file
@@ -291,10 +293,22 @@ class VG(vg_plotting.VGPlotting):
             infered by the outfilepath attribute).
         non_rain : None or sequence of str, optional
             Variables used for rain gap filling.
+        rain_method : 'distance' or 'regression', optional
+            Which method to use for rain gap filling. 'distance' uses
+            euclidean distance to wet states. 'regression' uses a
+            regression to extrapolate from wet do dry amounts.
+        conf_update : dict or None, optional
+            Replaces variables in the config file.
+        station_name : str or None, optional
+            Name of the station. Usefull in combination with
+            weathercop multisite generation.
         """
         # external_var_names=None,
         # "fix" unicode problems
         var_names = [str(var_name) for var_name in var_names]
+        self.station_name = station_name
+        if conf_update is not None:
+            self._conf_update(conf_update)
         super(VG, self).__init__(var_names, met_file=met_file,
                                  sum_interval=sum_interval, plot=plot,
                                  separator=separator, refit=refit,
@@ -303,9 +317,16 @@ class VG(vg_plotting.VGPlotting):
                                  cache_dir=cache_dir,
                                  seasonal_fitting=True,
                                  dump_data=dump_data,
-                                 non_rain=non_rain, **met_kwds)
+                                 non_rain=non_rain,
+                                 rain_method=rain_method, **met_kwds)
         # simulated residuals
         self.ut = None
+
+    def _conf_update(self, conf_update):
+            for name, value in conf_update.items():
+                setattr(conf, name, value)
+                setattr(vg_base.conf, name, value)
+                setattr(vg_plotting.conf, name, value)
 
     def __getattribute__(self, name):
         # VGPlotting overwrites __getattribute__ to do a seasonal fitting
@@ -447,7 +468,8 @@ class VG(vg_plotting.VGPlotting):
                  start_str=None, stop_str=None, random_state=None,
                  ex=None, ex_kwds=None, seed_before_sim=None,
                  loc_shift=False, resample=False, res_kwds=None,
-                 asy=False, residuals=None, sim_func=None):
+                 asy=False, residuals=None, sim_func=None,
+                 sim_func_kwds=None):
         """Simulate based on data from __init__ and the fit from calling
         self.fit().
         To choose a specific order of AR and MA call fit(p, q) before calling
@@ -514,7 +536,8 @@ class VG(vg_plotting.VGPlotting):
             the beginning) will be used for spin-up.
         sim_func : None or callable, optional
             Callback to replace the time series model.
-            
+        sim_func_kwds : None or dict
+            Extra keyword arguments for sim_func
 
         Returns
         -------
@@ -565,7 +588,7 @@ class VG(vg_plotting.VGPlotting):
             self.T = T
 
         # we depend on order selection if self.fit was not called
-        if self.p is None:
+        if self.p is None and sim_func is None:
             self.fit()
 
         self.sim_times = self._gen_sim_times(start_str=start_str,
@@ -598,7 +621,9 @@ class VG(vg_plotting.VGPlotting):
         if type(seed_before_sim) is int:
             np.random.seed(seed_before_sim)
         if sim_func is not None:
-            sim = sim_func(self, sc_pars)
+            if sim_func_kwds is None:
+                sim_func_kwds = {}
+            sim = sim_func(self, sc_pars, **sim_func_kwds)
         elif resample or res_kwds is not None:
             # in contrast to the parametric models, we do not
             # transform anything
@@ -700,7 +725,7 @@ class VG(vg_plotting.VGPlotting):
         #     sim_sea = seasonal_back(self.dist_sol, sim, self.var_names,
         #                             doys=self.sim_doys)
         #     sim_sea /= self.sum_interval
-            
+
         #     # if theta_incr > 0:
         #     #     plt.scatter(self.times, self.data_raw[0] / 24)
         #     #     plt.scatter(self.times[self.res_indices],
