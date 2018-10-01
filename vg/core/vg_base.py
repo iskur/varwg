@@ -886,9 +886,7 @@ class VGBase(object):
                     dist = seas_class(var, self.times,
                                       fixed_pars=conf.par_known[var_name],
                                       verbose=self.verbose, **kwds)
-                    solution = dist.fit(
-                        silverman=(var_name == "sun")
-                    )
+                    solution = dist.fit()
                     sh[solution_key] = [seas_class, None, solution]
                 else:
                     dist = seas_class(conf.dists[var_name], var, self.times,
