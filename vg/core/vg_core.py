@@ -743,6 +743,10 @@ class VG(vg_plotting.VGPlotting):
                                 doys=self.sim_doys)
         sim_sea /= self.sum_interval
 
+        # spicyness can lead to infs
+        sim_sea[~np.isfinite(sim_sea)] = np.nan
+        sim_sea = my.interp_nan(sim_sea, max_interp=3)
+
         if loc_shift:
             sim_sea = self._location_shift_back(sim_sea)
 
