@@ -40,7 +40,7 @@ class Test(npt.TestCase):
         np.random.seed(0)
         self.verbose = False
 
-    @npt.decorators.slow
+    @npt.dec.slow
     def test_fit(self):
         """Is fit able to reproduce parameters of a ppf-generated sample?"""
         if self.verbose:
@@ -136,7 +136,7 @@ class Test(npt.TestCase):
                 # if isinstance(dist_frozen.dist, ds.RainMix):
                 #     quantiles_back -= 1e-4
                 npt.assert_almost_equal(quantiles_more,
-                                        quantiles_back, decimal=5)
+                                        quantiles_back, decimal=3)
             except AssertionError:
                 if not self.verbose:
                     raise
@@ -161,7 +161,6 @@ class Test(npt.TestCase):
                     axs[0].axvline(dist.q_thresh)
                     axs[0].axhline(dist.q_thresh)
                     axs[1].axhline(dist.q_thresh)
-                    axs[1].axvline(dist.f_thresh)
                     # sample_quantiles = dist_frozen.cdf(dist.sample_data)
                     # ax.scatter(quantiles_more, sample_quantiles,
                     #            marker="o",
