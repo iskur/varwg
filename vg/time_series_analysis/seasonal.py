@@ -15,9 +15,13 @@ class Seasonal(object):
         finite_mask = np.isfinite(data)
         self.data = data[finite_mask]
         self.datetimes = datetimes[finite_mask]
+        # self.timestep = ((self.datetimes[1] -
+        #                   self.datetimes[0]).total_seconds() //
+        #                  (60 ** 2 * 24))
         self.timestep = ((self.datetimes[1] -
-                          self.datetimes[0]).total_seconds() //
+                          self.datetimes[0]).total_seconds() /
                          (60 ** 2 * 24))
+        assert self.timestep > 0
         self.doys = times.datetime2doy(datetimes[finite_mask])
         self.doys_unique = np.unique(my.round_to_float(self.doys,
                                                        self.timestep))
@@ -25,7 +29,7 @@ class Seasonal(object):
         # might need an offset for the unique doys
         doy0_diff = self.doys.min() - self.doys_unique[0]
         self.doys_unique += doy0_diff
-        assert np.max(self.doys_unique) <= 366
+        assert np.max(self.doys_unique) <= 367
         self.dt = self.doys_unique[1] - self.doys_unique[0]
         self.n_doys = len(self.doys_unique)
         if kill_leap:
@@ -166,7 +170,8 @@ class Torus(Seasonal):
 
     def _unpadded_index(self, doy):
         doy = np.atleast_1d(doy)
-        hour_index = ((doy - doy.astype(int)) * self.hours_per_day).astype(int)
+        hour_index = ((doy - doy.astype(int))
+                      * self.hours_per_day).astype(int)
         doy_index = doy.astype(int) - 1
         return np.squeeze(hour_index), np.squeeze(doy_index)
 
