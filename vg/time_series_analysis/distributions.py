@@ -1451,6 +1451,8 @@ class Kumaraswamy(Dist):
         x = np.atleast_1d(x).astype(float)
         if np.any((x < l) | (x > u)):
             warnings.warn("Some values below lower or above upper bounds.")
+            x = np.where(x > u, u, x)
+            x = np.where(x < l, l, x)
         return 1 - (1 - (old_div((x - l), (u - l)))**a)**b
 
     def _ppf(self, qq, a, b, l=0, u=1):
