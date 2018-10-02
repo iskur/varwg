@@ -45,7 +45,7 @@ def apply_kernel_ne(kernel_width, data, eval_points=None):
     if _distances.ndim > 2:
         k_slice = ([Ellipsis] +
                    (_distances.ndim - kernel_width.ndim) * [None])
-        kernel_width = kernel_width[k_slice]
+        kernel_width = kernel_width[tuple(k_slice)]
     densities = ne.evaluate(
         "1.0 / (sqrt(2 * _pi) * kernel_width) * " +
         "exp(-_distances ** 2 / (2 * kernel_width ** 2))")
