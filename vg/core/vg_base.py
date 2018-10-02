@@ -27,7 +27,8 @@ import pyximport
 pyximport.install(setup_args={'include_dirs': np.get_include(),
                               # 'gdb_debug': True
                               },
-                  reload_support=True)
+                  # reload_support=True
+                  )
 from vg import ctimes
 
 
