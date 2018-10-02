@@ -1,13 +1,18 @@
-from builtins import range
 import os
 import shutil
 import tempfile
-import numpy as np
+import warnings
+
 import pandas as pd
-from numpy.testing import (assert_almost_equal, TestCase, run_module_suite,
-                           decorators)
+import numpy as np
+from builtins import range
+from numpy.testing import (TestCase, assert_almost_equal, dec,
+                           run_module_suite)
+
 import vg
 from vg.core import monty
+
+
 vg.conf = vg.config_template
 
 
@@ -19,9 +24,13 @@ class Test(TestCase):
     def tearDown(self):
         shutil.rmtree(self.data_dir)
 
-    @decorators.slow
+    @dec.slow
     def test_Monty(self):
         """Do we get the same results sequentially and in parallel?"""
+        import sys
+        if sys.version_info.major == 2:
+            warnings.warn("Not supported in Python 2")
+            return
         n_realizations = 2
         vg_kwds = dict(var_names=("theta", "ILWR", "Qsw", "rh", "u", "v"))
         fit_kwds = dict(p=3)
