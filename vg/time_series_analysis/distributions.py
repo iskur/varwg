@@ -388,7 +388,8 @@ class Dist(with_metaclass(DistMeta, object)):
         if lower_key:
             lower = kwds.get(lower_key)
             if lower is None:
-                lower = args[self.parameter_names.index(lower_key)]
+                lower_i = self.parameter_names.index(lower_key)
+                lower = np.atleast_1d(args[lower_i])
             if x.size == 1 and lower.size > 1:
                 x = np.full_like(lower, x)
                 mask = np.full_like(lower, mask)
@@ -401,7 +402,8 @@ class Dist(with_metaclass(DistMeta, object)):
         if upper_key:
             upper = kwds.get(upper_key)
             if upper is None:
-                upper = args[self.parameter_names.index(upper_key)]
+                upper_i = self.parameter_names.index(upper_key)
+                upper = np.atleast_1d(args[upper_i])
             if x.size == 1 and upper.size > 1:
                 x = np.full_like(upper, x)
                 mask = np.full_like(upper, mask)
