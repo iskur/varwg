@@ -993,7 +993,7 @@ class VGPlotting(vg_base.VGBase):
                 dat = data[var_i, month_ii[month]]
                 if self.sim_sea is not None:
                     dat = [dat, self.sim_sea[var_i, sim_month_ii[month]]]
-                axs[month].hist(dat, bins, density=True)
+                axs[month].hist(dat, bins, density=True, histtype="step")
                 if self.sim_sea is None:
                     dat = dat,
                 ax_cdf = axs[month].twinx()
