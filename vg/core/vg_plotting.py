@@ -189,7 +189,8 @@ class VGPlotting(vg_base.VGBase):
             suptitle = "Power spectral density - daily"
             name = "psd_daily"
 
-        for var_i, var_name in enumerate(var_names):
+        for var_name in var_names:
+            var_i = self.var_names.index(var_name)
             axs[var_i].psd(data_obs[var_i], Fs=old_div(1, dt),
                            scale_by_freq=True, label="observed",
                            *args, **kwds)
@@ -287,7 +288,8 @@ class VGPlotting(vg_base.VGBase):
                     axs[i, 0] = plt.subplot(gs[i, 0], sharex=axs[i - 1, 0])
                 axs[i, 1] = plt.subplot(gs[i, 1], sharey=axs[i, 0])
 
-        for var_i, var_name in enumerate(var_names):
+        for var_name in var_names:
+            var_i = self.var_names.index(var_name)
             plt.xticks(rotation=70)
             axs[var_i, 0].plot(time, data[var_i], label=var_name)
             axs[var_i, 0].grid(True)
@@ -406,7 +408,8 @@ class VGPlotting(vg_base.VGBase):
         # or list does
         var_names = np.atleast_1d(var_names)
         figs = []
-        for var_ii, var_name in enumerate(var_names):
+        for var_name in var_names:
+            var_ii = self.var_names.index(var_name)
             fig = plt.figure()
             figs.append(fig)
             plt.scatter(self.data_doys,
@@ -435,7 +438,8 @@ class VGPlotting(vg_base.VGBase):
             var_names = self.var_names
 
         figs = []
-        for var_ii, var_name1 in enumerate(var_names):
+        for var_name1 in var_names:
+            var_ii = self.var_names.index(var_name1)
             for var_jj in range(var_ii + 1, len(var_names)):
                 var_name2 = var_names[var_jj]
                 fig = plt.subplots(nrows=1, ncols=1,
@@ -467,7 +471,8 @@ class VGPlotting(vg_base.VGBase):
             var_names = self.var_names
 
         figs = []
-        for var_ii, var_name in enumerate(var_names):
+        for var_name in var_names:
+            var_ii = self.var_names.index(var_name)
             fig, ax = plt.subplots(nrows=1, ncols=1,
                                    subplot_kw=dict(aspect="equal"))
             figs.append(fig)
@@ -582,7 +587,8 @@ class VGPlotting(vg_base.VGBase):
             var_names = var_names,
 
         figs, axes = [], []
-        for var_ii, var_name in enumerate(var_names):
+        for var_name in var_names:
+            var_ii = self.var_names.index(var_name)
             if hourly:
                 try:
                     dist, solution = self.dist_sol_hourly(var_name)
@@ -980,7 +986,7 @@ class VGPlotting(vg_base.VGBase):
             sim_month_ii = [times.time_part(self.sim_times, "%m") == month
                             for month in range(1, 13)]
         for var_name in var_names:
-            var_i = var_names.index(var_name)
+            var_i = self.var_names.index(var_name)
             fig, axs = plt.subplots(3, 4)
             axs = axs.ravel()
             for month in range(12):
@@ -1018,7 +1024,8 @@ class VGPlotting(vg_base.VGBase):
             var_names = var_names,
 
         figs = []
-        for var_i, var_name in enumerate(var_names):
+        for var_name in var_names:
+            var_i = self.var_names.index(var_name)
             medians = self.fitted_medians(var_name, self.data_doys)
             devs_obs = \
                 self.data_raw[var_i] / self.sum_interval[var_i] - medians
