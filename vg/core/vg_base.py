@@ -75,8 +75,8 @@ def met_as_array(met, p=0, T=None, var_names=None):
     met_as_array.var_names, met_as_array.T = var_names, T
     # the "T + p" is there to include the presample timesteps.
     data = np.nan * np.empty((K, T + p))
-    for var_i, key in enumerate(var_names):
-        data[var_i] = met[key]
+    for var_name in var_names:
+        data[var_names.index(var_name)] = met[var_name]
     return data
 
 
