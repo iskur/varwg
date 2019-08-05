@@ -5,9 +5,11 @@ import numpy.testing as npt
 from vg.time_series_analysis import time_series
 import vg
 from vg.time_series_analysis import cresample
-import pyximport
-pyximport.install(setup_args={'include_dirs': np.get_include()},
-                  reload_support=True)
+
+# import pyximport
+# pyximport.install(setup_args={'include_dirs': np.get_include()},
+#                   inplace=True,
+#                   reload_support=True)
 
 
 class Test(npt.TestCase):

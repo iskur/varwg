@@ -30,13 +30,14 @@ from vg.core import vg_base, vg_plotting
 
 read_met = vg_base.read_met
 
-import pyximport
-pyximport.install(setup_args={'include_dirs': np.get_include(),
-                              # 'gdb_debug': True
-                              },
-                  reload_support=True)
+# import pyximport
+# pyximport.install(setup_args={'include_dirs': np.get_include(),
+#                               # 'gdb_debug': True
+#                               },
+#                   inplace=True,
+#                   reload_support=True)
+
 from vg.time_series_analysis import cresample
-# reload(cresample)
 
 try:
     from vg import config as conf
