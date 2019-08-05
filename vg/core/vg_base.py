@@ -23,12 +23,14 @@ from vg.meteo import avrwind, meteox2y
 from vg.time_series_analysis import (distributions,
                                      seasonal_distributions as sd)
 
-import pyximport
-pyximport.install(setup_args={'include_dirs': np.get_include(),
-                              # 'gdb_debug': True
-                              },
-                  # reload_support=True
-                  )
+# import pyximport
+# pyximport.install(setup_args={'include_dirs': np.get_include(),
+#                               # 'gdb_debug': True
+#                               },
+#                   inplace=True,
+#                   # reload_support=True
+#                   )
+
 from vg import ctimes
 
 

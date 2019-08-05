@@ -1,6 +1,7 @@
 from distribute_setup import use_setuptools
 use_setuptools()
 
+import sys
 import numpy as np
 from setuptools import setup, find_packages, findall
 from setuptools.extension import Extension
@@ -13,12 +14,27 @@ except ImportError:
     USE_CYTHON = False
     ext = ".c"
 
+if sys.platform == "win32":
+    library_dirs = ["."]
+    extra_link_args = []
+else:
+    library_dirs = []
+    extra_link_args = ["-fopenmp"]
+
 extensions = [
-    Extension("cresample", ["vg/time_series_analysis/cresample" + ext],
-              include_dirs=[np.get_include()]),
+    Extension("cresample",
+              ["vg/time_series_analysis/cresample" + ext],
+              include_dirs=[np.get_include()],
+              library_dirs=library_dirs),
     Extension("ctimes", ["vg/ctimes" + ext],
-              include_dirs=[np.get_include()]),
-]
+              include_dirs=[np.get_include()],
+              library_dirs=library_dirs),
+    Extension("meteox2y_cy",
+              ["vg/meteo/meteox2y_cy" + ext],
+              include_dirs=[np.get_include()],
+              extra_compile_args=['-fopenmp'],
+              extra_link_args=['-fopenmp'],
+              library_dirs=library_dirs)]
 
 if USE_CYTHON:
     ext_modules = cythonize(extensions)
@@ -44,6 +60,10 @@ setup(
         'pandas',
         'cython',
         'tqdm',
+        'future',
+        "timezonefinder",
+        "PICOS",
+        "cvxopt",
         ],
     # dependency_links=[
     #     'http://sourceforge.net/projects/matplotlib/files/matplotlib/matplotlib-1.1.1/',
