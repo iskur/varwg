@@ -63,6 +63,7 @@ def dump_data(times_, data, var_names, p, q, extra="", random_state=None,
     if p is None:
         p = 0
     if conversions:
+        data = np.copy(data)
         for conversion in list(conversions):
             times_, data, var_names = conversion(times_, data, var_names)
     outfilename = "VARMA_p%d_q%d_sim%s.dat" % (p, q, extra)
