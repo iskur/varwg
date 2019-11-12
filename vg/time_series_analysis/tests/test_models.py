@@ -4,38 +4,38 @@ from builtins import range
 from past.utils import old_div
 import os
 import numpy as np
-from numpy.testing import (assert_almost_equal, TestCase, run_module_suite,
-                           decorators)
-from vg.time_series_analysis import models
+import numpy.testing as npt
+import numpy.testing.decorators as decorators
+from vg.time_series_analysis import models, tests
 
 # the following parameters and data are taken from p.707 in order to test
 # functions regarding the VAR least-squares estimator
-B_test = np.matrix([
+B_test = np.array([
     [-.017, -.320, .146, .961, -.161, .115, .934],
     [.016, .044, -.153, .289, .050, .019, -.010],
     [.013, -.002, .225, -.264, .034, .355, -.022]])
-Bex_test = np.matrix([
+Bex_test = np.array([
     [-.017, -.320, .146, .961, -.161, .115, .934, .25],
     [.016, .044, -.153, .289, .050, .019, -.010, .1],
     [.013, -.002, .225, -.264, .034, .355, -.022, -.25]])
-A_test = np.matrix([
+A_test = np.array([
     [-.319, .147, .959, -.160, .115, .932],
     [.044, -.152, .286, .050, .020, -.012],
     [-.002, .225, -.264, .034, .355, -.022]])
-sigma_u_test = 1e-4 * np.matrix([[21.3, .72, 1.23],
-                                 [.72, 1.37, .61],
-                                 [1.23, .61, .89]])
+sigma_u_test = 1e-4 * np.array([[21.3, .72, 1.23],
+                                [.72, 1.37, .61],
+                                [1.23, .61, .89]])
 VAR_p = 2
 VAR_K = 3
 VARMA_p, VARMA_q = 2, 1
-e1_filepath = os.path.join(os.path.dirname(__file__), "e1.dat")
+e1_filepath = os.path.join(os.path.dirname(tests.__file__), "e1.dat")
 data = np.loadtxt(e1_filepath, skiprows=7).T
 data = np.log(data[:, 1:]) - np.log(data[:, :-1])
 data = data[:, :75]
 data_means = data.mean(axis=1).reshape((3, 1))
 
 
-class Test(TestCase):
+class Test(npt.TestCase):
     msg = "They do suggest the right p, however."
     # Test is not conclusive: solutions are for ML estimator of VAR process...
     # We get however, the same p!
@@ -47,15 +47,17 @@ class Test(TestCase):
         order_data = np.copy(data[:, 4:])
         p = 1
         K, T = order_data.shape
-        sigma_u = (float(T - K * p - 1) / T) * models.VAR_LS(order_data, p)[1]
+        sigma_u = ((float(T - K * p - 1) / T)
+                   * models.VAR_LS(order_data, p)[1])
         print(np.linalg.det(sigma_u) * 1e11)
         print(models.VAR_LS(order_data, p)[1] * 1e4)
-        objectives = np.array([(old_div(float(T - K * p_ - 1), T)) *
-                               models.AIC(models.VAR_LS(order_data, p_)[1], p_,
-                                          order_data.shape[1])
-                               for p_ in range(5)])
+        objectives = np.array(
+            [(float(T - K * p_ - 1) / T) *
+             models.AIC(models.VAR_LS(order_data, p_)[1], p_,
+                        order_data.shape[1])
+             for p_ in range(5)])
         AICs = -24 - np.array([.42, .5, .59, .41, .36])
-        assert_almost_equal(AICs, objectives, decimal=2)
+        npt.assert_almost_equal(AICs, objectives, decimal=2)
 
     @decorators.setastest(False)
     @decorators.knownfailureif(True, msg)
@@ -65,7 +67,7 @@ class Test(TestCase):
                                          order_data.shape[1])
                                for p in range(5)])
         HQs = -24 - np.array([.42, .38, .37, .07, -.1])
-        assert_almost_equal(HQs, objectives, decimal=2)
+        npt.assert_almost_equal(HQs, objectives, decimal=2)
 
     @decorators.setastest(False)
     @decorators.knownfailureif(True, msg)
@@ -75,7 +77,7 @@ class Test(TestCase):
                                          order_data.shape[1])
                                for p in range(5)])
         SCs = np.array([-24.42, -24.21, -24.02, -23.55, -23.21])
-        assert_almost_equal(SCs, objectives, decimal=2)
+        npt.assert_almost_equal(SCs, objectives, decimal=2)
 
     @decorators.setastest(False)
     @decorators.knownfailureif(True, msg)
@@ -88,7 +90,19 @@ class Test(TestCase):
                                for p in range(5)])
         objectives *= 1e11
         FPEs = np.array([2.691, 2.5, 2.272, 2.748, 2.91])
-        assert_almost_equal(FPEs, objectives, decimal=2)
+        npt.assert_almost_equal(FPEs, objectives, decimal=2)
+
+    def test_B2A(self):
+        B = np.array(
+            [[0, 1, 2, 5, 6],
+             [0, 3, 4, 7, 8]])
+        A_exp = np.array(
+            [[1, 2, 5, 6],
+             [3, 4, 7, 8],
+             [1, 0, 0, 0],
+             [0, 1, 0, 0]])
+        A_act = models.B2A(B)
+        npt.assert_almost_equal(A_act, A_exp)
 
     def test__scale_additive(self):
         self.assertRaises(ValueError, models._scale_additive,
@@ -100,27 +114,28 @@ class Test(TestCase):
         scaled = models._scale_additive([1, 0],
                                         [[.5, 0],
                                          [0, 1]])
-        self.assertAlmostEquals(tuple(scaled), (.5, 0))
+        self.assertAlmostEqual(tuple(scaled), (.5, 0))
 
         scaled = models._scale_additive([1, 0],
                                         [[.5, 0, .5, 0],
                                          [0, 1, 0, 1]], p=1)
-        self.assertAlmostEquals(tuple(scaled), (.5, 0))
+        self.assertAlmostEqual(tuple(scaled), (.5, 0))
 
-        scaled = models._scale_additive([[1, .5], [0, 0]],
+        scaled = models._scale_additive([[1, .5],
+                                         [0, 0]],
                                         [[.5, 0],
                                          [0, 1]])
-        assert_almost_equal(scaled, np.asmatrix([[.5, .25],
-                                                 [0, 0]]))
-        self.assertEquals(scaled.shape, (2, 2))
+        npt.assert_almost_equal(scaled, np.array([[.5, .25],
+                                                  [0, 0]]))
+        self.assertEqual(scaled.shape, (2, 2))
 
     def test_VAR_LS(self):
         """Checking the example mentioned in the VAR_LS-docstring (p. 707f)."""
         # values from 1960-1978 with presample data
         B, sigma_u = models.VAR_LS(data, VAR_p)
         # sigma_u = np.cov(models.VAR_LS_residuals(data, B, VAR_p), ddof=1)
-        assert_almost_equal(B, B_test, decimal=3)
-        assert_almost_equal(sigma_u, sigma_u_test, decimal=6)
+        npt.assert_almost_equal(B, B_test, decimal=3)
+        npt.assert_almost_equal(sigma_u, sigma_u_test, decimal=6)
 
     # def test_VAR_YW(self):
     #     """Checking the example mentioned in the VAR_LS-docstring (p. 707f)."""
@@ -134,8 +149,21 @@ class Test(TestCase):
         """Does VAR_LS_sim reproduce the correlation matrix?"""
         T = 500
         sim = models.VAR_LS_sim(B_test, sigma_u_test, T)
-        assert_almost_equal(np.corrcoef(data), np.corrcoef(sim),
-                            decimal=1)
+        npt.assert_almost_equal(np.corrcoef(data), np.corrcoef(sim),
+                                decimal=1)
+
+    def test_VAR_LS_sim_m(self):
+        """Does VAR_LS_sim change means as requested."""
+        T = 500
+        np.random.seed(0)
+        sim = models.VAR_LS_sim(B_test, sigma_u_test, T)
+        np.random.seed(0)
+        m = np.array([2, 1, .5])
+        mt = np.empty((len(m), T))
+        mt.T[:] = m
+        sim_m = models.VAR_LS_sim(B_test, sigma_u_test, T, m=mt)
+        m_actual = sim_m.mean(axis=1) - sim.mean(axis=1)
+        npt.assert_almost_equal(m_actual, m, decimal=1)
 
     def test_VAR_LS_sim_fixed_var(self):
         """Does VAR_LS_sim return the fixed values given via fixed_data?"""
@@ -143,7 +171,7 @@ class Test(TestCase):
         fixed = np.nan * np.empty(VAR_K * T).reshape((VAR_K, T))
         fixed[0] = np.array([0, 0, 1., 0, 0])
         sim = models.VAR_LS_sim(B_test, sigma_u_test, T, fixed_data=fixed)
-        assert_almost_equal(sim[0], fixed[0])
+        npt.assert_almost_equal(sim[0], fixed[0])
 
     def test_VARMA_LS_sim_fixed_var(self):
         """Does VAR_LS_sim return the fixed values given via fixed_data?"""
@@ -153,7 +181,7 @@ class Test(TestCase):
         AM, sigma_u = models.VARMA_LS_prelim(data, VARMA_p, VARMA_q)[:-1]
         sim = models.VARMA_LS_sim(AM, VARMA_p, VARMA_q, sigma_u, data_means, T,
                                   fixed_data=fixed)
-        assert_almost_equal(sim[0], fixed[0])
+        npt.assert_almost_equal(sim[0], fixed[0])
 
     #  def test_VARMA_LS_sim(self):
     #      """Does VAR_LS_sim reproduce the correlation matrix?"""
@@ -161,7 +189,7 @@ class Test(TestCase):
     #      AM, sigma_u = models.VARMA_LS_prelim(data, VARMA_p, VARMA_q)[:-1]
     #      means = data.mean(axis=1)
     #      sim = models.VARMA_LS_sim(AM, VARMA_p, VARMA_q, sigma_u, means, T)
-    #      assert_almost_equal(np.corrcoef(data), np.corrcoef(sim), decimal=2)
+    #      npt.assert_almost_equal(np.corrcoef(data), np.corrcoef(sim), decimal=2)
 
     # def test_VARMA_LS_sim_VARMA_residuals(self):
     #     """Round-trip test: do we get predifined residuals back from
@@ -175,7 +203,7 @@ class Test(TestCase):
     #     sim = models.VARMA_LS_sim(AM, VARMA_p, VARMA_q, sigma_u, T,
     #                               residuals_test, n_sim_multiple=1)
     #     residuals = models.VARMA_residuals(sim, AM, VARMA_p, VARMA_q)
-    #     assert_almost_equal(residuals, residuals_test, decimal=3)
+    #     npt.assert_almost_equal(residuals, residuals_test, decimal=3)
 
     # def test_MGARCH_sim_MGARCH_residuals(self):
     #     np.random.seed(0)
@@ -215,20 +243,45 @@ class Test(TestCase):
         """Round-trip test: do we get predifined residuals back from
         VAR_LS_residuals when simulating with VAR_LS_sim?"""
         T = 5
-        residuals_test = np.asmatrix(
+        residuals_test = np.array(
                             [np.random.multivariate_normal(VAR_K * [0],
                                                            sigma_u_test)
                              for t in range(T)]).reshape((VAR_K, T))
         sim = models.VAR_LS_sim(B_test, sigma_u_test, T, u=residuals_test,
                                 n_presim_steps=0)
         residuals = models.VAR_residuals(sim, B_test, VAR_p)
-        assert_almost_equal(residuals, residuals_test)
+        npt.assert_almost_equal(residuals, residuals_test)
+
+    def test_VAR_LS_B_recover(self):
+        T = 10000
+        np.random.seed(0)
+        sim = models.VAR_LS_sim(B_test, sigma_u_test, T)
+        # fit on simulated values check if we can recover B
+        B_fit, sigma_u_fit = models.VAR_LS(sim, p=VAR_p)
+        try:
+            npt.assert_almost_equal(B_fit, B_test, decimal=1)
+            npt.assert_almost_equal(sigma_u_fit, sigma_u_test,
+                                    decimal=4)
+        except AssertionError:
+            import matplotlib.pyplot as plt
+            fig, axs = plt.subplots(nrows=2, ncols=2,
+                                    constrained_layout=True)
+            axs[0, 0].matshow(B_test)
+            axs[0, 0].set_title("B_test")
+            axs[1, 0].matshow(B_fit)
+            axs[1, 0].set_title("B_fit")
+            axs[0, 1].matshow(sigma_u_test)
+            axs[0, 1].set_title("sigma_u_test")
+            axs[1, 1].matshow(sigma_u_fit)
+            axs[1, 1].set_title("sigma_u_fit")
+            plt.show()
+            raise
 
     def test_VAREX_LS_sim_VAREX_residuals(self):
         """Round-trip test: do we get predifined residuals back from
         VAREX_LS_residuals when simulating with VAREX_LS_sim?"""
         T = 5
-        residuals_test = np.asmatrix(
+        residuals_test = np.array(
                             [np.random.multivariate_normal(VAR_K * [0],
                                                            sigma_u_test)
                              for t in range(T)]).reshape((VAR_K, T))
@@ -236,48 +289,192 @@ class Test(TestCase):
         sim, ex_out = models.VAREX_LS_sim(Bex_test, sigma_u_test, T, ex,
                                           u=residuals_test, n_presim_steps=0)
         residuals = models.VAREX_residuals(sim, ex, Bex_test, VAR_p)
-        assert_almost_equal(residuals, residuals_test)
-        assert_almost_equal(ex_out, ex)
+        npt.assert_almost_equal(residuals, residuals_test)
+        npt.assert_almost_equal(ex_out, ex)
 
     def test_VAREX_LS_sim_VAREX_residuals_funcy(self):
         """Round-trip test: do we get predifined residuals back from
         VAREX_LS_residuals when simulating with VAREX_LS_sim?"""
         T = 5
-        residuals_test = np.asmatrix(
+        residuals_test = np.array(
                             [np.random.multivariate_normal(VAR_K * [0],
                                                            sigma_u_test)
                              for t in range(T)]).reshape((VAR_K, T))
         ex_kwds = dict(fac=1.5)
-        ex = lambda x, fac: np.mean(x[:, -1]) * fac
+
+        def ex(x, fac):
+            return np.mean(x[:, -1]) * fac
         sim, ex_out = models.VAREX_LS_sim(Bex_test, sigma_u_test, T, ex,
                                           u=residuals_test, n_presim_steps=0,
                                           ex_kwds=ex_kwds)
         residuals = models.VAREX_residuals(sim, ex, Bex_test, VAR_p, ex_kwds)
-        assert_almost_equal(residuals, residuals_test)
+        npt.assert_almost_equal(residuals, residuals_test)
+
+    def Bs_test(self, T):
+        # have to have seasonal B_test and sigma_u_test
+        Bs_test = np.empty(B_test.shape + (min(T, 365),))
+        sin = .25 * np.sin(np.arange(min(T, 365)) * 2 * np.pi / 365)
+        Bs_test[...] = (sin[None, None, :] *
+                        np.asarray(B_test[..., None]))
+        Bs_test += B_test[..., None]
+        # Bs_test[:, 0] = B_test[:, 0, None]
+        return Bs_test
+
+    def sigma_u_test_s(self, T):
+        sigma_u_test_s = np.empty((sigma_u_test.shape[0],
+                                   sigma_u_test.shape[1],
+                                   min(T, 365)))
+        sin = .05 * np.sin(np.arange(min(T, 365)) * 2 * np.pi / 365)
+        sigma_u_test_s[:] = (sin[None, None, :] *
+                             np.asarray(sigma_u_test[..., None]))
+        sigma_u_test_s += sigma_u_test[..., None]
+        return sigma_u_test_s
+
+    def test_sigma_u_test_s(self):
+        """Is it symmetric and positive semi-definite?"""
+        T = 365
+        sigma_us = self.sigma_u_test_s(T)
+        sym = [np.all((sigma_us[..., t] - sigma_us[..., t].T) == 0)
+               for t in range(T)]
+        self.assertTrue(np.all(sym))
+        for t in range(T):
+            np.linalg.cholesky(sigma_us[..., t])
 
     def test_SVAR_LS_sim_SVAR_residuals(self):
         """Round-trip test: do we get predifined residuals back from
         SVAR_LS_residuals when simulating with SVAR_LS_sim?"""
-        T = 365
-        residuals_test = np.asmatrix(
+        T = 5 * 365
+        residuals_test = np.array(
                             [np.random.multivariate_normal(VAR_K * [0],
                                                            sigma_u_test)
                              for t in range(T)]).reshape((VAR_K, T))
-        doys = np.arange(1, T + 1)
-        # have to have seasonal B_test and sigma_u_test
-        Bs_test = np.empty((B_test.shape[0], B_test.shape[1], T))
-        sigma_u_test_s = np.empty((sigma_u_test.shape[0],
-                                   sigma_u_test.shape[1], T))
-        Bs_test[...] = ((np.arange(T) % 2 - .5)[None, None, :] * 2 *
-                        np.asarray(B_test[..., None]))
-        sigma_u_test_s[:] = sigma_u_test[..., None]
-#        residuals_test[:] = 0
-        sim = models.SVAR_LS_sim(Bs_test, sigma_u_test_s, doys,
+        doys = np.arange(1, T + 1) % 365
+        # residuals_test[:] = 0
+        Bs_test = self.Bs_test(T)
+        sim = models.SVAR_LS_sim(Bs_test,
+                                 self.sigma_u_test_s(T), doys,
                                  u=residuals_test, n_presim_steps=0)
         residuals = models.SVAR_residuals(sim, doys, Bs_test, VAR_p)
+        residuals_test = np.asarray(residuals_test)
         # the beginning time steps will not be matched, but I do not care!
-        assert_almost_equal(residuals[:, VAR_p:], residuals_test[:, VAR_p:],
-                            decimal=6)
+        try:
+            npt.assert_almost_equal(residuals[:, VAR_p:],
+                                    residuals_test[:, VAR_p:],
+                                    decimal=6)
+        except AssertionError:
+            import matplotlib.pyplot as plt
+            fig, axs = plt.subplots(ncols=sim.shape[0],
+                                    subplot_kw=dict(aspect="equal"))
+            for var_i, ax in enumerate(axs):
+                _ = ax.scatter(residuals[var_i, VAR_p:],
+                               residuals_test[var_i, VAR_p:])
+            plt.show()
+            raise
+
+    def test_SVAR_LS_B_recover(self):
+        T = 50 * 365
+        seed = 100
+        np.random.seed(seed)
+        doys = np.arange(T) % 365
+        Bs_test = self.Bs_test(T)
+        sigma_u_test_s = self.sigma_u_test_s(T)
+        B_test_mean = Bs_test.mean(axis=-1)
+        sigma_u_test_mean = sigma_u_test_s.mean(axis=-1)
+        K = Bs_test.shape[0]
+        sim = models.SVAR_LS_sim(Bs_test, sigma_u_test_s, doys)
+        # sigma_u_test_s[:, :] = sigma_u_test_mean[..., None]
+        # sim = models.SVAR_LS_sim(Bs_test, sigma_u_test_s, doys)
+        np.random.seed(1)
+        sim_stat = models.VAR_LS_sim(B_test_mean,
+                                     sigma_u_test_mean,
+                                     T)
+        means = sim.mean(axis=1)
+        means_stat = sim_stat.mean(axis=1)
+        try:
+            npt.assert_almost_equal(means, means_stat, decimal=2)
+        except AssertionError:
+            import matplotlib.pyplot as plt
+            fig, axs = plt.subplots(nrows=K, ncols=1,
+                                    sharex=True,
+                                    constrained_layout=True)
+            means_th = np.array([np.squeeze(models.VAR_mean(Bs_test[..., t]))
+                                 for t in np.arange(T) % 365]).T
+            means_stat_th = models.VAR_mean(B_test_mean)
+            for var_i, ax in enumerate(axs):
+                ax.plot(sim[var_i], "k", alpha=.25)
+                ax.plot(means_th[var_i], "k")
+                ax.axhline(means[var_i], color="k")
+                ax.plot(sim_stat[var_i], "b", alpha=.25)
+                ax.axhline(means_stat_th[var_i], color="b")
+                ax.axhline(means_stat[var_i], color="b")
+            plt.show()
+
+        # std = sim.std(axis=1)
+        # std_stat = sim_stat.std(axis=1)
+        # npt.assert_almost_equal(std, std_stat, decimal=3)
+
+        import matplotlib.pyplot as plt
+        fig, axs = plt.subplots(nrows=2, ncols=K,
+                                figsize=(9, 6))
+        ranks = (np.arange(T) - .5) / T
+        for var_i in range(K):
+            sim_sorted = np.sort(sim[var_i])
+            sim_stat_sorted = np.sort(sim_stat[var_i])
+            axs[0, var_i].plot(sim_sorted, ranks,
+                               label="seasonal")
+            axs[0, var_i].plot(sim_stat_sorted, ranks,
+                               label="stationary")
+            axs[1, var_i].plot(np.sort(sim_stat[var_i]),
+                               np.sort(sim[var_i]))
+            smin = min(sim_sorted[0], sim_stat_sorted[0])
+            smax = max(sim_sorted[-1], sim_stat_sorted[-1])
+            axs[1, var_i].plot([smin, smax], [smin, smax],
+                               "--k")
+            axs[1, var_i].set_xlabel("stationary")
+        axs[1, 0].set_ylabel("seasonal")
+        axs[0, 0].legend(loc="best")
+        for ax in np.ravel(axs):
+            ax.grid(True)
+        plt.show()
+
+        # fit on simulated values check if we can recover B and
+        # sigma_u
+        B_fit, sigma_u_fit = models.SVAR_LS(sim, doys,
+                                            doy_width=20,
+                                            fft_order=2,
+                                            p=VAR_p,
+                                            )
+        try:
+            npt.assert_almost_equal(B_fit, Bs_test, decimal=1)
+            npt.assert_almost_equal(sigma_u_fit, sigma_u_test_s,
+                                    decimal=4)
+        except AssertionError:
+            import matplotlib.pyplot as plt
+            fig, axs = plt.subplots(nrows=K, ncols=2,
+                                    constrained_layout=True)
+            J = Bs_test.shape[1]
+            for k in range(K):
+                for j in range(J):
+                    t = (j - 1) // VAR_p
+                    k_other = (j - 1) % VAR_p
+                    axs[k, 0].plot(Bs_test[k, j],
+                                   label=f"(k={k_other}, t={t})")
+                    axs[k, 0].axhline(B_test_mean[k, j])
+                for j in range(K):
+                    axs[k, 1].plot(sigma_u_test_s[k, j],
+                                   label=f"(k={k}, t={j})")
+                    axs[k, 1].axhline(sigma_u_test_mean[k, j])
+                for ax in axs[k]:
+                    ax.set_prop_cycle(None)
+                for j in range(J):
+                    axs[k, 0].plot(B_fit[k, j], "--")
+                for j in range(K):
+                    axs[k, 1].plot(sigma_u_fit[k, j], "--")
+                for ax in axs[k]:
+                    ax.legend(loc="best")
+            plt.show()
+            raise
+
 
 if __name__ == "__main__":
-    run_module_suite()
+    npt.run_module_suite()
