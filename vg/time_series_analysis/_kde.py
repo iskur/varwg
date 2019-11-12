@@ -36,18 +36,26 @@ def distance_array_sparse(x_vec, y_vec, mask):
     return dist_sparse.T.tocsr()
 
 
-def apply_kernel_ne(kernel_width, data, eval_points=None):
-    if eval_points is None:
-        _distances = distance_array(data, data)
+def apply_kernel_ne(kernel_width, data, eval_points=None, recalc=False):
+    has_distance_cache = hasattr(apply_kernel_ne, "distances")
+    if eval_points is not None and has_distance_cache:
+        if len(eval_points) != apply_kernel_ne.distances.shape[0]:
+            recalc = True
+    if recalc or not has_distance_cache:
+        if eval_points is None:
+            _distances = distance_array(data, data)
+            apply_kernel_ne.distances = _distances
+        else:
+            _distances = distance_array(data, eval_points)
     else:
-        _distances = distance_array(data, eval_points)
+        _distances = apply_kernel_ne.distances
     _pi = np.pi
     if _distances.ndim > 2:
         k_slice = ([Ellipsis] +
                    (_distances.ndim - kernel_width.ndim) * [None])
         kernel_width = kernel_width[tuple(k_slice)]
     densities = ne.evaluate(
-        "1.0 / (sqrt(2 * _pi) * kernel_width) * " +
+        "1.0 / (sqrt(2 * _pi) * kernel_width) * "
         "exp(-_distances ** 2 / (2 * kernel_width ** 2))")
     return densities
 
@@ -121,12 +129,9 @@ def optimal_kernel_width(x):
                             )
     if res.success and not np.isclose(res.x, 1e-6):
         return np.squeeze(res.x)
-    warnings.warn("Recursing in optimal_kernel_width")
-    try:
-        # try with a little added noise again
-        return optimal_kernel_width(x + x0 / 1000 * np.random.randn(len(x)))
-    except RecursionError:
-        return x0
+    warnings.warn("Kernel-width optimization unsuccesful. "
+                  "Using rule of thumb.")
+    return x0
 
 
 def apply_2d_kernel_(kernel_width, data, doys, circ, doy_width,

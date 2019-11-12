@@ -58,7 +58,7 @@ class Test(npt.TestCase):
             return kde.kernel_density(kernel_width, sample, eval_points=x)
 
         integral = integrate.romberg(density_func, x0, x1)
-        
+
         # import matplotlib.pyplot as plt
         # xx = np.linspace(x0, x1, 500)
         # densities = density_func(xx)
@@ -75,27 +75,29 @@ class Test(npt.TestCase):
         # plt.scatter(sample, np.zeros_like(sample), label="sample")
         # plt.legend(loc="best")
         # plt.show()
-        
-        npt.assert_almost_equal(integral, q2 - q1, decimal=1)
+
+        npt.assert_almost_equal(integral, q2 - q1, decimal=3)
 
     def test_log_kernel_integration(self):
         np.random.seed(0)
-        sample = np.exp(np.random.normal(size=500))
+        sample = np.exp(np.linspace(0, 1, 500))
         kernel_width = kde.optimal_kernel_width(np.log(sample))
-        q1, q2 = .8, .98
+        q1, q2 = 1e-3, 1 - 1e-3
         x0, x1 = map(lambda q: np.percentile(sample, 100 * q),
                      (q1, q2))
 
         def density_func(x):
-            density = kde.kernel_density(kernel_width, np.log(sample),
+            density = kde.kernel_density(kernel_width,
+                                         np.log(sample),
                                          eval_points=np.log(x))
             return density / x
 
-        xx = np.linspace(x0, x1, 500)
+        xx = np.linspace(x0,
+                         x1 + 5 * kernel_width,
+                         1000)
         densities = density_func(xx)
         integral = integrate.trapz(y=densities, x=xx)
-        # integral = integrate.romberg(density_func, x0, x1)
-        npt.assert_almost_equal(integral, q2 - q1, decimal=2)
+        npt.assert_almost_equal(integral, q2 - q1, decimal=3)
 
     def test_distance_array_sparse(self):
         """Do we get the same as with distance_array?"""

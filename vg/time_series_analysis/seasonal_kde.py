@@ -192,8 +192,10 @@ class SeasonalKDE(seasonal.Seasonal):
         if self._x_grid is None:
             xx = np.empty((len(self.doys_unique), self.nx))
             for doy_i, doy in enumerate(self.doys_unique):
-                xx[doy_i] = np.linspace(self.lower_bound(doy),
-                                        self.upper_bound(doy), self.nx)
+                xx[doy_i] = np.squeeze(
+                    np.linspace(self.lower_bound(doy),
+                                self.upper_bound(doy),
+                                self.nx))
             self._x_grid = xx
         return self._x_grid
 
@@ -252,7 +254,8 @@ class SeasonalKDE(seasonal.Seasonal):
 
     def density_per_doy(self, kernel_width, data, doys, doy_middle,
                         eval_data=None, leave_one_out=False):
-        densities = kde.apply_kernel(kernel_width, data, eval_data)
+        densities = kde.apply_kernel(kernel_width, data, eval_data,
+                                     recalc=True)
         doy_scale = (1. - times.doy_distance(doy_middle, doys) /
                      (self.doy_width + 1)) / (self.doy_width - 1)
         densities *= doy_scale
@@ -357,16 +360,18 @@ class SeasonalKDE(seasonal.Seasonal):
     def solution(self, solution):
         self.kernel_widths, self.quantile_grid = solution
 
-    def pdf(self, solution, x, doys):
-        x, doys = np.atleast_1d(x, doys)
-        densities = np.empty((len(doys), len(x)))
+    def pdf(self, solution, data, doys):
+        data, doys = np.atleast_1d(data, doys)
+        densities = np.empty((len(doys), len(data)))
         for doy in doys:
             doy_i = my.val2ind(self.doys_unique, doy)
             kernel_width = self.kernel_widths[doy_i]
             ii = self.doy_mask_dict[doy]
             densities[doy_i] = self.density_per_doy(kernel_width,
                                                     self.data[ii],
-                                                    self.doys[ii], doy, x)
+                                                    self.doys[ii],
+                                                    doy,
+                                                    data)
         return densities
 
     def cdf(self, solution=None, x=None, doys=None):
@@ -383,7 +388,7 @@ class SeasonalKDE(seasonal.Seasonal):
             doy_i = my.val2ind(self.doys_unique, doy)
             try:
                 quantiles[ii] = self.cdf_interp_per_day[doy_i](x_single)
-            except ValueError as e:
+            except ValueError:
                 if x_single < self.lower_bound(self.doys_unique[doy_i]):
                     quantiles[ii] = np.nan
                     continue
@@ -394,9 +399,11 @@ class SeasonalKDE(seasonal.Seasonal):
             quantiles = my.interp_nan(quantiles, max_interp=3)
         return quantiles
 
-    def ppf(self, solution, quantiles, doys):
+    def ppf(self, solution, quantiles, doys=None):
         if solution is not None:
             self.solution = solution
+        if doys is None:
+            doys = self.doys
         quantiles, doys = np.atleast_1d(quantiles, doys)
         # for the purpose of distribution parameters: assume February
         # 29th behaves as February 28th
@@ -727,14 +734,16 @@ class SeasonalHourlyKDE(SeasonalKDE, seasonal.Torus):
 
 if __name__ == "__main__":
     import vg
-    vg.vg_base.conf = vg.config_konstanz
-    met_vg = vg.VG(("theta", "ILWR", "rh", "u", "v"))
-    # from vg.meteo import avrwind
-    # data = avrwind.component2angle(met_vg.met["u"], met_vg.met["v"])[1]
-    data = met_vg.met["theta"][:3 * 8760]
-    dtimes = met_vg.times_orig[:3 * 8760]
-    sea_kde = SeasonalHourlyKDE(data, dtimes, doy_width=10, verbose=True)
-    solution = kernel_widths, quantile_grid = sea_kde.fit()
+    my_vg = vg.VG(("theta", "Qsw", "ILWR", "rh", "u", "v"), verbose=False)
+    
+    # # vg.vg_base.conf = vg.config_konstanz
+    # met_vg = vg.VG(("theta", "ILWR", "rh", "u", "v"))
+    # # from vg.meteo import avrwind
+    # # data = avrwind.component2angle(met_vg.met["u"], met_vg.met["v"])[1]
+    # data = met_vg.met["theta"][:3 * 8760]
+    # dtimes = met_vg.times_orig[:3 * 8760]
+    # sea_kde = SeasonalHourlyKDE(data, dtimes, doy_width=10, verbose=True)
+    # solution = kernel_widths, quantile_grid = sea_kde.fit()
 
     # import vg, config_konstanz
     # vg.conf = config_konstanz
