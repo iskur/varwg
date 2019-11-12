@@ -53,6 +53,7 @@ setup(
     # ext_modules=extensions,
     scripts=["distribute_setup.py"],
     setup_requires=["numpy"],
+    python_requires=">=3.5",
     install_requires=[
         'matplotlib',
         'scipy',

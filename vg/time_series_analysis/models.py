@@ -32,12 +32,13 @@ import scipy
 from past.utils import old_div
 from scipy import linalg, optimize
 from scipy.linalg import kron
-from scipy.stats import skew
+from scipy.stats import (skew, rankdata,
+                         distributions as sp_distributions)
 from tqdm import tqdm
 
 from vg import helpers as my
 from vg.time_series_analysis import time_series as ts
-from vg.time_series_analysis.distributions import MDFt
+from vg.time_series_analysis.distributions import MDFt, norm
 from vg.time_series_analysis import phase_randomization
 
 
@@ -74,8 +75,8 @@ def MGARCH_ML(residuals, q, m):
 
 def _check_stationarity(Gammas, Gs):
     M = np.zeros_like(Gammas[0])
-    for matrix in itertools.chain(Gammas, Gs):
-        M += matrix
+    for array in itertools.chain(Gammas, Gs):
+        M += array
     eigenvalues = linalg.eigvals(M)
     if np.any(eigenvalues >= 1):
         msg = "Non-stationarity: MGARCH eigenvalues too high. "
@@ -225,9 +226,9 @@ def VAR_LS(data, p=2):
 
     Returns
     -------
-    B : matrix
+    B : array
         Parameters of the fitted VAR-process.
-    sigma_u: matrix
+    sigma_u: array
         Covariance matrix of the residuals.
 
     See also
@@ -243,17 +244,17 @@ def VAR_LS(data, p=2):
     elif np.ndim(data) == 1:
         K, T = 1, len(data) - p
         data = data[np.newaxis, :]
-    # Y is a (K, T) matrix
-    Y = np.asmatrix(data[:, p:])
+    # Y is a (K, T - p) array
+    Y = data[:, p:]
 
-    Z = np.asmatrix(np.empty((K * p + 1, T)))
-    Zt = np.empty((K * p + 1, 1))
+    Z = np.empty((K * p + 1, T))
+    Zt = np.empty(K * p + 1)
     Zt[0] = 1
     for t in range(p, T + p):
         for subt in range(p):
             start_i = 1 + subt * K
             stop_i = 1 + (subt + 1) * K
-            Zt[start_i:stop_i] = data[:, t - subt - 1].reshape((K, 1))
+            Zt[start_i:stop_i] = data[:, t - subt - 1]
         Z[:, t - p] = Zt
 
     # delete all columns containing nans
@@ -264,23 +265,23 @@ def VAR_LS(data, p=2):
     Y = np.delete(Y, Z_nan_cols, axis=1)
     Z = np.delete(Z, Z_nan_cols, axis=1)
     # no idea why there are remaining columns with nans in Z!
-    Z_nan_cols = np.where(np.isnan(Z))[1]
-    Y = np.asmatrix(np.delete(Y, Z_nan_cols, axis=1))
-    Z = np.asmatrix(np.delete(Z, Z_nan_cols, axis=1))
+    Z_nan_cols_ = np.where(np.isnan(Z))[1]
+    Y = np.delete(Y, Z_nan_cols_, axis=1)
+    Z = np.delete(Z, Z_nan_cols_, axis=1)
 
     # B contains all the parameters we want: (nu, A1, ..., Ap)
     # Y = BZ + U
     try:
-        inv = (Z * Z.T).I
+        inv = np.linalg.inv(Z @ Z.T)
     except np.linalg.LinAlgError:
         print("Adding a little random noise in order to invert matrix...")
         Z += (np.random.randn(Z.size) * Z.std() * 1e-9).reshape(Z.shape)
-        inv = (Z * Z.T).I
-    B = Y * Z.T * inv
+        inv = np.linalg.inv(Z @ Z.T)
+    B = Y @ Z.T @ inv
 
     # covariance matrix of the noise
-    sigma_u = Y * Y.T - Y * Z.T * (Z * Z.T).I * Z * Y.T
-    sigma_u /= T - K * p - 1
+    sigma_u = Y @ Y.T - B @ Z @ Y.T
+    sigma_u /= (Y.shape[1] - K * p - 1)
 
     return B, sigma_u
 
@@ -306,10 +307,10 @@ def VAREX_LS(data, p, ex):
 
     Returns
     -------
-    B : matrix
+    B : array
         Parameters of the fitted VAR-process.
         B := (A_1, ..., A_p, C)
-    sigma_u: matrix
+    sigma_u: array
         Covariance matrix of the residuals of the data.
 
     See also
@@ -326,9 +327,9 @@ def VAREX_LS(data, p, ex):
         K, T = 1, len(data) - p
         data = data[np.newaxis, :]
     # Y is a (K, T) matrix
-    Y = np.asmatrix(data[:, p:])
+    Y = data[:, p:]
 
-    Z = np.asmatrix(np.empty((K * p + 1, T)))
+    Z = np.empty((K * p + 1, T))
     Zt = np.empty((K * p, 1))
     Z[-1] = ex[p:].reshape(1, T)
     for t in range(p, T + p):
@@ -343,117 +344,209 @@ def VAREX_LS(data, p, ex):
     Y = np.delete(Y, Y_nan_cols, axis=1)
     Z = np.delete(Z, Y_nan_cols, axis=1)
     Z_nan_cols = np.where(np.isnan(Z))[1]
-    Y = np.asmatrix(np.delete(Y, Z_nan_cols, axis=1))
-    Z = np.asmatrix(np.delete(Z, Z_nan_cols, axis=1))
+    Y = np.delete(Y, Z_nan_cols, axis=1)
+    Z = np.delete(Z, Z_nan_cols, axis=1)
 
     # B contains all the parameters we want: (A1, ..., Ap, C)
     # Y = BZ + U
-    B = Y * Z.T * (Z * Z.T).I
+    B = Y @ Z.T @ np.linalg.inv(Z @ Z.T)
 
     # covariance matrix of the noise of data
-    sigma_u = Y * Y.T - Y * Z.T * (Z * Z.T).I * Z * Y.T
-    sigma_u /= T - K * p - 1
+    sigma_u = Y @ Y.T - B @ Z @ Y.T
+    sigma_u /= Y_nan_cols.size - K * p - 1
 
     return B, sigma_u
 
 
-def SVAR_LS(data, doys, p=2, doy_width=30, fft_order=4, var_names=None,
+def SVAR_LS(data, doys, p=2, doy_width=10, fft_order=4, var_names=None,
             verbose=True):
     """Seasonal version of the least squares estimator."""
     K, T = data.shape
     Bs, sigma_us = [], []
     unique_doys = np.unique(doys)
-
-    for doy_ii, doy in tqdm(enumerate(unique_doys), disable=(not verbose)):
-        ii = (doys > doy - doy_width) & (doys <= doy + doy_width)
+    for doy in tqdm(unique_doys, disable=(not verbose)):
+        mask = (doys > doy - doy_width) & (doys <= doy + doy_width)
         if (doy - doy_width) < 0:
-            ii |= doys > (365. - doy_width + doy)
+            mask |= doys > (365. - doy_width + doy)
         if (doy + doy_width) > 365:
-            ii |= doys < (doy + doy_width - 365.)
-        B, sigma_u = VAR_LS(np.where(ii, data, np.nan), p=p)
+            mask |= doys < (doy + doy_width - 365.)
+        B, sigma_u = VAR_LS(np.where(mask, data, np.nan), p=p)
         Bs += [B]
-        # account for the smaller sample size
-        sigma_us += [sigma_u * T / sum(ii)]
+        sigma_us += [sigma_u]
 
     Bs, sigma_us = np.asarray(Bs), np.asarray(sigma_us)
-    if verbose:
-        print()
+
+    # import matplotlib.pyplot as plt
+    # import itertools
+    # Bs = np.asarray(Bs)
+    # sigma_us = np.asarray(sigma_us)
+    # for i, j in itertools.combinations(range(data.shape[0]), 2):
+    #     plt.figure()
+    #     plt.plot(Bs[:, i, j + 1], "b")
+    #     plt.plot(np.fft.irfft(np.fft.fft(Bs[:, i, j + 1])[:fft_order + 1],
+    #                           n_doys_unique),
+    #              "b", label="%s_t-1 -> %s_t" % (var_names[j], var_names[i]))
+    #     plt.plot(Bs[:, j, i + 1], "g")
+    #     plt.plot(np.fft.irfft(np.fft.fft(Bs[:, j, i + 1])[:fft_order + 1],
+    #                           n_doys_unique),
+    #              "g", label="%s_t-1 -> %s_t" % (var_names[i], var_names[j]))
+    #     plt.plot(sigma_us[:, i, j])
+    #     plt.plot(np.fft.irfft(np.fft.fft(sigma_us[:, i, j])[:fft_order + 1],
+    #                           n_doys_unique))
+    #     plt.legend()
+    #     plt.title("%s %s" % (var_names[i], var_names[j]))
+    #     plt.grid()
+    # for i in range(data.shape[0]):
+    #     plt.figure()
+    #     plt.plot(Bs[:, i, i + 1], "b")
+    #     plt.plot(np.fft.irfft(np.fft.fft(Bs[:, i, i + 1])[:fft_order + 1],
+    #                           n_doys_unique),
+    #              "b")
+    #     plt.grid()
+    #     plt.title(var_names[i])
+
+    def matr_fft(M, fft_order):
+        return np.asarray(
+            [[my.fourier_approx(M[:, k, j], fft_order)
+              for j in range(M.shape[2])]
+             for k in range(K)])
+
+    # import matplotlib.pyplot as plt
+    # plt.rcParams["font.size"] = 7
+    # plt.rcParams["legend.fontsize"] = 6
+    # Bs = np.asarray(Bs)
+    # Bs_app = matr_fft(Bs)
+    # columnwidth_pt = 307.28987
+    # inches_per_pt = 1. / 72.27
+    # fig_width = columnwidth_pt * inches_per_pt
+    # plt.figure(figsize=(fig_width, .5 * fig_width))
+    # plt.plot(Bs[:, 0, 1], label="from moving window")
+    # plt.plot(Bs_app[0, 1], label="fft approximated")
+    # plt.grid()
+    # plt.xlabel("day of year")
+    # plt.tight_layout()
+    # plt.savefig("/home/dirk/Desktop/Diss/Praesentationen/A00_approx",
+    #             transparent=True, dpi=600)
+    # plt.show()
+
+    Bs = matr_fft(Bs, fft_order)
+    sigma_us = matr_fft(sigma_us, fft_order)
+    return Bs, sigma_us
 
 
-#    import matplotlib.pyplot as plt
-#    import itertools
-#    Bs = np.asarray(Bs)
-#    sigma_us = np.asarray(sigma_us)
-#    for i, j in itertools.combinations(range(data.shape[0]), 2):
-#        plt.figure()
-#        plt.plot(Bs[:, i, j + 1], "b")
-#        plt.plot(np.fft.irfft(np.fft.fft(Bs[:, i, j + 1])[:fft_order + 1],
-#                              n_doys_unique),
-#                 "b", label="%s_t-1 -> %s_t" % (var_names[j], var_names[i]))
-#        plt.plot(Bs[:, j, i + 1], "g")
-#        plt.plot(np.fft.irfft(np.fft.fft(Bs[:, j, i + 1])[:fft_order + 1],
-#                              n_doys_unique),
-#                 "g", label="%s_t-1 -> %s_t" % (var_names[i], var_names[j]))
-##        plt.plot(sigma_us[:, i, j])
-##        plt.plot(np.fft.irfft(np.fft.fft(sigma_us[:, i, j])[:fft_order + 1],
-##                              n_doys_unique))
-#        plt.legend()
-#        plt.title("%s %s" % (var_names[i], var_names[j]))
-#        plt.grid()
-#    for i in range(data.shape[0]):
-#        plt.figure()
-#        plt.plot(Bs[:, i, i + 1], "b")
-#        plt.plot(np.fft.irfft(np.fft.fft(Bs[:, i, i + 1])[:fft_order + 1],
-#                              n_doys_unique),
-#                 "b")
-#        plt.grid()
-#        plt.title(var_names[i])
+def VAR_mean(B):
+    K = B.shape[0]
+    p = (B.shape[1] - 1) // K
+    Ai = [np.asarray(B[:, 1 + i * K: 1 + (i + 1) * K])
+          for i in range(p)]
+    nu = B[:, 0]
+    mu = np.identity(K)
+    for i in range(p):
+        mu -= Ai[i]
+    return (np.linalg.inv(mu) @ nu.T)[:, None]
 
-    matr_fft = lambda M: np.asarray(
-        [[my.fourier_approx(M[:, ii, jj], fft_order)
-          for jj in range(M.shape[2])]
-         for ii in range(K)])
 
-#    import matplotlib.pyplot as plt
-#    plt.rcParams["font.size"] = 7
-#    plt.rcParams["legend.fontsize"] = 6
-#    Bs = np.asarray(Bs)
-#    Bs_app = matr_fft(Bs)
-#    columnwidth_pt = 307.28987
-#    inches_per_pt = 1. / 72.27
-#    fig_width = columnwidth_pt * inches_per_pt
-#    plt.figure(figsize=(fig_width, .5 * fig_width))
-#    plt.plot(Bs[:, 0, 1], label="from moving window")
-#    plt.plot(Bs_app[0, 1], label="fft approximated")
-#    plt.grid()
-#    plt.xlabel("day of year")
-#    plt.tight_layout()
-#    plt.savefig("/home/dirk/Desktop/Diss/Praesentationen/A00_approx",
-#                transparent=True, dpi=600)
-#    plt.show()
+def VAR_cov(B, sigma_u):
+    K = B.shape[0]
+    p = (B.shape[1] - 1) // K
+    A = B2A(B)
+    Ikp2 = np.identity((K * p) ** 2)
+    sigma_U = np.zeros_like(A)
+    sigma_U[:K, :K] = sigma_u
+    cov_vec = np.linalg.inv(Ikp2 - np.kron(A, A)) @ vec(sigma_U)
+    return unvec(cov_vec, K)
 
-    return matr_fft(Bs), matr_fft(sigma_us)
+
+def B2A(B):
+    K = B.shape[0]
+    p = (B.shape[1] - 1) // K
+    A = np.zeros((K * p, K * p))
+    A[:K] = B[:, 1:]
+    Ik = np.identity(K)
+    for i in range(p - 1):
+        A[(i + 1) * K: (i + 2) * K,
+          i * K: (i + 1) * K] = Ik
+    return A
 
 
 def SVAR_LS_sim(Bs, sigma_us, doys, m=None, ia=None, m_trend=None,
-                u=None, n_presim_steps=100, fixed_data=None):
+              u=None, n_presim_steps=100, fixed_data=None,
+              phase_randomize=False):
     doys_ii = (doys % 365) / 365. * len(np.unique(doys))
+    # doys_ii = doys % len(np.unique(doys))
     doys_ii = doys_ii.astype(int)
     K = Bs.shape[0]
     p = (Bs.shape[1] - 1) // K
-    Y = np.zeros((K, len(doys) + p))
-    if u is not None:
+    T = len(doys)
+    Y = np.zeros((K, T + p))
+    Y[:, :p] = VAR_mean(Bs[..., doys_ii[-1]])
+    if phase_randomize:
+        if u is None:
+            raise RuntimeError("u must be passed for phase randomization!")
         u = phase_randomization.randomize2d(u)
-    for date_i, doy_i in enumerate(doys_ii):
-        Y[:, date_i + p] = \
-            VAR_LS_sim(Bs[..., doy_i], sigma_us[..., doy_i], 1,
-                       None if m is None else m[:, date_i, None],
-                       None if ia is None else ia[:, date_i, None],
-                       m_trend, n_presim_steps=0,
-                       u=None if u is None else u[:, date_i, None],
-                       # u=u[:, date_i, None],
-                       prev_data=Y[:, date_i:date_i + p]).ravel()
-    return Y[:, p:]
+    if u is None:
+        u = np.array(
+            [np.random.multivariate_normal(K * [0],
+                                           sigma_us[..., doy_i])
+             for doy_i in doys_ii])
+        u = u.T
+    for t, doy_i in enumerate(doys_ii):
+        # B = Bs[..., doy_i].copy()
+        # if t > 0:
+        #     for j in range(1, p):
+        #         islice = slice(j * K + 1, (j + 1) * K + 1)
+        #         # B[:, islice] = Bs[:, islice, doy_i - j]
+        #         B[:, islice] = .5 * (B[:, islice] +
+        #                              Bs[:, islice, doy_i - j])
+        Y[:, t + p] = \
+            VAR_LS_sim(
+                       # B,
+                       Bs[..., doy_i],
+                       sigma_us[..., doy_i],
+                       1,
+                       None if m is None else m[:, t, None],
+                       None if ia is None else ia[:, t, None],
+                       m_trend,
+                       n_presim_steps=0,
+                       # u=None if u is None else u[:, t, None],
+                       u=u[:, t, None],
+                       prev_data=Y[:, t:t + p]).ravel()
+    Y = Y[:, p:]
+    Y_new = Y
+
+    # # SVAR messes with the marginals, so we z-transform to normal as
+    # # expected by the rest of the code base. We maintain the means,
+    # # though.
+    # means = np.array([np.squeeze(VAR_mean(Bs[..., doys_ii[t]]))
+    #                   for t in range(T)]).T
+    # stds = np.array([np.sqrt(np.diag(
+    #     VAR_cov(Bs[..., doys_ii[t]],
+    #             sigma_us[..., doys_ii[t]])))
+    #          for t in range(T)]).T
+    # means_mean = means.mean(axis=-1)[:, None]
+    # stds_mean = stds.mean(axis=-1)[:, None]
+    # Y_new = (Y - means_mean) / stds_mean * stds + means
+
+    # import matplotlib.pyplot as plt
+    # fig, axs = plt.subplots(nrows=K, ncols=2,
+    #                         sharex=True, sharey="row",
+    #                         constrained_layout=True)
+    # for var_i in range(K):
+    #     axs[var_i, 0].plot(Y[var_i])
+    #     axs[var_i, 0].plot(means[var_i])
+    #     axs[var_i, 0].plot(means[var_i] - stds[var_i], "--k")
+    #     axs[var_i, 0].plot(means[var_i] + stds[var_i], "--k")
+    #     axs[var_i, 0].axhline(means_mean[var_i])
+    #     axs[var_i, 0].axhline(means_mean[var_i] - stds_mean[var_i],
+    #                           linestyle="--", color="b")
+    #     axs[var_i, 0].axhline(means_mean[var_i] + stds_mean[var_i],
+    #                           linestyle="--", color="b")
+    #     axs[var_i, 1].plot(Y_new[var_i], alpha=.25, label="new")
+    #     axs[var_i, 1].plot(Y[var_i], alpha=.25, label="old")
+    # axs[0, 1].legend(loc="best")
+    # plt.show()
+
+    return Y_new
 
 
 def VAR_LS_asy(data, skewed_i, p=None):
@@ -630,7 +723,7 @@ def VAR_LS_sim_asy(B, sigma_u, T, data, p, skewed_i,
 
 def VAR_LS_sim(B, sigma_u, T, m=None, ia=None, m_trend=None, u=None,
                n_presim_steps=100, fixed_data=None, prev_data=None,
-               transform=None):
+               transform=None, phase_randomize=False):
     """Based on a least squares estimator, simulate a time-series of the form
     ..math::y(t) = nu + A1*y(t-1) + ... + Ap*y(t-p) + ut
     B contains (nu, A1, ..., Ap).
@@ -638,10 +731,10 @@ def VAR_LS_sim(B, sigma_u, T, m=None, ia=None, m_trend=None, u=None,
 
     Parameters
     ----------
-    B : (K, K*p+1) matrix or ndarray
+    B : (K, K*p+1) ndarray
         Parameters of the VAR-process as returned from VAR_LS. K is the number
         of variables, p the autoregressive order.
-    sigma_u : (K, K) matrix or ndarray
+    sigma_u : (K, K) ndarray
         Covariance matrix of the residuals as returned from VAR_LS.
     T : int
         Number of timesteps to simulate.
@@ -688,51 +781,51 @@ def VAR_LS_sim(B, sigma_u, T, m=None, ia=None, m_trend=None, u=None,
         m = _scale_additive(m, B[:, 1:], p)
         # we have to expand m to include the pre-simulation timesteps
         m = np.concatenate((m[:, :n_presim_steps], m), axis=1)
-    m_trend = np.asarray([0] * K) if m_trend is None else np.asarray(m_trend)
-    m_trend = m_trend[:, np.newaxis]  # ha! erwischt!
-    m_trend = _scale_additive(m_trend, B[:, 1:], p)
 
     if ia is not None:
         ia = _scale_additive(ia, B[:, 1:], p)
 
     # the first p columns are initial values, which will be omitted later
-    Y = np.asmatrix(np.zeros((K, n_sim_steps)))
+    Y = np.zeros((K, n_sim_steps))
     if prev_data is not None:
-        Y[:, :p] = np.asmatrix(prev_data[:, -p:])
+        Y[:, :p] = prev_data[:, -p:]
         n_sim_steps -= n_presim_steps
 
     Ai = [np.asarray(B[:, 1 + i * K: 1 + (i + 1) * K]) for i in range(p)]
 
     if m is None and prev_data is None:
-        nu = np.asmatrix(B[:, 0])
         # setting starting values to the process mean
-        mu = np.asmatrix(np.identity(K))
-        for i in range(p):
-            mu -= Ai[i]
-        mu = mu.I * nu
-        Y[:, :p] = mu
+        Y[:, :p] = VAR_mean(B)
     Y = np.asarray(Y)
 
-    if u is None:
+    if phase_randomize:
+        if u is None:
+            raise RuntimeError("u must be passed for phase randomization!")
+        u = phase_randomization.randomize2d(u)
+    elif u is None:
         u = np.random.multivariate_normal(K * [0], sigma_u, n_sim_steps - p)
-        u = np.asmatrix(u.T)
+        u = u.T
 
     Y[:, -u.shape[1]:] += u
-    if m is None and prev_data is None:
-        Y[:, p:] += nu
+    if m is None:
+        nu = B[:, 0]
+        Y[:, p:] += nu[:, None]
     elif m is not None:
         Y[:, -m.shape[1]:] += m
 
     if ia is not None:
         Y[:, -ia.shape[1]:] += ia
 
-    # apply changes as a trend
-    Y[:, -T:] += np.arange(T, dtype=float) / T * m_trend
+    if m_trend is not None:
+        # apply changes as a trend
+        m_trend = np.asarray(m_trend)[:, None]
+        m_trend = _scale_additive(m_trend, B[:, 1:], p)
+        Y[:, -T:] += np.arange(T, dtype=float) / T * m_trend
 
     start_t = n_sim_steps - T
     for t in range(p, n_sim_steps):
         for i in range(p):
-            Y[:, t] += np.dot(Ai[i], Y[:, t - i - 1])
+            Y[:, t] += Ai[i] @ Y[:, t - i - 1]
 
         # on-line transformations
         if transform:
@@ -742,7 +835,7 @@ def VAR_LS_sim(B, sigma_u, T, m=None, ia=None, m_trend=None, u=None,
             # fixing what's asked to be held constant
             Y[:, t] = np.where(np.isnan(fixed_data[:, t - start_t]),
                                Y[:, t], fixed_data[:, t - start_t])
-    return np.asarray(Y[:, -T:])
+    return Y[:, -T:]
 
 
 def VAREX_LS_sim(B, sigma_u, T, ex, m=None, ia=None, m_trend=None, u=None,
@@ -754,10 +847,10 @@ def VAREX_LS_sim(B, sigma_u, T, ex, m=None, ia=None, m_trend=None, u=None,
 
     Parameters
     ----------
-    B : (K, K*p+1) matrix or ndarray
+    B : (K, K*p+1) ndarray
         Parameters of the VAR-process as returned from VAR_LS. K is the number
         of variables, p the autoregressive order.
-    sigma_u : (K, K) matrix or ndarray
+    sigma_u : (K, K) ndarray
         Covariance matrix of the residuals as returned from VAR_LS.
     ex : (T,) ndarray or function
         External variable. If given as a function, ex_t will be generated by
@@ -821,31 +914,19 @@ def VAREX_LS_sim(B, sigma_u, T, ex, m=None, ia=None, m_trend=None, u=None,
         ia = _scale_additive(ia, B[:, 1:], p)
 
     # the first p columns are initial values, which will be omitted later
-    Y = np.asmatrix(np.zeros((K, n_sim_steps)))
+    Y = np.zeros((K, n_sim_steps))
     if prev_data is not None:
-        Y[:, :p] = np.asmatrix(prev_data[:, -p:])
+        Y[:, :p] = prev_data[:, -p:]
         n_sim_steps -= n_presim_steps
 
-    Ai = [np.asarray(B[:, i * K: (i + 1) * K]) for i in range(p)]
-    C = np.asarray(B[:, -1])
-
-#     if m is None and prev_data is None:
-#         nu = np.asmatrix(B[:, 0])
-#         # setting starting values to the process mean
-#         mu = np.asmatrix(np.identity(K))
-#         for i in range(p):
-#             mu -= Ai[i]
-#         mu = mu.I * nu
-#         Y[:, :p] = mu
-    Y = np.asarray(Y)
+    Ai = [B[:, i * K: (i + 1) * K] for i in range(p)]
+    C = B[:, -1]
 
     if u is None:
         u = np.random.multivariate_normal(K * [0], sigma_u, n_sim_steps - p)
-        u = np.asmatrix(u.T)
+        u = u.T
 
     Y[:, -u.shape[1]:] += u
-#     if m is None and prev_data is None:
-#         Y[:, p:] += nu
     if m is not None:
         Y[:, -m.shape[1]:] += m
 
@@ -858,7 +939,7 @@ def VAREX_LS_sim(B, sigma_u, T, ex, m=None, ia=None, m_trend=None, u=None,
     start_t = n_sim_steps - T
     for t in range(p, n_sim_steps):
         for i in range(p):
-            Y[:, t] += np.dot(Ai[i], Y[:, t - i - 1])
+            Y[:, t] += Ai[i] @ Y[:, t - i - 1]
 
         if t >= start_t:
             if ex_isfunc:
@@ -868,7 +949,7 @@ def VAREX_LS_sim(B, sigma_u, T, ex, m=None, ia=None, m_trend=None, u=None,
                 ex_t = ex[t - p - start_t]
             Y[:, t] += np.squeeze(C * ex_t)
 
-    return np.asarray(Y[:, -T:]), ex_out
+    return Y[:, -T:], ex_out
 
 
 def VAR_residuals(data, B, p=2):
@@ -879,18 +960,14 @@ def VAR_residuals(data, B, p=2):
         mean_adjusted = False
         i_shift = 1
         # what is the process mean?
-        nu = np.asmatrix(B[:, 0])
-        mu = np.asmatrix(np.identity(K))
-        for i in range(p):
-            Ai = B[:, 1 + i * K: 1 + (i + 1) * K]
-            mu -= Ai
-        mu = mu.I * nu
+        nu = B[:, 0]
+        mu = VAR_mean(B)
         nu = np.asarray(nu).ravel()
     else:
         mean_adjusted = True
         i_shift = 0
         # estimate the process means from the data.
-        mu = np.asmatrix(np.mean(data, axis=1)[:, np.newaxis])
+        mu = np.mean(data, axis=1)[:, None]
 
     # set the pre-sample period to the process means
     data = np.concatenate((np.empty((K, p)), data), axis=1)
@@ -899,11 +976,11 @@ def VAR_residuals(data, B, p=2):
 
     for t in range(p, T + p):
         for i in range(p):
-            Ai = np.asarray(B[:, i_shift + i * K: i_shift + (i + 1) * K])
-            resi[:, t] -= np.dot(Ai, data[:, t - i - 1])
+            Ai = B[:, i_shift + i * K: i_shift + (i + 1) * K]
+            resi[:, t] -= Ai @ data[:, t - i - 1]
         if not mean_adjusted:
             resi[:, t] -= nu
-    return np.asarray(resi[:, p:] + mu) if mean_adjusted else resi[:, p:]
+    return resi[:, p:] + mu if mean_adjusted else resi[:, p:]
 
 
 def VAR_LS_extro(data, data_trans, transforms, backtransforms, p=2):
@@ -952,18 +1029,14 @@ def VAR_onestep_predictions(data, B, p=2):
         mean_adjusted = False
         i_shift = 1
         # what is the process mean?
-        nu = np.asmatrix(B[:, 0])
-        mu = np.asmatrix(np.identity(K))
-        for i in range(p):
-            Ai = B[:, 1 + i * K: 1 + (i + 1) * K]
-            mu -= Ai
-        mu = mu.I * nu.T
+        nu = B[:, 0]
+        mu = VAR_mean(B)
         nu = np.asarray(nu).ravel()
     else:
         mean_adjusted = True
         i_shift = 0
         # estimate the process means from the data.
-        mu = np.asmatrix(np.mean(data, axis=1)[:, np.newaxis])
+        mu = np.mean(data, axis=1)[:, np.newaxis]
 
     predictions = np.zeros_like(data)
     predictions[:, :p] = mu
@@ -972,16 +1045,13 @@ def VAR_onestep_predictions(data, B, p=2):
 
     for t in range(p, T):
         for i in range(p):
-            Ai = np.asarray(B[:, i_shift + i * K: i_shift + (i + 1) * K])
-            predictions[:, t] += np.dot(Ai, data[:, t - i - 1])
+            Ai = B[:, i_shift + i * K: i_shift + (i + 1) * K]
+            predictions[:, t] += Ai @ data[:, t - i - 1]
         if not mean_adjusted:
             predictions[:, t] -= nu
     return (np.asarray(predictions + mu)
             if mean_adjusted
             else predictions)
-    # return (np.asarray(predictions[:, p:] + mu)
-    #         if mean_adjusted
-    #         else predictions[:, p:])
 
 
 def VAREX_residuals(data, ex, B, p=2, ex_kwds=None):
@@ -1002,7 +1072,7 @@ def VAREX_residuals(data, ex, B, p=2, ex_kwds=None):
     for t in range(p, T + p):
         for i in range(p):
             Ai = np.asarray(B[:, i * K: (i + 1) * K])
-            resi[:, t] -= np.dot(Ai, data[:, t - i - 1])
+            resi[:, t] -= Ai @ data[:, t - i - 1]
 
         if ex_isfunc:
             ex_t = ex(data[:, :t], **ex_kwds)
@@ -1028,29 +1098,16 @@ def SVAR_residuals(data, doys, B, p=2):
         # estimate the process means from the data.
         mu = np.asmatrix(np.mean(data, axis=1)[:, np.newaxis])
 
-    def process_mean(B):
-        nu = np.asmatrix(B[:, 0]).T
-        mu = np.asmatrix(np.identity(K))
-        for i in range(p):
-            Ai = B[:, 1 + i * K: 1 + (i + 1) * K]
-            mu -= Ai
-        mu = mu.I * nu
-        return np.asarray(nu).ravel(), mu
-
     # set the pre-sample period to the process means
     data = np.concatenate((np.empty((K, p)), data), axis=1)
-    data[:, :p] = process_mean(B[..., 0])[1]
+    data[:, :p] = VAR_mean(B[..., 0])
     resi = np.copy(data)
 
     for t in range(p, T + p):
         for i in range(p):
             Ai = B[:, i_shift + i * K: i_shift + (i + 1) * K, doys_ii[t - p]]
-            resi[:, t] -= \
-                np.squeeze(np.asarray(np.asmatrix(Ai) *
-                                      data[:, t - i - 1].reshape(K, 1)))
-       # if not mean_adjusted:
-       #     resi[:, t] -= process_mean(B[..., doys_ii[t - p]])[0]
-    return np.asarray(resi[:, p:] + mu) if mean_adjusted else resi[:, p:]
+            resi[:, t] -= Ai @ data[:, t - i - 1]
+    return resi[:, p:] + mu if mean_adjusted else resi[:, p:]
 
 
 def VARMA_LS_prelim(data, p, q):
@@ -1065,34 +1122,34 @@ def VARMA_LS_prelim(data, p, q):
     B = VAR_LS(data, max(10, int(1.5 * (p + q))))[0]
     ut_est = VAR_residuals(data, B, p)
 
-    Y = np.asmatrix(data[:, p:])
-    X = np.asmatrix(np.ones((K * (p + q), T)))
-    Xt = np.zeros((K * (p + q), 1))
+    Y = data[:, p:]
+    X = np.ones((K * (p + q), T))
+    Xt = np.zeros(K * (p + q))
     for t in range(p, T + p):
         for subt in range(p):
             start_i = subt * K
             stop_i = (subt + 1) * K
-            Xt[start_i:stop_i] = data[:, t - subt - 1].reshape((K, 1))
+            Xt[start_i:stop_i] = data[:, t - subt - 1]
         for subt in range(p, p + q):
             start_i = subt * K
             stop_i = (subt + 1) * K
-            Xt[start_i:stop_i] = ut_est[:, t - subt - p - 1].reshape((K, 1))
+            Xt[start_i:stop_i] = ut_est[:, t - subt - p - 1]
         X[:, t - p] = Xt
 
     # R might not be necessary since we do not limit any parameters here
-    R = np.asmatrix(np.identity(N))
-    IK = np.asmatrix(np.identity(K))
-    gamma = ((R.T * kron(X * X.T, IK) * R).I * R.T * kron(X, IK) * vec(Y))
-#    gamma = (X * sp.linalg.kron(X.T, IK)).I * sp.linalg.kron(X, IK) * vec(Y)
-    residuals_arma_vec = vec(Y) - kron(X.T, IK) * R * gamma
+    R = np.identity(N)
+    IK = np.identity(K)
+    gamma = ((R.T @ np.linalg.inv(kron(X @ X.T, IK) @ R))
+             @ R.T @ kron(X, IK) @ vec(Y))
+    residuals_arma_vec = vec(Y) - kron(X.T, IK) @ R @ gamma
     residuals_arma = residuals_arma_vec.reshape((K, T), order="F")
     # make the residuals have the same length as the data
     residuals_arma = np.concatenate((np.zeros((K, p)), residuals_arma),
                                     axis=1)
-    sigma_u_arma = residuals_arma * residuals_arma.T / T
+    sigma_u_arma = residuals_arma @ residuals_arma.T / T
     AM = gamma.reshape((K, -1), order="F")
     # the following expression leads to the same result...
-#    AM = Y * X.T * (X * X.T).I
+    # AM = Y * X.T * (X * X.T).I
     return AM, sigma_u_arma, residuals_arma
 
 
@@ -1104,7 +1161,7 @@ def VARMA_LS_sim(AM, p, q, sigma_u, means, T, S=None, m=None, ia=None,
 
     Parameters
     ----------
-    AM :       (K,K*(p+q)) matrix
+    AM :       (K,K*(p+q)) array
                The parameters of the VARMA-process. The first p columns are
                interpreted as the Ai-matrices of the auto regressive part. The
                last q columns as the Mi-matrices of the moving average part. K
@@ -1113,13 +1170,13 @@ def VARMA_LS_sim(AM, p, q, sigma_u, means, T, S=None, m=None, ia=None,
                Order of the auto regressive process.
     q :        integer
                Order of the moving average process.
-    sigma_u :  (K,K) matrix
+    sigma_u :  (K,K) array
                Covariance matrix of the residuals.
-    means :    (K,) matrix
+    means :    (K,) array
                Process means. Used as starting values.
     T :        integer
                Desired length of the output time series.
-    S :        (K,K) matrix, optional
+    S :        (K,K) array, optional
                Used as multiplicative change of the disturbance vector to
                increase the variance of the output.
     m :        (K,T) array_like, optional
@@ -1147,7 +1204,7 @@ def VARMA_LS_sim(AM, p, q, sigma_u, means, T, S=None, m=None, ia=None,
     """
     K = AM.shape[0]
     if S is None:
-        S = np.asmatrix(np.identity(K, dtype=float))
+        S = np.identity(K, dtype=float)
     n_sim_steps = n_sim_multiple * T + p
     if m is None:
         m = np.zeros((K, n_sim_steps))
@@ -1156,74 +1213,69 @@ def VARMA_LS_sim(AM, p, q, sigma_u, means, T, S=None, m=None, ia=None,
         # we have to expand m to include the pre-simulation timesteps
         m = np.tile(m, n_sim_multiple)
     m_trend = np.asarray([0] * K) if m_trend is None else np.asarray(m_trend)
-    m_trend = m_trend[:, np.newaxis]  # ha! erwischt!
     m_trend = _scale_additive(m_trend, AM, p)
 
     if ia is not None:
         ia = _scale_additive(ia, AM, p)
 
     # the first p columns are initial values, which will be omitted later
-    Y = np.asmatrix(np.zeros((K, n_sim_steps)))
+    Y = np.zeros((K, n_sim_steps))
     Y[:, :p] = means.reshape((K, -1))
 
     Y[:, -m.shape[1]:] += m
-
     start_t = Y.shape[1] - T
-
-    ut = np.asmatrix([np.random.multivariate_normal(K * [0], sigma_u)
-                      for i in range(q)]).reshape((K, q))
-
+    ut = np.array([np.random.multivariate_normal(K * [0], sigma_u)
+                   for i in range(q)]).reshape((K, q))
     for t in range(p, n_sim_steps):
         # shift the old values back and draw a new random vector
         ut[:, :-1] = ut[:, 1:]
-        ut[:, -1] = \
-            np.random.multivariate_normal(K * [0], sigma_u).reshape(K, 1)
+        ut[:, -1] = np.random.multivariate_normal(K * [0], sigma_u)
         Y[:, t] = ut[:, -1][np.newaxis, :]
 
         # non-standard scenario stuff
-        # beware of matrix multiplication! *= is not what we want
-        Y[:, t] = S * Y[:, t]
+        Y[:, t] = S @ Y[:, t]
         if t > start_t:
             if ia is not None:
-                Y[:, t] += np.asmatrix(ia[:, t - start_t]).T
+                Y[:, t] += ia[:, t - start_t].T
             # apply changes as a trend
             Y[:, t] += float(t - start_t) / T * m_trend
 
         # conventional VARMA things
         for i in range(p):
             Ai = AM[:, i * K: (i + 1) * K]
-            Y[:, t] += Ai * Y[:, t - i - 1]
+            Y[:, t] += Ai @ Y[:, t - i - 1]
         for i in range(p, p + q):
             Mi = AM[:, i * K: (i + 1) * K]
-            Y[:, t] += Mi * ut[:, -1 - i + p]
+            Y[:, t] += Mi @ ut[:, -1 - i + p]
 
         if (fixed_data is not None) and (t >= start_t):
             # fixing what's asked to be held constant
             Y[:, t] = \
-                np.where(np.isnan(fixed_data[:, t - start_t, np.newaxis]),
-                         Y[:, t], fixed_data[:, t - start_t, np.newaxis])
+                np.where(np.isnan(fixed_data[:, t - start_t]),
+                         Y[:, t],
+                         fixed_data[:, t - start_t])
 
         if fixed_data is None:
-            Y[:, t] += means.reshape((K, -1))
+            Y[:, t] += means
 
-    return np.asarray(Y[:, -T:])
+    return Y[:, -T:]
 
 
 def vec(A):
     """The vec operator stacks 2dim matrices into 1dim vectors column-wise.
     See p.661f.
 
-    >>> A = np.matrix(np.arange(4).reshape(2, 2))
+    >>> A = np.arange(4).reshape(2, 2)
     >>> A
-    matrix([[0, 1],
-            [2, 3]])
+    array([[0, 1],
+           [2, 3]])
     >>> vec(A)
-    matrix([[0],
-            [2],
-            [1],
-            [3]])
+    array([[0],
+           [2],
+           [1],
+           [3]])
     """
-    return np.asmatrix(A.T.ravel()).T
+    return A.T.ravel()[:, None]
 
 
 def unvec(sequence, K):
@@ -1233,10 +1285,10 @@ def unvec(sequence, K):
     >>> a
     [0, 1, 2, 3]
     >>> unvec(a, K=2)
-    matrix([[0, 2],
-            [1, 3]])
+    array([[0, 2],
+           [1, 3]])
     """
-    return np.asmatrix(np.array(sequence).reshape(K, -1, order="F"))
+    return np.array(sequence).reshape(K, -1, order="F")
 
 
 def vech(A):
@@ -1244,31 +1296,31 @@ def vech(A):
     returns the rest in a column-stacked form.
     See p.661f.
 
-    >>> A = np.matrix(np.arange(4).reshape(2, 2))
+    >>> A = np.arange(4).reshape(2, 2)
     >>> A
-    matrix([[0, 1],
-            [2, 3]])
+    array([[0, 1],
+           [2, 3]])
     >>> vech(A)
-    matrix([[0],
-            [2],
-            [3]])
+    array([[0],
+           [2],
+           [3]])
     """
     rows, columns = np.mgrid[0:A.shape[0], 0:A.shape[1]]
-    return np.asmatrix(A.T[rows.T >= columns.T]).T
+    return A.T[rows.T >= columns.T][:, None]
 
 
 def unvech(sequence, K):
     """The inverse of vech.
 
-    >>> a = np.matrix([0, 2, 3])
+    >>> a = np.array([0, 2, 3])
     >>> unvech(a, K=2)
-    matrix([[ 0.,  2.],
-            [ 2.,  3.]])
+    array([[ 0.,  2.],
+           [ 2.,  3.]])
     """
     A = np.empty((K, K))
     A[np.tril_indices_from(A)] = np.squeeze(sequence)
     A[np.triu_indices_from(A, k=1)] = A[np.tril_indices_from(A, k=-1)]
-    return np.asmatrix(A)
+    return A
 
 
 def SC(sigma_u, p, T):
@@ -1340,7 +1392,7 @@ def VAR_order_selection(data, p_max=10, criterion=SC, estimator=VAR_LS,
 
 
 def VARMA_order_selection(data, p_max=5, q_max=5, criterion=SC,
-                          plot_table=False):
+                          plot_table=False, *args, **kwds):
     """Returns p and q, the orders of a VARMA process that allows for
     parsimonious parameterization.
     Naive extension of VAR_order_selection without a theoretical basis!"""
@@ -1351,8 +1403,8 @@ def VARMA_order_selection(data, p_max=5, q_max=5, criterion=SC,
     for p in range(1, p_max + 1):
         for q in range(q_max + 1):
             if q is 0:
-                sigma_us[p, q] = VAR_LS(data, p)[1]
-            sigma_us[p, q] = VARMA_LS_prelim(data, p, q)[1]
+                sigma_us[p, q] = VAR_LS(data, p, *args, **kwds)[1]
+            sigma_us[p, q] = VARMA_LS_prelim(data, p, q, *args, **kwds)[1]
 
     crits = list(criterion)
     criterion_table = np.nan * np.empty((len(crits), p_max + 1, q_max + 1))
@@ -1380,11 +1432,11 @@ def _scale_additive(additive, A, p=None):
 
     Parameters
     ----------
-    additive :   (K,) or (K,T) matrix or ndarray
+    additive :   (K,) or (K,T) ndarray
                  Additive component to be scaled. K is the number of variables
                  simulated.Can be m, m_trend or ia of VARMA_LS_sim, for
                  example.
-    A :          (K,K*p) matrix or ndarray
+    A :          (K,K*p) ndarray
                  Parameters of the VAR process. p is the order of the VAR
                  process.
     p :          int, optional
@@ -1399,32 +1451,17 @@ def _scale_additive(additive, A, p=None):
                  Scaled additive component.
     """
 
-    A = np.asarray(A)  # np.asmatrix(A)
+    A = np.asarray(A)
     K = A.shape[0]
     if p is None:
-        p = old_div(A.shape[1], K)
+        p = A.shape[1] / K
         if p * K != A.shape[1]:
-            raise ValueError("Matrix A is not (K,K*p)-shape.")
-
-    # assure that the Ai and the additive is aligned
-    additive = np.asarray(additive)
-    additive = additive.reshape((K, -1))
+            raise ValueError("A is not (K,K*p)-shape.")
 
     scale_matrix = np.identity(K)
     for i in range(p):
         scale_matrix -= A[:, i * K: (i + 1) * K]
-
-    # the following is equivalent to:
-    #    # number of timesteps
-    #    T = additive.shape[1]
-    #    scaled_additive = np.zeros_like(additive).astype(float)
-    #        for t in xrange(T):
-    #            scaled_additive[:, t] = scale_matrix * additive[:, t]
-    # (considering everything is of type matrix)
-    scaled_additive = np.sum(scale_matrix[..., np.newaxis] *
-                             additive[np.newaxis, ...], axis=1)
-
-    return np.asarray(scaled_additive)
+    return scale_matrix @ additive
 
 
 ###############################################################################
