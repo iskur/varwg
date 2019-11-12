@@ -11,8 +11,7 @@ import scipy as sp
 from past.utils import old_div
 from scipy import stats
 
-# import vg.helpers as my
-from .. import helpers as my
+from vg import helpers as my
 from vg import smoothing, times
 from vg.time_series_analysis import (distributions, optimize,
                                      seasonal)
@@ -20,21 +19,24 @@ from tqdm import tqdm
 
 
 class SeasonalDist(seasonal.Seasonal):
-    def __init__(self, distribution, x, datetimes, fixed_pars=None,
+    def __init__(self, distribution, data, datetimes, fixed_pars=None,
                  par_ntrig=None, time_form="%m", verbose=False,
                  kill_leap=False, **kwds):
-        """distribution should be an object that implements pdf, cdf and so on.
-        fixed_pars is expected to be a dictionary mapping parameter names to
-        functions that take days of the year as input to calculate distribution
-        parameters.
+        """distribution should be an object that implements pdf, cdf etc.
+
+        fixed_pars is expected to be a dictionary mapping parameter
+        names to functions that take days of the year as input to
+        calculate distribution parameters.
+
         time_form (e.g. "%m") determines what is used to generate a starting
         solution of trigonometric parameters.
-        var_ntrig should be a sequence mapping distribution parameters to
-        number of trigonometric parameters. If that is None, 3 trig  parameters
-        per dist parameter are assumed
+        
+        var_ntrig should be a sequence mapping distribution parameters
+        to number of trigonometric parameters. If that is None, 3 trig
+        parameters per dist parameter are assumed
+
         """
-        # super(SeasonalDist, self).__init__(x, datetimes, kill_leap=kill_leap)
-        seasonal.Seasonal.__init__(self, x, datetimes, kill_leap=kill_leap)
+        seasonal.Seasonal.__init__(self, data, datetimes, kill_leap=kill_leap)
         self.verbose = verbose
         if isinstance(distribution, collections.Iterable):
             self.dist = distribution[0](distribution[1], **kwds)
@@ -43,11 +45,8 @@ class SeasonalDist(seasonal.Seasonal):
         self.fixed_pars = {} if fixed_pars is None else fixed_pars
         if not hasattr(self.dist, "parameter_names"):
             # we assume that we have come across a scipy.stats.distribution
-            self.dist.parameter_names = ["loc", "scale"]
-            if self.dist.shapes is not None:
-                self.dist.parameter_names += self.dist.shapes.split(",")
-            self.dist.__bases__ = distributions.Dist
-            self.dist.scipy_ = True
+            self._scipy_setup()
+
         if par_ntrig is None:
             self.par_ntrig = [3] * len(self.dist.parameter_names)
         else:
@@ -58,13 +57,31 @@ class SeasonalDist(seasonal.Seasonal):
                                 in self.dist.parameter_names
                                 if par_name
                                 not in self.fixed_pars.keys()]
-        if self.dist.supplements_names is not None:
+        if not self.dist.isscipy and self.dist.supplements_names is not None:
             for suppl in self.dist.supplements_names:
                 self.non_fixed_names.remove(suppl)
 
         self.n_trig_pars = 3
         self.pre_start = []
         self._supplements = None
+
+    def _scipy_setup(self):
+        self.dist.isscipy = True
+        self.dist.supplements_names = None
+        self.dist.parameter_names = ["loc", "scale"]
+        if self.dist.shapes is not None:
+            self.dist.parameter_names += self.dist.shapes.split(",")
+        self.dist.n_pars = len(self.dist.parameter_names)
+        # this basically sets no constraints on the parameters
+        self.dist._constraints = distributions.Dist._constraints
+        self.dist.__bases__ = distributions.Dist
+
+        def _clean_kwds(kwds):
+            return {key: value
+               for key, value in list(kwds.items())
+               if key in self.parameter_names}
+
+        self.dist._clean_kwds = _clean_kwds
 
     def trig2pars(self, trig_pars, _T=None):
         """This is the standard "give me distribution parameters for
@@ -108,42 +125,38 @@ class SeasonalDist(seasonal.Seasonal):
                   list(self.fixed_values_dict(doys).items())}
         if doys is None:
             _T = None
+            x = self.data
         else:
             _T = np.copy(doys) * 2 * np.pi / 365
+            x = np.full_like(_T, np.nan)
         params.update(
             {param_name: values for param_name, values
              in zip(self.non_fixed_names,
-                    self.trig2pars(trig_pars, _T=_T))})
+                   self.trig2pars(trig_pars, _T=_T))})
 
         if self.supplements is not None:
-            params.update({param_name: values for param_name, values
+            params.update({param_name: values
+                           for param_name, values
                            in self.all_supplements_dict(doys).items()})
 
         # fft_approx can produce values outside of valid parameter
         # values.
         par_names_ordered = self.dist.parameter_names
         T = len(params[par_names_ordered[0]])
-        invalid_mask = np.zeros(T, dtype=bool)
-        for t in range(T):
-            param_args = [np.atleast_1d(params[name])[t]
-                          for name in par_names_ordered]
-            invalid_mask[t] = not self.dist._constraints(1, *param_args)
-        # interpolate over invalid values
-        if np.any(invalid_mask):
-            for name in self.non_fixed_names:
-                par = params[name]
-                par[invalid_mask] = np.nan
-                half = T // 2
-                par_pad = np.concatenate((par[-half:], par, par[:half]))
-                params[name] = my.interp_nan(par_pad)[half:-half]
+        if np.sum(np.isfinite(x)) > 2:
+            invalid_mask = self.dist._constraints(x, **params)
+            # interpolate over invalid values
+            if np.any(invalid_mask):
+                for name in self.non_fixed_names:
+                    par = params[name]
+                    par[invalid_mask] = np.nan
+                    half = T // 2
+                    par_pad = np.concatenate((par[-half:], par, par[:half]))
+                    params[name] = my.interp_nan(par_pad)[half:-half]
         return params
 
     def all_supplements_dict(self, doys=None):
         """Dictionary of all supplements assembled by doy distance."""
-        # if doys is not None:
-        #     doys = np.copy(doys) * 2 * np.pi / 365
-        # else:
-        #     doys = self.doys
         if doys is None:
             doys = self.doys
         doys_ii = self.doys2doys_ii(doys)
@@ -202,10 +215,6 @@ class SeasonalDist(seasonal.Seasonal):
                                if name not in self.dist.supplements_names]
             pars += [fitted_pars]
         return np.array(pars)
-
-    @property
-    def monthly_supplements(self):
-        pass
 
     def get_start_params(self, opt_func=sp.optimize.fmin, x0=None, **kwds):
         """Estimate seasonal distribution parameters by fitting a
@@ -270,33 +279,34 @@ class SeasonalDist(seasonal.Seasonal):
                 start_pars += list(opt_func(error, start, disp=False,
                                             args=(fit_me, times_), **kwds))
             elif par_name not in self.fixed_pars:
-                start_pars += list(opt_func(error, x0, args=(par_timeseries,),
+                start_pars += list(opt_func(error, x0,
+                                            args=(par_timeseries,),
                                             disp=False, **kwds))
         self._start_pars = start_pars
         return start_pars
 
-    def _complete_dist_call(self, func, trig_pars, x=None, doys=None,
+    def _complete_dist_call(self, func, trig_pars, data=None, doys=None,
                             broadcast=False, **kwds):
         """Abstracts the common ground for self.{pdf,cdf,ppf} which call the
         according functions of the underlying distribution."""
         params = self.all_parameters_dict(trig_pars, doys)
         params.update(kwds)
-        x = np.atleast_1d(self.data if x is None else x)
+        data = np.atleast_1d(self.data if data is None else data)
         if broadcast:
-            xx = x[np.newaxis, :]
+            xx = data[np.newaxis, :]
             params = dict((par_name, val[:, np.newaxis])
                           for par_name, val in list(params.items()))
-            if self.dist.scipy_:
+            if self.dist.isscipy:
                 args = [params[par_name] for par_name
                         in self.dist.parameter_names]
                 return func(xx, *args)
             return func(xx, **params)
         else:
-            if self.dist.scipy_:
+            if self.dist.isscipy:
                 args = [params[par_name] for par_name
                         in self.dist.parameter_names]
-                return np.vectorize(func)(x, *args)
-            return func(x, **params)
+                return np.vectorize(func)(data, *args)
+            return func(data, **params)
 
     def pdf(self, trig_pars, x=None, doys=None, **kwds):
         return self._complete_dist_call(self.dist.pdf, trig_pars, x, doys,
@@ -331,10 +341,10 @@ class SeasonalDist(seasonal.Seasonal):
             self._start_pars = self.get_start_params()
         return self.start_pars
 
-    def fit(self, x=None, opt_func=optimize.simulated_annealing, x0=None,
+    def fit(self, data=None, opt_func=optimize.simulated_annealing, x0=None,
             **kwds):
-        if x is not None:
-            self.data = x
+        if data is not None:
+            self.data = data
         if x0 is None:
             x0 = self.get_start_params(maxfun=1e3 * sum(self.par_ntrig))
 
@@ -378,12 +388,12 @@ class SeasonalDist(seasonal.Seasonal):
 #        def combined(trig_pars):
 #            return unlikelihood(trig_pars) + f_diff(trig_pars)
         result = opt_func(unlikelihood, x0, constraints=(constraints,),
-                          callback=lambda x: setattr(self, "_solution", x),
+                          callback=lambda data: setattr(self, "_solution", data),
                           **kwds)
 #        try:
 #            result = opt_func(unlikelihood, x0, constraints=(constraints,),
-#                              callback=lambda x: setattr(self, "_solution",
-#                                                         x),
+#                              callback=lambda data: setattr(self, "_solution",
+#                                                         data),
 #                              **kwds)
 #        except ValueError:
 #            #HACK!
@@ -396,7 +406,7 @@ class SeasonalDist(seasonal.Seasonal):
 
     def chi2_test(self, k=None):
         """Chi-square goodness-of-fit test.
-        H0: The given data **x** follows **distribution** with parameters
+        H0: The given data **data** follows **distribution** with parameters
             aquired by ``func::SeasonalDist.fit``
         To side-step complications arising from having a different
         distribution for every doy, we test whether the quantiles (which are
@@ -411,7 +421,7 @@ class SeasonalDist(seasonal.Seasonal):
         -------
         p_value : float
         """
-        quantiles = self.cdf(self.solution)
+        quantiles = self.cdf(self.solution, x=self.data, doys=self.doys)
         n = len(quantiles)
         n_parameters = len(self.dist.parameter_names)
         if k is None:
@@ -473,12 +483,7 @@ class SeasonalDist(seasonal.Seasonal):
             s_kwds = dict(marker="o")
         _T = self.doys_unique * 2 * np.pi / 365
         xx = np.linspace(self.data.min(), self.data.max(), 100)
-        try:
-            dens = self.pdf(trig_pars, xx, self.doys_unique, broadcast=True)
-        except ValueError:
-            dens = np.array([self.pdf(trig_pars, xx, doy) for doy in
-                             self.doys_unique])
-        # dens[dens < 1e-12] = 0
+        dens = self.pdf(trig_pars, xx, self.doys_unique, broadcast=True)
         fig = plt.figure(figsize=figsize)
         ax1 = fig.gca()
         ax1.contourf(self.doys_unique, xx, dens.T, 15)
@@ -548,14 +553,20 @@ class SeasonalDist(seasonal.Seasonal):
             # get a parameter set per month
             monthly_params_dict = \
                 self.all_parameters_dict(solution, month_doys)
+            par_names = self.dist.parameter_names
+            if self.dist.supplements_names is not None:
+                par_names = [name for name in par_names
+                             if name not in self.dist.supplements_names]
             monthly_params = my.list_transpose([monthly_params_dict[par_name]
                                                 for par_name in
-                                                self.dist.parameter_names])
+                                                par_names])
+            monthly_params = np.array(monthly_params)
         monthly_fixed = [{par_name: func(month_doy)
                           for par_name, func in self.fixed_pars.items()}
                          for month_doy in month_doys]
 
-        fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(23, 12))
+        fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(23, 12),
+                                 sharex=True)
         ax = axes.ravel()
         plt.suptitle(self.dist.name)
         fig.canvas.set_window_title(self.dist.name)
@@ -563,11 +574,11 @@ class SeasonalDist(seasonal.Seasonal):
             ax1 = ax[ii]
 
             # the histogram of the data
-            bins = ax1.hist(values, n_classes, density=True, facecolor='grey',
-                            alpha=0.75)[1]
+            bins = ax1.hist(values, n_classes, density=True,
+                            facecolor='grey', alpha=0.75)[1]
 
             class_middles = 0.5 * (bins[1:] + bins[:-1])
-            if self.dist.scipy_:
+            if self.dist.isscipy:
                 density = self.dist.pdf(class_middles, *monthly_params[ii])
             else:
                 parameter_names = self.dist.parameter_names
@@ -581,11 +592,17 @@ class SeasonalDist(seasonal.Seasonal):
                                     zip(parameter_names,
                                         monthly_params[ii]))
                 monthly_dict.update(monthly_fixed[ii])
+                if isinstance(self.dist, distributions.RainMix):
+                    month_i = month_doys[ii]
+                    for key in ("q_thresh", "q_kde_eval", "x_eval",
+                             "f_thresh"):
+                        monthly_dict[key] = self.supplements[month_i][key]
                 if self.dist.supplements_names is not None:
                     f_thresh = monthly_dict["f_thresh"]
                     monthly_dict["kernel_data"] = values[values >= f_thresh]
                 density = self.dist.pdf(class_middles, **monthly_dict)
             ax1.plot(class_middles, density, 'r--')
+            ax1.set_xlim(values.min(), values.max() * 1.1)
 
             # the quantile part
             ax2 = ax1.twinx()
@@ -596,7 +613,7 @@ class SeasonalDist(seasonal.Seasonal):
             # theoretical cdf
             xx = np.linspace(values.min(), values.max(), 5e2)
             ranks_gen = np.linspace(1e-6, 1 - 1e-6, 100)
-            if self.dist.scipy_:
+            if self.dist.isscipy:
                 ranks_theory = self.dist.cdf(xx, *monthly_params[ii])
                 xx_from_ppf = self.dist.ppf(ranks_gen, *monthly_params[ii])
                 qq = self.dist.cdf(values, *monthly_params[ii])
@@ -606,9 +623,6 @@ class SeasonalDist(seasonal.Seasonal):
                 qq = self.dist.cdf(values, **monthly_dict)
             ax2.plot(xx, ranks_theory, 'r--')
             ax2.plot(xx_from_ppf, ranks_gen, "g--")
-            # ax1.scatter(np.full_like(xx, 0), ranks_theory, 
-            #             marker="o", facecolor=(0, 0, 0, 0),
-            #             edgecolor="black", alpha=.3)
             ax2.hist(qq[np.isfinite(qq)], 40, color="gray",
                      density=True, histtype="step",
                      orientation="horizontal")
@@ -644,12 +658,14 @@ class SeasonalDist(seasonal.Seasonal):
         return fig, ax
 
     def plot_monthly_params(self):
-        for par_name, values in zip(self.dist.parameter_names,
-                                    self.monthly_params.T):
-            plt.figure()
-            plt.plot(values)
-            plt.title(par_name)
-        plt.show()
+        n_pars = self.dist.n_pars - n_fixed_pars
+        fig, axs = plt.subplots(nrows=n_pars, ncols=1)
+        for par_name, values, ax in zip(self.dist.parameter_names,
+                                     self.monthly_params.T,
+                                     axs):
+            ax.plot(values)
+            ax.title(par_name)
+        return fix, axs
 
 
 class SlidingDist(SeasonalDist):
@@ -692,7 +708,7 @@ class SlidingDist(SeasonalDist):
         for start_i, end_i in zip(year_end_ii[:-1], year_end_ii[1:]):
             year_slice = slice(start_i, end_i)
             year_doys = doys[year_slice]
-            if np.max(year_doys) > 366:
+            if np.max(year_doys) >= 366:
                 year_doys[year_doys > 31 + 29] -= 1
                 doys[year_slice] = year_doys
 
@@ -707,7 +723,7 @@ class SlidingDist(SeasonalDist):
             n_fixed_pars = len(list(self.dist
                                     ._clean_kwds(self.fixed_pars)
                                     .keys()))
-            n_pars = (self.dist.n_pars - n_fixed_pars)
+            n_pars = self.dist.n_pars - n_fixed_pars
             self._sliding_pars = np.ones((self.n_doys, n_pars))
             if self.dist.supplements_names:
                 # we need to save supplements also (needed for method
@@ -715,30 +731,29 @@ class SlidingDist(SeasonalDist):
                 self._supplements = []
             for doy_ii in tqdm(range(self.n_doys), disable=(not self.verbose)):
                 data = self.data[self.doy_mask[doy_ii]]
-                if not self.dist.scipy_:
+                if not self.dist.isscipy:
                     # weight the data by doy-distance
-                    doys = self.doys[self.doy_mask[doy_ii]]
-                    doy_dist = times.doy_distance(doy_ii + 1, doys)
-                    weights = (1 - doy_dist /
-                               (self.doy_width + 2)) ** 2
+                    # doys = self.doys[self.doy_mask[doy_ii]]
+                    # doy_dist = times.doy_distance(doy_ii + 1, doys)
+                    # weights = (1 - doy_dist /
+                    #            (self.doy_width + 2)) ** 2
+                    weights = np.ones_like(data)
                 fixed = {par_name: func(self.doys_unique[doy_ii])
                          for par_name, func in list(self.fixed_pars.items())}
-                if self.dist.scipy_ or \
+                if self.dist.isscipy or \
                    isinstance(self.dist, distributions.Rain):
-                    self._sliding_pars[doy_ii] = self.dist.fit(data, **fixed)
+                    self._sliding_pars[doy_ii] = self.dist.fit(data,
+                                                               **fixed)
                 else:
                     x0 = (self._sliding_pars[doy_ii - 1]
                           if doy_ii > 0
                           else self.dist.fit(data, **fixed))
                     result = self.dist.fit_ml(data, weights=weights, x0=x0,
                                               method='Powell', **fixed)
-                    if result.success and not np.any(np.isnan(result.x)):
-                        self._sliding_pars[doy_ii] = result.x
-                    else:
-                        x0 = self.dist.fit(data, **fixed)
-                        self._sliding_pars[doy_ii] = x0
                     self._sliding_pars[doy_ii] = \
-                        result.x if result.success else [np.nan] * len(x0)
+                        (result.x
+                         if result.success else
+                         [np.nan] * n_pars)
                     if result.supplements:
                         self._supplements += [result.supplements]
             if self.verbose:
@@ -752,7 +767,6 @@ class SlidingDist(SeasonalDist):
                 par_pad = np.concatenate((par[-half:], par, par[:half]))
                 interp = my.interp_nan(par_pad)[half:-half]
                 self._sliding_pars[:, par_i] = interp
-
         return self._sliding_pars.T
 
     @property
@@ -818,7 +832,7 @@ class SlidingDist(SeasonalDist):
                 _T = self._T = (2 * np.pi / 365 * self.doys)[np.newaxis, :]
         doys = np.atleast_1d(365 * np.squeeze(_T) / (2 * np.pi))
         doys_ii = np.where(np.isclose(self.doys_unique, doys[:, None]))[1]
-        if len(doys_ii) < len(doys):
+        if len(doys_ii) != len(doys):
             doys_ii = [my.val2ind(self.doys_unique, doy) for doy in doys]
         fourier_pars = self.fourier_approx(fft_order, trig_pars)
         return np.array([fourier_pars[:, doy_i] for doy_i in doys_ii]).T
@@ -884,7 +898,7 @@ class SlidingDistHourly(SlidingDist, seasonal.Torus):
                 data = self.torus[self._torus_slice(doy)].ravel()
                 fixed = {par_name: func(self.doys_unique[doy_ii])
                          for par_name, func in list(self.fixed_pars.items())}
-                if self.dist.scipy_ or \
+                if self.dist.isscipy or \
                    isinstance(self.dist, distributions.Rain):
                     self._sliding_pars[doy_ii] = self.dist.fit(data, **fixed)
                 else:
@@ -1003,7 +1017,8 @@ class SlidingDistHourly(SlidingDist, seasonal.Torus):
 if __name__ == "__main__":
     import os
     import vg
-    conf = vg.config_konstanz_disag
+    # conf = vg.config_konstanz_disag
+    import config_konstanz_disag as conf
     from vg.core import vg_plotting
     vg.conf = vg.vg_base.conf = vg_plotting.conf = conf
     # from scipy.stats import distributions as sp_dists
