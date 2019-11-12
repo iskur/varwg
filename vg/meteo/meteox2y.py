@@ -374,7 +374,11 @@ def temp2lw(temp):
         incident longwave radiation [W/m**2]
     """
     from scipy import constants
-    theta_kelvin = constants.C2K(temp)
+    try:
+        theta_kelvin = constants.C2K(temp)
+    except AttributeError:
+        theta_kelvin = constants.convert_temperature(temp, 'Celsius',
+                                                     'Kelvin')
     e = 6.2 * np.exp(17.26 * temp / (theta_kelvin - 35.8))
     boltz = 0.0000000567  # ask gideon
     alpha, beta = .42, .065
