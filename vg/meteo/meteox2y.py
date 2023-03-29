@@ -832,6 +832,14 @@ def pot_s_rad(date, lat=48.738, longt=9.099, in_format='%Y-%m-%dT%H:%M',
     >>> pot_s_rad(times.datetime2doy(dt))
     array([855.35624182])
     """
+    if tz_mer is None:
+        timezone_str = tzf.timezone_at(lat=float(lat),
+                                       lng=float(longt))
+        timezone = pytz.timezone(timezone_str)
+        dt = datetime(2020, 6, 1)
+        tz_offset = ((timezone.utcoffset(dt, is_dst=False).total_seconds())
+                     / 3600)
+        tz_mer = 15 * tz_offset
     s0 = 1373  # Solarkonstante W/m^2
     # once upon a time there was a latitude
     Lc = wog * (tz_mer - longt) / 15.0  # Local correction of time
