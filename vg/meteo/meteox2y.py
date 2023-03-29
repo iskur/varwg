@@ -117,6 +117,54 @@ def rel2vap_p(rh, at):
     e = rh * c_e
     return e
 
+def rel2abs_hum(rh, at):
+    """Absolute humidity from relative humidity and air temperature.
+
+    Parameters
+    ----------
+    rh : float or numpy.array of floats
+        relative humidity with values between 0 and 1
+    at : float or numpy.array of floats
+        air temperature [deg C]
+
+    Returns
+    -------
+    abs_hum : float or numpy.array of floats
+        absolute humidity [g / m^3]
+
+    Examples
+    --------
+    >>> rel2abs_hum(0.8, 20)
+    13.831072059995932
+    """
+    rh, at = map(np.array, (rh, at))
+    e = rel2vap_p(rh, at) * 100
+    return 2.16679 * e / (273.15 + at)
+
+
+def abs_hum2rel(abs_hum, at):
+    """Relative humidity from absolute humidity and air temperature.
+
+    Parameters
+    ----------
+    abs_hum : float or numpy.array of floats
+        absolute humidity [g / m^3]
+    at : float or numpy.array of floats
+        air temperature [deg C]
+
+    Returns
+    -------
+    rh : float or numpy.array of floats
+        relative humidity with values between 0 and 1
+
+    Examples
+    --------
+    >>> abs_hum2rel(13.831072059995932, 20)
+    0.8
+    """
+    abs_hum, at = map(np.array, (abs_hum, at))
+    e = abs_hum / 2.16679 * (273.15 + at)
+    return vap_p2rel(e / 100, at)
 
 def vap_p2rel(e, at):
     """ relative humidity from vapour pressure and air temperature
