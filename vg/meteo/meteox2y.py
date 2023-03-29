@@ -193,7 +193,7 @@ def vap_p2rel(e, at):
     """
     e, at = np.array(e), np.array(at)
     c_e = sat_vap_p(at)
-    rh = old_div(e, c_e)
+    rh = e / c_e
     return rh
 
 
