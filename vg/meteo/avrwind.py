@@ -468,7 +468,7 @@ def plothist(x, legend):
     rects2 = plot.bar(color='b')
 
     plot.hist(x, density=True, bins=30)
-    plot.legend((rects1[0], rects2[0])(legend[0], legend[1]))
+    plot.legend((rects1[0], rects2[0]), (legend[0], legend[1]))
     plot.show()
 
 
@@ -482,10 +482,10 @@ def phi_main(u, v):
 
 def turn_uv(u, v, phi):
     uv = np.array([u, v]).T
-    turn_matrix = np.matrix([[np.cos(phi), -np.sin(phi)],
-                             [np.sin(phi), np.cos(phi)]])
-    uv = uv * turn_matrix
-    u, v = np.asarray(uv).T
+    turn_matrix = np.array([[np.cos(phi), -np.sin(phi)],
+                            [np.sin(phi), np.cos(phi)]])
+    uv = uv @ turn_matrix
+    u, v = uv.T
     return np.squeeze(u), np.squeeze(v)
 
 
