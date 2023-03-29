@@ -10,7 +10,7 @@ import numpy as np
 import numpy.testing as npt
 import vg
 config_template = vg.config_template
-vg.conf = vg.vg_base.conf = config_template
+vg.set_conf(config_template)
 
 p = 3
 T = 2 * 365

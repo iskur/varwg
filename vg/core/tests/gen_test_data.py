@@ -5,8 +5,10 @@ import shutil
 import tempfile
 import numpy as np
 import vg
-from vg import config_template
 from vg.core.tests import test_vg
+config_template = vg.config_template
+vg.set_conf(config_template)
+
 
 p, T = test_vg.p, test_vg.T
 
