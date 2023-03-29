@@ -190,18 +190,8 @@ def _init(vg_config_name, vg_kwds, fit_kwds):
     """This is run on a cluster node."""
     import importlib
     import vg
-    # try:
-    #     from importlib import reload
-    # except ImportError:
-    #     pass
-    import sys
-    PY2 = sys.version_info.major == 2
-    if not PY2:
-        reload = importlib.reload
-    else:
-        importlib.reload = reload
-    vg.conf = importlib.import_module(vg_config_name)
-    importlib.reload(vg.conf)
+    config = importlib.import_module(vg_config_name)
+    vg.set_conf(config)
     vg_kwds["dump_data"] = False
     met_vg = vg.VG(**vg_kwds)
     met_vg.fit(**fit_kwds)
