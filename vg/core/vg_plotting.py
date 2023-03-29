@@ -916,6 +916,47 @@ class VGPlotting(vg_base.VGBase):
         fig.name = "qq"
         return fig, axs
 
+    def plot_seasonal_corrs(self, var_names=None, trans=False, figsize=None,
+                          fig=None, axs=None):
+        if var_names is None:
+            var_names = self.var_names
+        elif isinstance(var_names, basestring):
+            var_names = var_names,
+        if fig is None and axs is None:
+            fig, axs = plt.subplots(nrows=len(var_names), ncols=1,
+                                    sharex=True,
+                                    constrained_layout=True,
+                                    figsize=figsize)
+        if trans:
+            obs_df = self.to_df("daily input trans", var_names=var_names)
+            sim_df = self.to_df("daily output trans", var_names=var_names)
+        else:
+            obs_df = self.to_df("daily input", var_names=var_names)
+            sim_df = self.to_df("daily output", var_names=var_names)
+        for ax, var_name in zip(axs, var_names):
+            corrs_obs = np.empty((12, self.K - 1), dtype=float)
+            var_i = var_names.index(var_name)
+            var_other_ii = [idx for idx in range(len(var_names))
+                            if idx != var_i]
+            for month_i, group in obs_df.groupby(obs_df.index.month):
+                corrs = np.corrcoef(group.T)
+                corrs_obs[month_i - 1] = corrs[var_i, var_other_ii]
+            # simulated time series can have a different length
+            corrs_sim = np.empty((12, self.K - 1), dtype=float)
+            for month_i, group in sim_df.groupby(sim_df.index.month):
+                corrs = np.corrcoef(group.T)
+                corrs_sim[month_i - 1] = corrs[var_i, var_other_ii]
+            var_names_other = [var_names[idx] for idx in var_other_ii]
+            for corr_obs in corrs_obs.T:
+                ax.plot(corr_obs, "--")
+            ax.set_prop_cycle(None)
+            for corr_sim, var_name_other in zip(corrs_sim.T, var_names_other):
+                ax.plot(corr_sim, label=var_name_other)
+            ax.set_title(var_name)
+            ax.legend(loc="best")
+            ax.grid(True, zorder=0)
+        fig.suptitle(f"Monthly correlations {'trans' if trans else ''}")
+        return fig, axs
 
     def plot_windrose(self, figsize=None, seasonal=False, *args, **kwds):
         try:
