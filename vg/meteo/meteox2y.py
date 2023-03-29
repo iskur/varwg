@@ -1045,7 +1045,7 @@ def sunshine_hours(dates, longitude, latitude, tz_offset=0):
     array([15.89961046])
     """
     J_rise, J_set = sunshine_riseset(dates, longitude, latitude, tz_offset)
-    return J_set - J_rise
+    return (J_set - J_rise) * 60
 
 
 def max_sunshine_minutes(dates, longitude, latitude, tz_offset=0):
@@ -1086,7 +1086,8 @@ def sunshine_riseset(dates, longitude, latitude, tz_offset=0):
         timezone = pytz.timezone(timezone_str)
         dts = [datetime(date.year, date.month, date.day)
                for date in dates]
-        tz_offset = np.array([timezone.utcoffset(dt).total_seconds()
+        tz_offset = np.array([timezone.utcoffset(dt, is_dst=True
+                                                 ).total_seconds()
                               for dt in dts]) / 86400
 
     n = jdn - 2451545.0008  # current julian day
