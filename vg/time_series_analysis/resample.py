@@ -294,7 +294,9 @@ def resample(data, dtimes, p=3, n_sim_steps=None, theta_incr=0.0,
 
 if __name__ == "__main__":
     import vg
-    vg.conf = vg.vg_base.conf = vg.config_konstanz
+    import config_konstanz
+    vg.set_conf(config_konstanz)
+    # vg.conf = vg.vg_base.conf = vg.config_konstanz
     met_vg = vg.VG((
         # "R",
         "theta", "Qsw",
