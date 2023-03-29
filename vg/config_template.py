@@ -45,7 +45,6 @@ seasonal_cache_file = os.path.join(cache_dir, "seasonal_solutions.she")
 #-----------------------------------------------------------------------------#
 
 import collections
-
 long_var_names = {"R": "Precipitation",
                   "U": "Wind velocity",
                   "u": "Eastward wind speed",
@@ -67,10 +66,12 @@ units.update({"ILWR":        "[$W / m ^ 2$]",
               "e":           "[hPa]",
               "rh":          "[-]",
               "Cloud_Cover": "[-]",
-              "R":           "[m]",
+              "R":           "[mm]",
               "Qsw":         "[$W / m ^ 2$]",
-              "theta":       "[$ ^{\circ}C$]",
-              "theta_monthly":       "[$ ^ {\circ}C$]",
+              "Qsw_lars":    "[$W / m ^ 2$]",
+              "theta":       "[$^{\circ}C$]",
+              "theta_lars":       "[$^{\circ}C$]",
+              "theta_monthly":       "[$^{\circ}C$]",
               "U":           "[$m / s$]",
               "u":           "[$m / s$]",
               "v":           "[$m / s$]",
@@ -85,11 +86,14 @@ ygreek.update({
     "theta":  r'$\theta$',
     "rh":     r"$\phi$",
     "Qsw":    r"$Q_{sw}$",
-    "ILWR":   r"$Q_{lw(incident)}$",
+    "ILWR":   r"$Q_{lw(inc.)}$",
     "u":      r"$u$",
     "v":      r"$v$",
     })
 
+
+def var_names_greek(var_names):
+    return [ygreek[var_name] for var_name in var_names]
 
 #-----------------------------------------------------------------------------#
 # These are internals of the fitting / deseasonalization process
@@ -103,33 +107,22 @@ from vg.meteo import meteox2y
 from vg import helpers as my
 
 # theoretical distributions for each variable.
-dists = {
-    "theta":           distributions.norm,
-    "Qsw":             "empirical",
-    "ILWR":            distributions.norm,
-    "rh":              distributions.truncnorm,
-    "u":               "empirical",
-    "v":               "empirical",
-
-    "e":               distributions.kumaraswamy,
-    "Cloud_Cover":     distributions.kumaraswamy,
-    "R":               (distributions.RainMix, distributions.kumaraswamy),
-    "U":               distributions.lognormal,
-    }
-# seasonal behaviour of the distribution parameters in dists
-seasonal_classes = {
-    "theta":           sd.SlidingDist,
-    "Qsw":             skde.SeasonalKDE,
-    "ILWR":            sd.SlidingDist,
-    "rh":              sd.SlidingDist,
-    "u":               skde.SeasonalKDE,
-    "v":               skde.SeasonalKDE,
-
-    "e":               sd.SlidingDist,
-    "Cloud_Cover":     sd.SlidingDist,
-    "R":               sd.SlidingDist,
-    "U":               sd.SlidingDist,
-    }
+dists = {"ILWR":            distributions.norm,
+         "e":               distributions.norm,
+         "rh":              distributions.truncnorm,
+         "Cloud_Cover":     distributions.truncnorm,
+         "Qsw":             "empirical",
+         "theta":           distributions.norm,
+         "R":               (distributions.RainMix,
+                             distributions.kumaraswamy),
+         "U":               distributions.lognormal,
+         "u":               "empirical",
+         "v":               "empirical",
+         "nao":             distributions.norm,
+         }
+seasonal_classes = dict.fromkeys(dists, sd.SlidingDist)
+seasonal_classes["Qsw"] = skde.SeasonalKDE
+seasonal_classes["u"] = seasonal_classes["v"] = skde.SeasonalKDE
 
 # threshold for daily precipitation sum to count as such. same unit as
 # precipitation in the input file
@@ -138,8 +131,8 @@ dists_kwds = {
     "R": dict(
         threshold=threshold,
         q_thresh_lower=.7,
-        q_thresh_upper=.95,
-        doy_width=10,
+        q_thresh_upper=.99,
+        doy_width=20,
         fft_order=4,
     ),
     # "R": dict(threshold=1.5e-4,
@@ -152,7 +145,7 @@ def array_gen(scalar):
     return lambda tt: np.full_like(tt, scalar)
 
 
-# unomment the following decorator to cache results of max_qsw on the
+# uncomment the following decorator to cache results of max_qsw on the
 # hard-drive and speed up repeated vg initialization
 # @my.pickle_cache(os.path.join(cache_dir, "max_qsw_%s.pkl"), warn=False)
 def max_qsw(doys, lon=longitude, lat=latitude, **kwds):
@@ -171,24 +164,25 @@ def max_qsw(doys, lon=longitude, lat=latitude, **kwds):
 hpd = 24
 par_known = dict.fromkeys(dists)
 par_known.update({
-     "theta":       None,
-     "Qsw":         # "l" and "c" are parameters of the SeasonalKDE class
-                    {"l": array_gen(0),
-                     # the .725 is unfortunately a complicated
-                     # subject it seems as it should also be a
-                     # function of t
-                     "u": np.vectorize(lambda x: .725 *
-                                       max_qsw(x + 1 if x < 366 else 1))},
-    "ILWR":         None,
-    "rh":           # "lc" and "uc" are parameters of the Truncated
-                    # meta-distribution
-                    {"lc": array_gen(-.001), "uc": array_gen(hpd * 1.01)},
-    "u":            None,
-    "v":            None,
-
-    "R":            {"u": array_gen(1.)},
-    "Cloud_Cover":  {"l": array_gen(-.1), "u": array_gen(hpd + .1)},
-    "e":            {"l": array_gen(0)},
+    "Cloud_Cover": {"l": array_gen(-.1),
+                    "u": array_gen(hpd + .1)},
+    "Qsw":         {"l": array_gen(0),
+                    # the .725 is unfortunately a complicated
+                    # subject it seems as it should also be a
+                    # function of t
+                    "u": np.vectorize(lambda x: .725 *
+                                      max_qsw(x + 1 if x < 366
+                                              else 1))},
+    "rh":          {"lc": array_gen(-.001),
+                    "uc": array_gen(hpd * 1.01),
+                    # "l": array_gen(-.001),
+                    # "u": array_gen(hpd * 1.01)
+                    },
+    "R":           {"u": array_gen(1.),
+                    # "l": array_gen(0.),
+                    # "lc": array_gen(.0002),
+                    # "uc": array_gen(1e12)
+                    },
     })
 
 
@@ -229,12 +223,17 @@ par_known_hourly.update({
 
 conversions = []
 
-# def R_m2mm(times_, data, var_names):
-#     ri = var_names.index("R")
-#     data[ri] *= 1000 * 24
-#     return times_, data, var_names
 
-# conversions += [R_m2mm]
+def R_m2mm(times_, data, var_names):
+    try:
+        ri = var_names.index("R")
+    except ValueError:
+        return times_, data, var_names
+    data[ri] *= 1000 * 24
+    return times_, data, var_names
+
+
+conversions += [R_m2mm]
 
 # # for example: calculate long-wave radiation from air temperature
 # def theta2ilwr(times_, data, var_names):
