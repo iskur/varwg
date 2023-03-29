@@ -165,8 +165,49 @@ class VGPlotting(vg_base.VGBase):
         sim = self.sim_sea_dis[rain_i]
         obs = self.met["R"]
         return rain_stats.plot_exceedance(obs, sim, kind="all",
-                                     thresh=thresh, fig=None,
-                                     axs=None, *args, **kwds)
+                                     thresh=thresh, fig=None, axs=None,
+                                     *args, **kwds)
+
+    def plot_hyd_year_sums(self, fig=None, ax=None, alpha=0.5, *args, **kwds):
+        if "R" not in self.var_names:
+            warnings.warn("No R in var_names, no plot_hyd_year_sums")
+            return
+        import xarray as xr
+        if fig is None or ax is None:
+            fig, ax = plt.subplots(nrows=1, ncols=1)
+            first_fig = True
+        else:
+            first_fig = False
+        obs_xr = (xr
+                  .DataArray(self.to_df("daily input"))
+                  .rename(dict(dim_1="variable"))
+                  .sel(variable="R"))
+        obs = np.sort(rain_stats.hyd_year_sums(obs_xr, full_years=True))
+        ax.step(obs, my.rel_ranks(len(obs)), where="mid", label="obs")
+
+        if self.sim_sea is not None:
+            sim_xr = (xr
+                      .DataArray(self.to_df("daily output"))
+                      .rename(dict(dim_1="variable"))
+                      .sel(variable="R"))
+            sim = np.sort(rain_stats.hyd_year_sums(sim_xr, full_years=True))
+            ax.step(sim, my.rel_ranks(len(sim)), where="mid",
+                    color="k", alpha=alpha, label="sim")
+            if first_fig:
+                ax.legend(loc="best")
+
+        if first_fig:
+            ax.grid(True)
+            ax.set_ylabel("cdf")
+            ax.set_xlabel(f"R {conf.units['R']}")
+            title_str = "Hydrological year sums (cdf)"
+            ax.set_title(title_str)
+            try:
+                fig.canvas.set_window_title("%s (%d)" %
+                                            (title_str, fig.canvas.manager.num))
+            except AttributeError:
+                pass
+        return fig, ax
 
     def plot_psd(self, var_names=None, hourly=False, *args, **kwds):
         """Plots power spectral density using matplotlib.pyplot.psd.
