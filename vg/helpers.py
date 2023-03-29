@@ -36,7 +36,9 @@ import functools
 import random
 import numpy as np
 try:
+    from multiprocessing import cpu_count
     import numexpr as ne
+    ne.set_num_threads(cpu_count())
     NE = True
 except ImportError:
     NE = False
@@ -55,7 +57,7 @@ def asscalar(func):
     @functools.wraps(func)
     def wrapped(*args, **kwds):
         result = np.atleast_1d(func(*args, **kwds))
-        return np.asscalar(result) if len(result) == 1 else result
+        return result.item() if result.size == 1 else result
     return wrapped
 
 
@@ -65,6 +67,8 @@ def _build_arg_str(function, *func_args, **func_kwds):
     # remember that default arguments arrive empty in **func_kwds.
     # build dictionary of argument-names to default argument values
     spec_arg_names = inspect.getargspec(function).args
+    if spec_arg_names[0] == "self":
+        spec_arg_names = spec_arg_names[1:]
     arg_dict = dict.fromkeys(spec_arg_names, None)
     spec_arg_values = inspect.getargspec(function).defaults
     # spec_arg_values apply to the last n spec_arg_names
@@ -82,7 +86,7 @@ def _build_arg_str(function, *func_args, **func_kwds):
                      for key in sorted(arg_dict.keys()))
 
 
-def pickle_cache(filepath_template="%s.pkl", warn=True):
+def pickle_cache(filepath_template="%s.pkl", clear_cache=False, warn=True):
     """Use this as a function decorator to cache the result of a function as a
     pickle-file. The filename is determined by the arguments in the function.
     If the filename turns out to be too long, a hash of it is used."""
@@ -93,9 +97,23 @@ def pickle_cache(filepath_template="%s.pkl", warn=True):
             # arg_dict_str = sanitize(_build_arg_str(function, *args, **kwds))
             arg_dict_str = _build_arg_str(function, *args, **kwds)
             if len(arg_dict_str) > 0:
+                # if isinstance(filepath_template, pathlib.Path):
+                #     filepath_template = str(filepath_template)
                 filepath = filepath_template % arg_dict_str
             else:
                 filepath = filepath_template
+
+            def hash_(filepath):
+                name_hash = (hashlib.md5(os.path.basename(filepath.encode()))
+                             .hexdigest())
+                return os.path.join(os.path.dirname(filepath), name_hash)
+            
+            filepath_hash = hash_(filepath)
+            if clear_cache:
+                if os.path.exists(filepath):
+                    os.remove(filepath)
+                if os.path.exists(filepath_hash):
+                    os.remove(filepath_hash)
 
             if not re.match(r".*py[2,3]\.pkl$", filepath):
                 # keep different pickles for different python versions
@@ -107,10 +125,6 @@ def pickle_cache(filepath_template="%s.pkl", warn=True):
                 #                     "py2" if PY2 else "py3",
                 #                     name_parts[1]))
 
-            def hash_(filepath):
-                name_hash = (hashlib.md5(os.path.basename(filepath.encode()))
-                             .hexdigest())
-                return os.path.join(os.path.dirname(filepath), name_hash)
 
             def read(filepath):
                 with open(filepath, "rb") as pi_file:
@@ -127,8 +141,8 @@ def pickle_cache(filepath_template="%s.pkl", warn=True):
                             "here: %s" % filepath)
                     return read(filepath)
                 except IOError:
-                    if os.path.exists(hash_(filepath)):
-                        return read(hash_(filepath))
+                    if os.path.exists(filepath_hash):
+                        return read(filepath_hash)
                 except UnicodeDecodeError:
                     # this is probably a py2/3 incompatibility problem
                     os.remove(filepath)
@@ -172,13 +186,14 @@ class ADict(UserDict):
 
 def cache(*names, **name_values):
     """Use as a decorator, to supply *names attributes that can be used as
-    a cache. The attributes are set to None during compile time. The
-    wrapped function also has a 'clear_cache'-method to delete those
-    variables.
+    a cache. The attributes are set to their default/None during
+    compile time. The wrapped function also has a 'clear_cache'-method
+    to delete those variables.
 
     Parameter
     ---------
     *names : str
+
     """
     def wrapper(function):
         @functools.wraps(function)
@@ -279,9 +294,12 @@ def chi2_test(x, y, k=None, n_parameters=0):
     return stats.chisqprob(chi_test, dof)
 
 
-def rel_ranks(values):
+def rel_ranks(values, method="average"):
     """Returns ranks of values in the range [0,1]."""
-    return old_div((stats.stats.rankdata(values) - .5), len(values))
+    if isinstance(values, int):
+        N = values
+        return (np.arange(N) + .5) / N
+    return (stats.stats.rankdata(values, method) - .5) / len(values)
 
 
 def val2ind(values, value):
@@ -335,7 +353,12 @@ def fourier_approx(data, order=4, size=None, how="longest"):
     return np.fft.irfft(pars, size)
 
 
-def interp_nan(values, times=None, max_interp=None):
+def periodic_pad(values):
+    half = len(values) // 2
+    return np.concatenate((values[-half:], values, values[:half]))
+
+
+def interp_nan(values, times=None, max_interp=None, pad_periodic=False):
     """Remove nans from values by linear interpolation.
 
     Parameters
@@ -359,6 +382,9 @@ def interp_nan(values, times=None, max_interp=None):
     array([[ 0.,  1.,  2.],
            [ 3.,  4.,  5.]])
     """
+    if pad_periodic:
+        half = len(values) // 2
+        values = periodic_pad(values)
     values = np.atleast_2d(np.copy(values))
     for row_i, row in enumerate(values):
         nans = np.isnan(row)
@@ -382,6 +408,8 @@ def interp_nan(values, times=None, max_interp=None):
         if np.any(nans):
             values[row_i, nans] = \
                 np.interp(times[nans], times[~nans], row[~nans])
+    if pad_periodic:
+        values = values[:, half:-half]
     return np.squeeze(values)
 
 
@@ -458,7 +486,7 @@ def sumup(values, width=24, times_=None, drop_extra=True, mean=False,
     else:
         return np.squeeze(summed_values)
 
-
+ 
 def gaps(data):
     """Return indices referring to start and end points of gaps (marked by nans
     in the given array 'data'
@@ -491,12 +519,16 @@ def gaps(data):
         mask = data
     else:
         mask = np.isnan(data)
-    if np.all(~mask) or np.all(mask):
+    if np.all(~mask):
         return []
+    if np.all(mask):
+        return [[0, len(mask) - 1]]
     diff = np.diff(mask.astype(int))
     begin_ii = (np.where(diff == 1)[0] + 1).tolist()
     end_ii = np.where(diff == -1)[0].tolist()
     if mask[0]:
+        if len(begin_ii) == 0:
+            begin_ii = [0]
         if not end_ii[0] < begin_ii[0]:
             end_ii = [0] + end_ii
         begin_ii = [0] + begin_ii
@@ -670,7 +702,6 @@ def splom(data, variable_names=None, f_kwds=None, h_kwds=None, s_kwds=None,
     e_opacity = opacity if e_opacity is None else e_opacity
     data = np.asarray(data)
     n_variables = data.shape[0]
-    figsize = plt.rcParams["figure.figsize"] if figsize is None else figsize
     fig, axes = square_subplots(n_variables, figsize=figsize, **f_kwds)
 
     for ii in range(n_variables):
@@ -865,10 +896,11 @@ def kde_gauss(dataset, evaluation_points=None, kernel_width=None,
             densities = np.hstack((densities, tmp_densities))
     else:
         kdeMatrix = residual_matrix(dataset, evaluation_points)
-        preTerm = old_div(1.0, (np.sqrt(2 * np.pi) * kernel_width))
-        kdeMatrix = old_div(preTerm, np.exp(old_div(kdeMatrix ** 2, (2 * kernel_width ** 2))))
+        preTerm = 1.0 / (np.sqrt(2 * np.pi) * kernel_width)
+        with np.errstate(all="ignore"):
+            kdeMatrix = preTerm / np.exp(kdeMatrix ** 2 / (2 * kernel_width ** 2))
         # suming lines
-        densities = old_div(np.sum(kdeMatrix, axis=1), float(len(dataset)))
+        densities = np.sum(kdeMatrix, axis=1) / float(len(dataset))
     return densities
 
 
@@ -944,9 +976,11 @@ def hist(values, n_bins, dist=None, pdf=None, kde=False, fig=None,
                 pdf += [fitted_dist.pdf]
                 # theoretical cdf
                 ranks_theory = fitted_dist.cdf(eva_points)
-                p_val = stats.kstest(values, fitted_dist.cdf, mode="asymp")[1]
+                p_val = stats.kstest(values, fitted_dist.cdf,
+                                     mode="asymp")[1]
                 ax2.plot(eva_points, ranks_theory, '--',
-                         label="%s p-value: %.1f%%" % (dist.name, p_val * 100))
+                         label=("%s p-value: %.1f%%" %
+                                (dist.name, p_val * 100)))
                 ax2.set_ylabel(r"cumulative frequency")
                 ax2.set_ylim(0, 1)
                 ax2.grid()
@@ -998,7 +1032,8 @@ def scale_yticks(event):
         bbox = label.get_window_extent()
         # the figure transform goes from relative coords->pixels and we
         # want the inverse of that
-        bboxi = bbox.inverse_transformed(fig.transFigure)
+        # bboxi = bbox.inverse_transformed(fig.transFigure)
+        bboxi = bbox.transformed(fig.transFigure.inverted())
         bboxes.append(bboxi)
 
     # this is the bbox that bounds all the bboxes, again in relative
