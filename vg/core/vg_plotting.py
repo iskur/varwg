@@ -1257,19 +1257,55 @@ class VGPlotting(vg_base.VGBase):
             ax.grid(True)
         return figs, axs
 
+    def plot_monthly_hists_hourly(self, var_names=None, bins=20):
+        """Plot histograms grouped by month and variable."""
+        if var_names is None:
+            var_names = self.var_names
+        elif isinstance(var_names, basestring):
+            var_names = var_names,
+
+        figs = []
+        data = vg_base.met_as_array(self.met, var_names=var_names)
+        month_ii = [times.time_part(self.times_orig, "%m") == month
+                    for month in range(1, 13)]
+        if self.sim_sea_dis is not None:
+            sim_month_ii = [times.time_part(self.dis_times, "%m") == month
+                            for month in range(1, 13)]
+        for var_name in var_names:
+            var_i = self.var_names.index(var_name)
+            fig, axs = plt.subplots(3, 4, sharey=True, sharex=True)
+            axs = axs.ravel()
+            for month in range(12):
+                dat = data[var_i, month_ii[month]]
+                dat = dat[np.isfinite(dat)]
+                label = "obs"
+                if self.sim_sea is not None:
+                    label = [label, "sim"]
+                    dat = [dat, self.sim_sea_dis[var_i, sim_month_ii[month]]]
+                axs[month].hist(dat, bins, density=True, histtype="step",
+                                label=label)
+                if self.sim_sea is None:
+                    dat = dat,
+                ax_cdf = axs[month].twinx()
+                for values in dat:
+                    values = values[np.isfinite(values)]
+                    ranks = (np.arange(len(values)) - .5) / len(values)
+                    ax_cdf.plot(np.sort(values), ranks)
+                    ax_cdf.set_yticklabels([])
+                ax_cdf.set_ylim(0, 1)
                 axs[month].set_title(month + 1)
             if self.sim_sea is not None:
-                axs[0].legend(("observed", "simulated"), loc="best")
+                axs[0].legend(loc="best")
 
             suptitle = var_name
-            if self.station_name is not None:
-                suptitle = "%s %s" % (self.station_name, suptitle)
             fig.suptitle(suptitle)
             fig.tight_layout(rect=(0, 0, 1, .95))
             figs += [fig]
         if len(figs) == 1:
             figs = figs[0]
-        return figs
+        for ax in axs:
+            ax.grid(True)
+        return figs, axs
 
     def plot_episode_hists(self, var_names=None):
         """Plots histograms of episode duration and amplitude grouped by
