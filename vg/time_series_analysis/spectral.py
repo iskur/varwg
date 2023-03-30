@@ -233,14 +233,15 @@ class SpectralND(Spectral):
             cutoff = crange
 
         size_old = domainshape + cutoff
-        # increase size to fit inside a power of two, in order to speed up fft
+        # increase size to fit inside a power of two, in order to
+        # speed up fft
         domainshape_larger = 2 ** np.ceil(np.log2(size_old)).astype(int)
         grid = np.mgrid[[slice(0, dim_scale * dim, dim_scale)
                          for dim, dim_scale
                          in zip(domainshape_larger, scale)]]
         for _ in range(ndim):
             domainshape_larger = domainshape_larger[:, np.newaxis]
-        grid = np.min((grid, domainshape_larger - grid), axis=0)
+        grid = np.min((grid, np.abs(domainshape_larger - grid)), axis=0)
 
         # distances to origin
         origin_dists = np.sqrt((grid ** 2).sum(axis=0))
@@ -255,7 +256,7 @@ class SpectralND(Spectral):
         self.sqrt_fft_covs = np.sqrt(old_div(fft_covs, self.npoints))
         # needed in self.sim to cut a piece of domainshape size out of
         # the generated, larger field
-        self.mslice = [slice(dim) for dim in domainshape]
+        self.mslice = tuple([slice(dim) for dim in domainshape])
         # the size of the field we are generating (larger in hope of
         # acceleration)
         self.size = domainshape_larger
