@@ -29,11 +29,10 @@ def time_part_average(values, times, time_format_str="%w", expand=True,
     return values_means
 
 
-def matr_img(array, title=None, xlabels=None, ylabels=None, fig=None,
-             figsize=None, fontsize=12, colorbar=False, *args, **kwds):
+def matr_img(array, title=None, xlabels=None, ylabels=None, fig=None, figsize=None,
+           fontsize=12, colorbar=False, text=True, *args, **kwds):
     fig = plt.figure(figsize=figsize) if fig is None else fig
     plt.imshow(array, interpolation="nearest", **kwds)
-#    fig.canvas.mpl_connect("draw_event", my.scale_yticks)
     if xlabels is not None:
         plt.xticks(np.arange(len(xlabels)), xlabels, rotation=45)
     if ylabels is not None:
@@ -47,13 +46,15 @@ def matr_img(array, title=None, xlabels=None, ylabels=None, fig=None,
 
     if colorbar:
         plt.colorbar()
-    for x in range(array.shape[0]):
-        for y in range(array.shape[1]):
-            # do not let yourself be fooled by the strange imshow-coordinate
-            # system
-            plt.text(y, x, "%.2f" % array[x, y], fontsize=fontsize,
-                     horizontalalignment='center', verticalalignment="center")
-    return fig
+    if text:
+        for x in range(array.shape[0]):
+            for y in range(array.shape[1]):
+                # do not let yourself be fooled by the strange
+                # imshow-coordinate system
+                plt.text(y, x, "%.2f" % array[x, y],
+                         fontsize=fontsize, horizontalalignment='center',
+                         verticalalignment="center")
+    return fig, ax
 
 
 def corr_img(data, k=0, title=None, var_names=None, rank=False, *args,
@@ -64,7 +65,7 @@ def corr_img(data, k=0, title=None, var_names=None, rank=False, *args,
     else:
         corr = cross_corr(data, k)
     return matr_img(corr, title, xlabels=var_names, ylabels=var_names,
-                    vmin=-1, vmax=1, *args, **kwds)
+                    vmin=-1, vmax=1, cmap="coolwarm", *args, **kwds)
 
 
 def auto_cov_(data, k):
@@ -134,7 +135,7 @@ def auto_corr(data, k):
     k : int or iterable
         time-lag or time lags if k is an iterable
     """
-    if not isinstance(k, collections.Iterable):
+    if not isinstance(k, collections.abc.Iterable):
         k = k,
     return np.squeeze([auto_cov(data, lag) / auto_cov(data, 0)
                        for lag in k])
@@ -160,18 +161,17 @@ def _partial_autocorr_uni(data, k):
             P_km1 = np.atleast_1d(auto_corr(data, list(range(1, lag))))
             P_km1_rev = P_km1[::-1]
             # read P_k-1,k-1
-            P_km1km1 = np.matrix(np.ones((lag - 1, lag - 1)))
+            P_km1km1 = np.ones((lag - 1, lag - 1))
             for ii in range(lag - 1):
                 if ii > 0:
                     P_km1km1[ii, :ii] = P_km1_rev[-ii:]
                 if ii < lag - 2:
                     P_km1km1[ii, ii + 1:] = P_km1[ii:-1]
-            P_km1km1_inv = P_km1km1.I
-            P_km1, P_km1_rev = np.matrix(P_km1), np.matrix(P_km1_rev)
-            autos[lag_i] = (old_div((r_k - P_km1 * P_km1km1_inv * P_km1_rev.T),
-                            np.sqrt((1 - P_km1 * P_km1km1_inv * P_km1.T) *
-                                    (1 - P_km1_rev * P_km1km1_inv *
-                                     P_km1_rev.T))))
+            P_km1km1_inv = np.linalg.inv(P_km1km1)
+            autos[lag_i] = ((r_k - P_km1 @ P_km1km1_inv @ P_km1_rev.T) /
+                            np.sqrt((1 - P_km1 @ P_km1km1_inv @ P_km1.T) @
+                                    (1 - P_km1_rev @ P_km1km1_inv @
+                                     P_km1_rev.T)))
     return np.squeeze(autos)
 
 
@@ -185,10 +185,11 @@ def partial_autocorr(data, k):
 
 
 def plot_auto_corr(data, k_range=7 * 24, title="", var_names=None,
-                   n_per_day=1, partial=False, n_difference=0,
-                   draggable=False, figsize=None, window_title=True, *args,
-                   **kwds):
-    fig = plt.figure(figsize=figsize)
+                 n_per_day=1, partial=False, n_difference=0,
+                 figsize=None, window_title=True, fig=None, ax=None, *args,
+                 **kwds):
+    if fig is None or ax is None:
+        fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
     fig.canvas.mpl_connect('draw_event', my.scale_yticks)
     lags = np.arange(k_range)
     corr_func = partial_autocorr if partial else auto_corr
@@ -207,22 +208,21 @@ def plot_auto_corr(data, k_range=7 * 24, title="", var_names=None,
             fig.add_subplot(n_difference + 1, 1, diff + 1)
             autos = corr_func(data_2d, lags)
             for auto, color in zip(autos.T, "bgrcmykw"):
-                plt.plot(auto, color + linestyle + symbol,
-                         markerfacecolor=(0, 0, 0, 0),
-                         markeredgecolor=color)
+                ax.plot(auto, color + linestyle + symbol,
+                        markerfacecolor=(0, 0, 0, 0),
+                        markeredgecolor=color)
             xes = list(range(0, k_range, n_per_day))
-            plt.xticks(xes, xes)
+            ax.set_xticks(xes, minor=xes)
             if var_names is not None:
-                leg = plt.legend(var_names, loc="center left",
-                                 bbox_to_anchor=(1, .5), frameon=False,
-                                 borderaxespad=0.)
-                leg.draggable(draggable)
-    plt.grid()
-    plt.suptitle(title)
+                ax.legend(var_names, loc="center left",
+                          bbox_to_anchor=(1, .5), frameon=False,
+                          borderaxespad=0.)
+    ax.grid()
+    fig.suptitle(title)
     if window_title:
         fig.canvas.set_window_title("%s (%d)" %
                                     (title, fig.canvas.manager.num))
-    return fig
+    return fig, ax
 
 
 # def cross_cov_nan(data, k):
@@ -268,7 +268,7 @@ def cross_corr(data, k):
     k : int or iterable
         time-lag or time lags if k is an iterable
     """
-    if not isinstance(k, collections.Iterable):
+    if not isinstance(k, collections.abc.Iterable):
         k = k,
     finite_ii = np.isfinite(data)
     stds = [np.nanstd(row[row_ii]) for row, row_ii in zip(data, finite_ii)]
@@ -331,10 +331,13 @@ def plot_scaling(data, agg_funcs=(np.mean, np.std, sp.stats.skew),
 
     for var_i, var_name in enumerate(var_names):
         for agg_j, agg_func in enumerate(agg_funcs):
-            axs[var_i, agg_j].plot(data_agg[agg_j, :, var_i], *args, **kwds)
+            ax = axs[var_i, agg_j]
+            ax.semilogx(data_agg[agg_j, :, var_i], *args, **kwds)
+            ax.grid(True)
             if var_i == 0:
-                axs[var_i, agg_j].set_title(agg_func.__name__)
-        axs[var_i, 0].set_ylabel(var_name)
+                ax.set_title(agg_func.__name__)
+            if agg_j == 0:
+                ax.set_ylabel(var_name)
     return fig, axs
 
 
@@ -510,4 +513,5 @@ if __name__ == "__main__":
     met_vg = vg.VG(("theta", "ILWR", "Qsw", "rh", "u", "v"))
     met_vg.fit(2)
     simt, sim = met_vg.simulate()
-    met_vg.plot_autocorr()
+    # met_vg.plot_autocorr()
+    met_vg.plot_doy_scatter("theta")
