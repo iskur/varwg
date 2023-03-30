@@ -62,25 +62,30 @@ def apply_kernel_ne(kernel_width, data, eval_points=None, recalc=False):
 
 def apply_kernel_np(kernel_width, data, eval_points=None, mask=None,
                     recalc=False):
-    if recalc or not hasattr(apply_kernel_np, "distances"):
+    has_distance_cache = hasattr(apply_kernel_ne, "distances")
+    if eval_points is not None and has_distance_cache:
+        if len(eval_points) != apply_kernel_ne.distances.shape[0]:
+            recalc = True
+    if recalc or not has_distance_cache:
         if eval_points is None:
-            distances = distance_array(data, data)
-            apply_kernel_np.distances = distances
+            _distances = distance_array(data, data)
+            apply_kernel_ne.distances = _distances
         else:
-            distances = distance_array(data, eval_points)
+            _distances = distance_array(data, eval_points)
     else:
-        distances = apply_kernel_np.distances
-    if distances.ndim > 2:
+        _distances = apply_kernel_ne.distances
+    if _distances.ndim > 2:
         k_slice = ([Ellipsis] +
-                   (distances.ndim - kernel_width.ndim) * [None])
+                   (_distances.ndim - kernel_width.ndim) * [None])
         kernel_width = kernel_width[k_slice]
     return (1.0 /
             (np.sqrt(2 * np.pi) * kernel_width) *
-            np.exp(-distances ** 2 / (2 * kernel_width ** 2)))
-
+            np.exp(-_distances ** 2 / (2 * kernel_width ** 2)))
 
 try:
+    from multiprocessing import cpu_count
     import numexpr as ne
+    ne.set_num_threads(cpu_count())
     apply_kernel = apply_kernel_ne
     NE = True
 except ImportError:
@@ -116,23 +121,32 @@ def scotts_rule(n_data, n_dim=3):
 
 def silvermans_rule(x):
     """Silverman's rule of thumb for kernel bandwidth."""
-    return (1.06 * np.std(x) * len(x) ** (-1. / 5))
+    std = np.std(x)
+    if len(x) <= 1 or std == 0:
+        return np.nan
+    return (1.06 * std * len(x) ** (-1. / 5))
 
 
-def optimal_kernel_width(x):
-    x0 = silvermans_rule(x)
+def optimal_kernel_width(x, x0=None, bounds=None):
+    if bounds is None:
+        bounds = [1e-3, None]
+    silver = silvermans_rule(x)
+    if x0 is None:
+        # x0 = silvermans_rule(x)
+        x0 = silver
     res = optimize.minimize(sum_log_density, x0, args=(x,),
-                            bounds=([1e-2, None],),
+                            bounds=(bounds,),
+                            # bounds=([1e-5, None],),
+                            # bounds=([silver / 100, silver * 10],),
                             method="L-BFGS-B",
                             # method="TNC",
                             # method="SLSQP",
                             )
-    if res.success and not np.isclose(res.x, 1e-6):
+    if res.success and not np.isclose(res.x, 1e-7):
         return np.squeeze(res.x)
     warnings.warn("Kernel-width optimization unsuccesful. "
                   "Using rule of thumb.")
     return x0
-
 
 def apply_2d_kernel_(kernel_width, data, doys, circ, doy_width,
                      eval_points=None, eval_doys=None):
