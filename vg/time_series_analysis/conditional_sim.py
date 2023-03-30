@@ -122,7 +122,8 @@ def simulate(autocov, T, cov=None, cond_eq=None, cond_mean=None,
     prob.solve(solver="cvxopt", verbose=0)
     vv_arr = np.array(uu.value)[:, 0]
 
-    # somewhere between uu and vv lies the surface of the hypersphere. find it!
+    # somewhere between uu and vv lies the surface of the hypersphere.
+    # find it!
     def root_func(t):
         xx = uu_arr + t * (vv_arr - uu_arr)
         return np.dot(xx, xx) - 1
@@ -294,7 +295,7 @@ class SimulateMulti(object):
             A = self.gen_A(realizations)
             U, S, V = np.linalg.svd(A)
             c = np.dot(self.cv_total, U)
-            norm_inner = np.sum((old_div(c, S)) ** 2)
+            norm_inner = np.sum((c / S) ** 2)
             if self.verbose > 1:
                 print("\tn_realizations: %d, norm: %.3f" %
                       (self.n_realizations, norm_inner))
@@ -305,7 +306,7 @@ class SimulateMulti(object):
                                                extra_realizations))
                 self.n_realizations += self.n_extra
 
-        s = np.sum((old_div(c, S)) * V.T[:, :S.shape[0]], axis=1)
+        s = np.sum((c / S) * V.T[:, :S.shape[0]], axis=1)
         interpolator = np.tensordot(s, realizations, axes=1)
 
         realizations_compl = self.spec.sim_n(self.n_realizations)
@@ -364,7 +365,7 @@ class SimulateMulti(object):
             xx = x + np.dot(alpha, sol)
             norm_compl = np.dot(xx, xx)
 
-        tt = np.sqrt(old_div((1. - norm_inner), norm_compl))
+        tt = np.sqrt((1. - norm_inner) / norm_compl)
         return (interpolator +
                 np.tensordot(tt * xx, realizations_compl, axes=1))
 
@@ -403,7 +404,7 @@ class SimulateMulti(object):
         def squared_error(alpha):
             xx = interim.x + np.dot(alpha, interim.sol)
             norm_compl = np.dot(xx, xx)
-            tt = np.sqrt(old_div((1. - interim.norm_inner), norm_compl))
+            tt = np.sqrt((1. - interim.norm_inner) / norm_compl)
             sim = (interim.interpolator +
                    np.tensordot(tt * xx, interim.realizations_compl,
                                 axes=1))
@@ -436,7 +437,7 @@ class SimulateMulti(object):
         rmse = np.sqrt(result.fun /
                        max(1, len(conds_trans_mean_ij)))
         if rmse > .5:
-            n_throwaway = int(old_div(len(interim.realizations_compl), 3))
+            n_throwaway = int(len(interim.realizations_compl) / 3)
             realizations_compl = \
                 np.concatenate((interim.realizations_compl[n_throwaway:],
                                 self.spec.sim_n(self.n_extra + n_throwaway)))
@@ -597,7 +598,7 @@ def disaggregate_piecewice(data, autocov, disagg_len, cov=None,
     # reshape input data so that we can iterate through it the same way as
     # with data_sim
     n_chunks = data_sim.shape[0]
-    chunk_len_agg = old_div(data_sim.shape[-1], disagg_len)
+    chunk_len_agg = data_sim.shape[-1] / disagg_len
     data_chunked = [data[:, t: t + chunk_len_agg]
                     for t in range(0, data.shape[1] + chunk_len_agg - 1,
                                    chunk_len_agg)]
@@ -605,9 +606,9 @@ def disaggregate_piecewice(data, autocov, disagg_len, cov=None,
     if "doys" in t_kwds:
         doys = t_kwds["doys"]
         doys_chunked = [doys[t * disagg_len
-                             - (old_div(n_overlap, 2) if t > 0 else 0):
+                             - (n_overlap / 2 if t > 0 else 0):
                              disagg_len * (t + chunk_len_agg)
-                             + (old_div(n_overlap, 2) if t > 0 else 0)
+                             + (n_overlap / 2 if t > 0 else 0)
                              ]
                         for t in range(0, data.shape[1] + chunk_len_agg - 1,
                                        chunk_len_agg)]
@@ -640,7 +641,7 @@ def disaggregate_piecewice(data, autocov, disagg_len, cov=None,
         if "doys" in kwds and kwds["doys"] is not None:
             if np.array(cond_mean_ii)[:, 1].max() > len(doys_chunked[i]):
                 rest_len = (data_chunked[i].shape[1] * disagg_len
-                            + old_div(n_overlap, 2))
+                            + n_overlap / 2)
                 cols = [list(range(t, min(t + disagg_len, rest_len)))
                         for t in range(n_overlap, rest_len, disagg_len)]
                 if K > 1:

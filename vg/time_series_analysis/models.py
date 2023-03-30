@@ -1497,8 +1497,8 @@ def VAR_LS_predict(data_past, B, sigma_u, T=1, n_realizations=1):
     # number of variables
     K = B.shape[0]
     # order of VAR_LS-process
-    p = old_div((B.shape[1] - 1), K)
-    nu = np.asmatrix(B[:, 0]).ravel()
+    p = (B.shape[1] - 1) / K
+    nu = B[:, 0].ravel()
 
     # the first p columns are initial values, which will be omitted later
     Y = np.zeros((K, data_past.shape[1] + T, n_realizations))
@@ -1543,7 +1543,7 @@ def VAR_YW(data, p=2):
     # cov-matrices for up to p lags
     for lag in range(1, p + 1):
         # unbiased cross-covariance
-        cov = old_div(ts.cross_cov(data, lag), (T + p - lag))
+        cov = ts.cross_cov(data, lag) / (T + p - lag)
         start_i = (lag - 1) * cov.shape[0]
         stop_i = lag * cov.shape[0]
         Gamma_y[:, start_i:stop_i] = cov
@@ -1554,7 +1554,7 @@ def VAR_YW(data, p=2):
         for jj in range(p):
             start_j = jj * K
             stop_j = (jj + 1) * K
-            cov = old_div(ts.cross_cov(data, ii - jj), (T + p - abs(ii - jj)))
+            cov = ts.cross_cov(data, ii - jj) / (T + p - abs(ii - jj))
             Gamma_Y[start_i:stop_i, start_j:stop_j] = cov
     A = Gamma_y * Gamma_Y.I
 

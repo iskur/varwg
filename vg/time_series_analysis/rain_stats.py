@@ -1,6 +1,7 @@
 from __future__ import division
 from builtins import range
 from past.utils import old_div
+from past.types import basestring
 import warnings
 import numpy as np
 import matplotlib.pyplot as plt
@@ -178,8 +179,8 @@ def richardson_model(T, trans_pp):
     # decide on the first occurrence with unconditional probability
     occs[0] = rr[0] < pp[0].sum()
     for t in range(1, T):
-        occs[t] = rr[t] < (old_div(pp[int(occs[t - 1]), 1],
-                                   pp[:, int(occs[t - 1])].sum()))
+        occs[t] = rr[t] < (pp[int(occs[t - 1]), 1] /
+                           pp[:, int(occs[t - 1])].sum())
     return occs
 
 

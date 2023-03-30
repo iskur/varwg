@@ -1,11 +1,8 @@
-from __future__ import division, print_function
-
 import os
 import sys
 import subprocess
 import warnings
 from abc import ABCMeta, abstractmethod
-from builtins import map, object, range, zip
 from collections import namedtuple
 
 import matplotlib.pyplot as plt
@@ -251,7 +248,7 @@ class DistMeta(ABCMeta):
         return new_cls
 
 
-class Dist(with_metaclass(DistMeta, object)):
+class Dist(metaclass=DistMeta):
     """Mimics part of the interface of stats.rv_continuous. Comes with a few
     extra goodies."""
     # i would like to call the first item "solution", but in order to
@@ -477,7 +474,7 @@ class Frozen(object):
 
     def plot_qq(self, values, *args, **kwds):
         """A qq-plot. Scatters theoretic over empirical ranks."""
-        ranks_emp = old_div((stats.stats.rankdata(values) - .5), len(values))
+        ranks_emp = (stats.stats.rankdata(values) - .5) / len(values)
         ranks_the = self.cdf(values)
         fig = plt.figure()
         plt.scatter(ranks_emp, ranks_the, marker="o", *args, **kwds)
@@ -724,7 +721,7 @@ class Normal(Dist):
                                "exp(-(x - mu) ** 2 / (2 * sigma ** 2)))")
         else:
             dens = (1. / (2 * np.pi * sigma**2)**.5 *
-                    np.exp(old_div(-(x - mu)**2, (2 * sigma**2))))
+                    np.exp(-(x - mu)**2 / (2 * sigma**2)))
         return dens
 
     def _cdf(self, x, mu=0, sigma=1):
@@ -1027,21 +1024,21 @@ class JohnsonSU(Dist):
 
     def _pdf(self, x, a, b, loc, scale):
         x, a, b, loc, scale = np.atleast_1d(x, a, b, loc, scale)
-        x = old_div((x - loc), scale)
+        x = (x - loc) / scale
         x2 = x * x
         trm = norm.pdf(a + b * np.log(x + np.sqrt(x2 + 1)))
         dens = b * 1.0 / np.sqrt(x2 + 1.0) * trm / scale
         return dens
 
     def _cdf(self, x, a, b, loc, scale):
-        x = old_div(np.atleast_1d(x - loc), scale)
+        x = np.atleast_1d(x - loc) / scale
         qq = np.atleast_1d(norm.cdf(a + b * np.log(x + np.sqrt(x * x + 1))))
         qq[np.isneginf(x)] = 0
         return qq
 
     def _ppf(self, qq, a, b, loc, scale):
         qq, a, b, loc, scale = np.atleast_1d(qq, a, b, loc, scale)
-        z = np.sinh(old_div((norm.ppf(qq) - a), b))
+        z = np.sinh((norm.ppf(qq) - a) / b)
         x = z * scale + loc
         return x
 
@@ -1059,11 +1056,10 @@ class Cauchy(Dist):
     _feasible_start = (0, 1)
 
     def _pdf(self, x, x0, gamma):
-        return old_div(1, (np.pi * gamma * (1 + (old_div(
-            (x - x0), gamma))**2)))
+        return 1 / (np.pi * gamma * (1 + ((x - x0) / gamma)**2))
 
     def _cdf(self, x, x0, gamma):
-        return (old_div(1, np.pi)) * np.arctan2(x - x0, gamma) + .5
+        return (1 / np.pi) * np.arctan2(x - x0, gamma) + .5
 
     def _ppf(self, qq, x0, gamma):
         return x0 + gamma * np.tan(np.pi * (qq - .5))
@@ -1085,8 +1081,8 @@ class StudentT(Dist):
     def _pdf(self, x, mu=0, df=1):
         x, mu, df = np.atleast_1d(x, mu, df)
         Px = (np.exp(gammaln((df + 1) / 2.) - gammaln(df / 2.)) /
-              np.sqrt(df * np.pi) * (1 + old_div(
-                  (x - mu)**2, df))**(-(df + 1) / 2.))
+              np.sqrt(df * np.pi) * (1 + 
+                  (x - mu)**2 / df)**(-(df + 1) / 2.))
         return Px
 
     def _cdf(self, x, mu=0, df=1):
@@ -1124,8 +1120,8 @@ class NoncentralT(Dist):
     # stolen from scipy.stats.distributions.nct
     def _pdf(self, x, df, nc, mu=0):
         x, df, nc = (np.atleast_1d(var).astype(float) for var in (x, df, nc))
-        pdf_x = lambda x: ((old_div(df, x)) *
-                           (self.cdf(x * (1 + old_div(2, df)) ** .5, df + 2, nc) -
+        pdf_x = lambda x: ((df / x) *
+                           (self.cdf(x * (1 + 2 / df) ** .5, df + 2, nc) -
                             self.cdf(x, df, nc)))
         dens = np.where(
             np.abs(x - mu) <= .5, self._pdf_old(x, df, nc, mu), pdf_x(x - mu))
@@ -1140,15 +1136,14 @@ class NoncentralT(Dist):
         fac1 = n + x2
         trm1 = (n / 2. * np.log(n) + gammaln(n + 1) -
                 (n * np.log(2) + nc * nc / 2. +
-                 (old_div(n, 2.)) * np.log(fac1) + gammaln(old_div(n, 2.))))
+                 (n / 2.) * np.log(fac1) + gammaln(n / 2.)))
         Px = np.exp(trm1)
-        valF = old_div(ncx2, (2 * fac1))
-        trm1 = (np.sqrt(2) * nc *
-                (x - mu) * hyp1f1(old_div(n, 2) + 1, 1.5, valF) /
-                (np.asarray(fac1 * gamma_func(old_div((n + 1), 2)))))
-        trm2 = (old_div(
-            hyp1f1(old_div((n + 1), 2), 0.5, valF), (np.asarray(
-                np.sqrt(fac1) * gamma_func(old_div(n, 2) + 1)))))
+        valF = ncx2 / (2 * fac1)
+        trm1 = (sqrt2 * nc *
+                (x - mu) * hyp1f1(n / 2 + 1, 1.5, valF) /
+                (np.asarray(fac1 * gamma_func((n + 1) / 2))))
+        trm2 = (hyp1f1((n + 1) / 2, 0.5, valF) / (np.asarray(
+                np.sqrt(fac1) * gamma_func(n / 2 + 1))))
         Px *= trm1 + trm2
         return Px
 
@@ -1377,17 +1372,17 @@ class Weibull(Dist):
         # we need the coefficient of variation now and the mean later. so do
         # not use stats.variation in order to not calculate the mean twice.
         mean = np.nanmean(values)
-        cv = old_div(np.nanstd(values), mean)
+        cv = np.nanstd(values) / mean
 
         def cv_error(beta):
             """Squared error between the theoretical and empirical coefficient
             of variation."""
-            gamma1 = special.gamma(1 + old_div(2, beta))
-            gamma2 = special.gamma(1 + old_div(1, beta))
-            return (cv - old_div((gamma1 - gamma2**2)**.5, gamma2))**2
+            gamma1 = special.gamma(1 + 2 / beta)
+            gamma2 = special.gamma(1 + 1 / beta)
+            return (cv - (gamma1 - gamma2**2)**.5 / gamma2)**2
 
         beta = sp_optimize.fminbound(cv_error, -1, 1e6, disp=False)
-        alpha = (old_div(mean, special.gamma(old_div(1, beta) + 1)))**(-beta)
+        alpha = (mean / special.gamma(1 / beta + 1))**(-beta)
         return alpha, beta
 
     def _constraints(self, x, alpha, beta):
@@ -1412,7 +1407,7 @@ class Kumaraswamy(Dist):
             dens = ne.evaluate("a * b * x ** (a - 1) * (1 - x ** a) ** " +
                                "(b - 1) / (u - l)")
         else:
-            x = old_div((x - l), (u - l))
+            x = (x - l) / (u - l)
             dens = a * b * x**(a - 1) * (1 - x**a)**(b - 1) / (u - l)
         return dens
 
@@ -1465,7 +1460,7 @@ class Beta(Dist):
                 ne.evaluate("x ** (alpha - 1) * (1 - x) ** (beta - 1) / " +
                             "(u - l)")
         else:
-            x = old_div((u - l), (u - l))
+            x = (u - l) / (u - l)
             return (1 / special.beta(alpha, beta)
                     * x ** (alpha - 1) * (1 - x) ** (beta - 1) / (u - l))
 
@@ -1474,7 +1469,7 @@ class Beta(Dist):
             warnings.warn("Some values below lower or above upper bounds.")
         # note: the betainc function below really delivers the regularized
         # incomplete beta function
-        return special.betainc(alpha, beta, old_div((x - l), (u - l)))
+        return special.betainc(alpha, beta, (x - l) / (u - l))
 
     def _ppf(self, qq, alpha, beta, l=0, u=1):
         return (u - l) * special.betaincinv(alpha, beta, qq) + l
@@ -1564,8 +1559,6 @@ class Gamma(Dist):
                 return (np.log(k) -
                         (1. + (1. - (.1 - 1. / (21. * k ** 2)) / k ** 2)
                          / (6. * k)) / (2. * k))
-                # return np.log(k) - old_div((1 + old_div((1 - old_div(
-                #     (.1 - old_div(1, (21 * k**2))), k**2)), (6 * k))), (2 * k))
             else:
                 return psi(k + 1) - 1. / k
 
@@ -1573,10 +1566,6 @@ class Gamma(Dist):
             if k >= 8:
                 return ((1. + (1. + (1. - (1. / 5. - 1. / (7. * k ** 2)) /
                                      k ** 2) / (3. * k)) / (2. * k)) / k)
-                # return old_div((1 + old_div((1 + old_div((1 - old_div(
-                #     (old_div(1., 5) - old_div(1, (7 * k**2))), k**2)),
-                #                                          (3 * k))), (2 * k))),
-                #                k)
             else:
                 return psi_(k + 1) + 1. / k**2
 
@@ -1584,13 +1573,13 @@ class Gamma(Dist):
         # we get problems here if there are 0's in x (log(x) = -inf, which
         # happens for wind)
         s = np.log(xmean) - np.mean(np.log(x[np.isfinite(x) & (x > 0)]))
-        k_old = old_div((3 - s + ((s - 3)**2 + 24 * s)**.5), (12 * s))
+        k_old = (3 - s + ((s - 3)**2 + 24 * s)**.5) / (12 * s)
         k_rec = lambda k: k - (np.log(k) - psi(k) - s) / (1. / k - psi_(k))
         k_new = k_rec(k_old)
-        while old_div(abs(k_old - k_new), k_old) > rel_change:
+        while abs(k_old - k_new) / k_old > rel_change:
             k_old = k_new
             k_new = k_rec(k_old)
-        theta = old_div(xmean, k_new)
+        theta = xmean / k_new
         return self.fit_fsum(x, x0=(k_new, theta))
 
     def _constraints(self, x, k, theta):
@@ -1608,14 +1597,14 @@ class Gamma1(Dist):
 
     def _pdf(self, x, a, loc, scale):
         x, a, loc, scale = np.atleast_1d(x, a, loc, scale)
-        z = old_div((x - loc), scale)
-        dens = old_div((np.exp((a - 1) * np.log(z) - z - gammaln(a))), scale)
+        z = (x - loc) / scale
+        dens = (np.exp((a - 1) * np.log(z) - z - gammaln(a))) / scale
 
         return dens
 
     def _cdf(self, x, a, loc, scale):
         x, a, loc, scale = np.atleast_1d(x, a, loc, scale)
-        z = old_div((x - loc), scale)
+        z = (x - loc) / scale
         qq = gammainc(a, z)
         qq[np.isinf(x)] = 1
         return qq
@@ -1661,7 +1650,7 @@ class Expon(Dist):
     def _fit(self, x):
         x_noninf = x[np.isfinite(x)]
         x0 = np.min(x_noninf)
-        lambd = old_div(1, np.mean(x_noninf))
+        lambd = 1 / np.mean(x_noninf)
         return x0, lambd
 
     def _constraints(self, x, x0, lambd):
@@ -1689,16 +1678,16 @@ class ExponTwo(Dist):
     def _ppf(self, qq, x0, q0, lambda1, lambda2):
         qq = np.atleast_1d(qq)
         x = np.where(
-            qq <= q0, x0 + old_div(np.log(old_div(qq, q0)), lambda1),
-            x0 - old_div(np.log(1 - old_div((qq - q0), (1 - q0))), lambda2))
+            qq <= q0, x0 + np.log(qq / q0) / lambda1,
+            x0 - np.log(1 - (qq - q0) / (1 - q0)) / lambda2)
         return x
 
     def _fit(self, x):
         x_noninf = x[np.isfinite(x)]
         x0 = stats.mode(np.round(x_noninf, 1))[0][0]
-        lambda1 = old_div(-1, np.mean(x_noninf[x_noninf < x0] - x0))
-        lambda2 = old_div(1, np.mean(x_noninf[x_noninf > x0] - x0))
-        q0 = old_div((np.argmin(np.abs(np.sort(x_noninf) - x0)) + .5), len(x))
+        lambda1 = -1 / np.mean(x_noninf[x_noninf < x0] - x0)
+        lambda2 = 1 / np.mean(x_noninf[x_noninf > x0] - x0)
+        q0 = (np.argmin(np.abs(np.sort(x_noninf) - x0)) + .5) / len(x)
         return self.fit_ml(
             x_noninf, x0=(x0, q0, lambda1, lambda2), method="Nelder-Mead").x
 
@@ -1735,18 +1724,18 @@ class NoncentralLaplace(Dist):
         lambda2 = lambd * q0 / (1 - q0)
         qq = np.atleast_1d(qq)
         x = np.where(
-            qq <= q0, x0 + old_div(np.log(old_div(qq, q0)), lambd),
-            x0 - old_div(np.log(1 - old_div((qq - q0), (1 - q0))), lambda2))
+            qq <= q0, x0 + np.log(qq / q0) / lambd,
+            x0 - np.log(1 - (qq - q0) / (1 - q0)) / lambda2)
         return x
 
     def _fit(self, x):
         x0 = stats.mode(np.round(x, 1))[0][0]
-        q0 = old_div((np.argmin(np.abs(np.sort(x) - x0)) + .5), len(x))
-        lambd = old_div((1 - 2 * q0), (q0 * np.mean(x[np.isfinite(x)])))
+        q0 = (np.argmin(np.abs(np.sort(x) - x0)) + .5) / len(x)
+        lambd = (1 - 2 * q0) / (q0 * np.mean(x[np.isfinite(x)]))
         if lambd < 0:
             # this actually means that x0 was not right, so provide a feasible
             # lambd and let the ml estimation figure the rest out
-            lambd = old_div(-1., np.mean(x[(x < x0) & np.isfinite(x)] - x0))
+            lambd = -1. / np.mean(x[(x < x0) & np.isfinite(x)] - x0)
         return self.fit_ks(x, x0=(x0, q0, lambd))
 
     def _constraints(self, x, x0, q0, lambd):
@@ -1770,24 +1759,23 @@ class MDFt(object):
     @staticmethod
     def _marginal_pdf(x, sigma, df):
         x = np.atleast_1d(np.asarray(x))
-        dens = (gamma_func(old_div((df + 1), 2.)) /
-                (np.sqrt(df * np.pi) * gamma_func(old_div(df, 2.))) *
-                (1 + old_div(x**2, df))**(old_div(-(df + 1), 2.)))
+        dens = (gamma_func((df + 1) / 2.) /
+                (np.sqrt(df * np.pi) * gamma_func(df / 2.)) *
+                (1 + x**2 / df)**(-(df + 1) / 2.))
         return dens
 
     @staticmethod
     def loglikelihood(data, sigma, df):
         if np.any(~np.isfinite(sigma)):
             return np.inf
-        sigma_inv_sqrt = np.matrix(linalg.sqrtm(sigma)).I
-        yt = np.matrix([
-            old_div(
-                np.squeeze(np.asarray(sigma_inv_sqrt[i] * data)),
-                np.sqrt(old_div((dfi - 2), dfi))) for i, dfi in enumerate(df)
-        ])
+        sigma_inv_sqrt = np.linalg.inv(linalg.sqrtm(sigma))
+        yt = np.array([np.squeeze(np.asarray(sigma_inv_sqrt[i] @ data))/
+                       np.sqrt((dfi - 2) / dfi)
+                       for i, dfi in enumerate(df)
+                       ])
         marginal_pdfs = [MDFt._marginal_pdf(yt, sigma, dfi) for dfi in df]
         llh = (
-            np.sum(np.log(old_div(np.sqrt(df - 2), df))) +
+            np.sum(np.log(np.sqrt(df - 2) / df)) +
             np.sum(list(map(np.log, marginal_pdfs)))
             # is that needed? it should not change the location of
             # the maximum?!
@@ -1800,7 +1788,7 @@ class MDFt(object):
         if isinstance(df, float):
             df = np.array(K * [df])
         yt = np.array([student_t.sample(size, df=dfi) for dfi in df])
-        zt = np.sqrt(old_div((df - 2.), df))[:, None] * yt
+        zt = np.sqrt((df - 2.) / df)[:, None] * yt
         return np.dot(linalg.sqrtm(sigma), zt)
 
     @staticmethod
