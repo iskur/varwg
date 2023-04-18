@@ -159,19 +159,19 @@ def MGARCH_residuals(ut, gamma0, Gammas, Gs):
 def sqrtm(A):
     """Square root of a positive-definite Matrix.
 
-    >>> A = np.matrix([[4., 0, 0], [0, 9., 0], [0, 0, 16.]])
+    >>> A = np.array([[4., 0, 0], [0, 9., 0], [0, 0, 16.]])
     >>> sqrtm(A)
-    matrix([[ 2.,  0.,  0.],
-            [ 0.,  3.,  0.],
-            [ 0.,  0.,  4.]])
+    array([[2., 0., 0.],
+           [0., 3., 0.],
+           [0., 0., 4.]])
 
     Notes
     -----
     See Appendix 9.4.
     """
     eigenvalues, P = linalg.eigh(A)
-    Lambda_sqrt = np.matrix(np.diag(np.sqrt(eigenvalues)))
-    return np.dot(np.dot(P, Lambda_sqrt), P.T)
+    Lambda_sqrt = np.diag(np.sqrt(eigenvalues))
+    return P @ Lambda_sqrt @ P.T
 
 
 def MGARCH_sim(params, T, sigma0, epsilon=None, n_presim_steps=100):
@@ -185,18 +185,17 @@ def MGARCH_sim(params, T, sigma0, epsilon=None, n_presim_steps=100):
         epsilon = np.asmatrix(epsilon.T)
     ut = np.zeros((K, n_sim_steps))
     ut[:, :max(q, m)] = epsilon[:, :max(q, m)]
-    ut = np.asmatrix(ut)
     sigmas = q * [sigma0]
     for t in range(max(q, m), n_sim_steps):
         sigma_vech = gamma0
         for j in range(q):
-            sigma_vech += Gammas[j] * vech(ut[:, t - j] * ut[:, t - j].T)
+            sigma_vech += Gammas[j] @ vech(ut[:, t - j] @ ut[:, t - j].T)
         for j in range(m):
-            sigma_vech += Gs[j] * vech(sigmas[m - j - 1])
+            sigma_vech += Gs[j] @ vech(sigmas[m - j - 1])
         sigma = unvech(sigma_vech, K)
         sigmas[:-1] = sigmas[1:]
         sigmas[-1] = sigma
-        ut[:, t] = np.dot(linalg.sqrtm(sigma), epsilon[t])
+        ut[:, t] = linalg.sqrtm(sigma) @ epsilon[t]
     return ut[:, -T:]
 
 
@@ -326,7 +325,7 @@ def VAREX_LS(data, p, ex):
     elif np.ndim(data) == 1:
         K, T = 1, len(data) - p
         data = data[np.newaxis, :]
-    # Y is a (K, T) matrix
+    # Y is a (K, T) array
     Y = data[:, p:]
 
     Z = np.empty((K * p + 1, T))
@@ -1538,8 +1537,8 @@ def VAR_YW(data, p=2):
         X[:, t - p] = Xt
 
     # A contains all the parameters (A1, ..., Ap)
-    A = np.asmatrix(np.empty((K, K * p)))
-    Gamma_y = np.asmatrix(np.empty_like(A))
+    A = np.empty((K, K * p))
+    Gamma_y = np.empty_like(A)
     # cov-matrices for up to p lags
     for lag in range(1, p + 1):
         # unbiased cross-covariance
@@ -1547,7 +1546,7 @@ def VAR_YW(data, p=2):
         start_i = (lag - 1) * cov.shape[0]
         stop_i = lag * cov.shape[0]
         Gamma_y[:, start_i:stop_i] = cov
-    Gamma_Y = np.asmatrix(np.empty((K * p, K * p)))
+    Gamma_Y = np.empty((K * p, K * p))
     for ii in range(p):
         start_i = ii * K
         stop_i = (ii + 1) * K
@@ -1556,10 +1555,10 @@ def VAR_YW(data, p=2):
             stop_j = (jj + 1) * K
             cov = ts.cross_cov(data, ii - jj) / (T + p - abs(ii - jj))
             Gamma_Y[start_i:stop_i, start_j:stop_j] = cov
-    A = Gamma_y * Gamma_Y.I
+    A = Gamma_y @ Gamma_Y.I
 
     # lets use the same noise as VAR_LS. no idea if this is justified
-    sigma_u = Y * Y.T - Y * X.T * (X * X.T).I * X * Y.T
+    sigma_u = Y @ Y.T - Y @ X.T @ np.linalg.inv(X @ X.T) @ X @ Y.T
     sigma_u /= T - K * p - 1
 
 #    A_dash = Y * X.T * (X * X.T).I
@@ -1580,16 +1579,16 @@ def VAR_YW_sim(A, sigma_u, T):
     p = old_div(A.shape[1], K)
 
     # the first p columns are initial values, which will be omitted later
-    Y = np.asmatrix(np.zeros((K, T + p)))
+    Y = np.zeros((K, T + p))
 
     for t in range(p, T + p):
         ut = np.random.multivariate_normal(K * [0], sigma_u).reshape(K, 1)
         Y[:, t] = ut
         for i in range(p):
             Ai = A[:, i * K: (i + 1) * K]
-            Y[:, t] += Ai * Y[:, t - i]
+            Y[:, t] += Ai @ Y[:, t - i]
 
-    return np.asarray(Y[:, p:])
+    return Y[:, p:]
 
 
 # def VAR_YW_residuals(data, A, p=2):
@@ -1609,39 +1608,39 @@ def _ut_gamma_part(data, p, q, AM, ut):
     K, T = data.shape
     N = K ** 2 * (p + q)
 
-    Y = np.asmatrix(data[:, p:])
-    R = np.asmatrix(np.ones((N, N)))  # np.identity(N))
-    A_0 = np.asmatrix(np.identity(K))
-    IK_zeros = np.asmatrix(np.zeros((K ** 2, N)))
-    IK_zeros[:K ** 2, :K ** 2] = np.asmatrix(np.identity(K ** 2))
-#    zero_IK = np.asmatrix(np.zeros((N, N + 1)))
-#    zero_IK[:, 1:] = np.asmatrix(np.identity(N))
-    zero_IK = np.asmatrix(np.identity(N))
+    Y = data[:, p:]
+    R = np.identity(N)
+    A_0 = np.identity(K)
+    IK_zeros = np.zeros((K ** 2, N))
+    IK_zeros[:K ** 2, :K ** 2] = np.identity(K ** 2)
+    zero_IK = np.identity(N)
     ut_gamma_part = np.zeros((K, N, T + p))
 
     for t in range(p, T - p):
-        varma = np.asmatrix(np.zeros((K, 1)))
+        varma = np.zeros((K, 1))
         for i in range(p):
             Ai = AM[:, i * K: (i + 1) * K]
-            varma += Ai * Y[:, t - i]
+            varma += Ai @ Y[:, t - i]
         for i in range(p, p + q):
             Mi = AM[:, i * K: (i + 1) * K]
-            varma += Mi * ut[:, -1 - i + p, np.newaxis]
+            varma += Mi @ ut[:, -1 - i + p, np.newaxis]
 
         prev_yu = np.empty(K * (p + q))
         for i in range(p):
             prev_yu[i * K:(i + 1) * K] = Y[:, t - i].T
         for i in range(p, p + q):
             prev_yu[i * K:(i + 1) * K] = ut[:, t - i].T
-        prev_yu = np.asmatrix(prev_yu)
-        M_gamma_part = np.asmatrix(np.zeros((K, N)))
+        M_gamma_part = np.zeros((K, N))
         for i in range(p, p + q):
             Mi = AM[:, i * K: (i + 1) * K]
-            M_gamma_part += Mi * np.asmatrix(ut_gamma_part[..., t - i + p])
+            M_gamma_part += Mi @ ut_gamma_part[..., t - i + p]
         ut_gamma_part[..., t] = \
-            ((A_0.I * kron(varma.T, A_0.T)) * IK_zeros * R -
-             kron(prev_yu, A_0.I) * zero_IK * R -
-             A_0.I * M_gamma_part)
+            ((A_0 @ kron(varma.T, A_0.T)) @ IK_zeros @ R -
+             kron(prev_yu, A_0.I) @ zero_IK @ R -
+             A_0 @ M_gamma_part)
+            # ((A_0.I * kron(varma.T, A_0.T)) * IK_zeros * R -
+            #  kron(prev_yu, A_0.I) * zero_IK * R -
+            #  A_0.I * M_gamma_part)
     return ut_gamma_part
 
 
@@ -1649,8 +1648,7 @@ def VARMA_LS(data, p, q, rel_change=1e-3):
     """Implementation of the scoring algorithm to fit a VARMA model. p.470ff"""
     AM_pre, sigma_u_pre = VARMA_LS_prelim(data, p, q)[:2]
     # do not trust the estimator of the residuals
-#    ut = residuals_pre
-    ut = np.matrix(VARMA_residuals(data, AM_pre, p, q))
+    ut = VARMA_residuals(data, AM_pre, p, q)
     K, T = data.shape
     N = K ** 2 * (p + q)
 
@@ -1672,24 +1670,21 @@ def VARMA_LS(data, p, q, rel_change=1e-3):
         sigma_u_gamma = T ** -1 * np.sum([ut[:, t] * ut[:, t].T  # np.newaxis]
                                           for t in range(ut.shape[1])],
                                          axis=0)
-        sigma_u_gamma = np.asmatrix(sigma_u_gamma)
-        sigma_u_gamma_inv = sigma_u_gamma.I
+        sigma_u_gamma_inv = np.linalg.inv(sigma_u_gamma)
         # information matrix
-        IM = np.sum([ut_gamma_part[..., t].T * sigma_u_gamma_inv *
+        IM = np.sum([ut_gamma_part[..., t].T @ sigma_u_gamma_inv @
                      ut_gamma_part[..., t]
                      for t in range(T)], axis=0)
-        IM = np.asmatrix(IM)
-#        likeli_gamma_part = np.sum([ut[:, t].T * #, np.newaxis].T *
-        likeli_gamma_part = np.sum([ut[:, t, np.newaxis].T *
-                                    sigma_u_gamma_inv * ut_gamma_part[..., t]
+        likeli_gamma_part = np.sum([ut[:, t, np.newaxis].T @
+                                    sigma_u_gamma_inv @ ut_gamma_part[..., t]
                                     for t in range(ut.shape[1])],
                                    axis=0)
-        gamma -= IM.I * likeli_gamma_part.T
+        gamma -= np.linalg.inv(IM) @ likeli_gamma_part.T
 
         AM = gamma.reshape((K, K * (p + q)), order="F")
-        ut = np.matrix(VARMA_residuals(data, AM, p, q))
-        Y = np.asmatrix(data)  # [:, p:])
-        X = np.asmatrix(np.ones((K * (p + q), T)))
+        ut = VARMA_residuals(data, AM, p, q)
+        Y = data  # [:, p:])
+        X = np.ones((K * (p + q), T))
         Xt = np.zeros((K * (p + q), 1))
         for t in range(p, T):
             for subt in range(p):
@@ -1701,16 +1696,15 @@ def VARMA_LS(data, p, q, rel_change=1e-3):
                 stop_i = (subt + 1) * K
                 Xt[start_i:stop_i] = ut[:, t - subt - p - 1].reshape((K, 1))
             X[:, t - p] = Xt
-        IK = np.asmatrix(np.identity(K))
-        R = np.asmatrix(np.identity(N))
-        gamma2 = ((R.T * kron(X * X.T, IK) * R).I * R.T * kron(X, IK) * vec(Y))
-        residuals_arma_vec = vec(Y) - kron(X.T, IK) * R * gamma2
+        IK = np.identity(K)
+        R = np.identity(N)
+        gamma2 = (np.linalg.inv(R.T @ kron(X @ X.T, IK) @ R)
+                  @ R.T @ kron(X, IK) @ vec(Y))
+        residuals_arma_vec = vec(Y) - kron(X.T, IK) @ R @ gamma2
         residuals_arma = residuals_arma_vec.reshape((K, T), order="F")
         # make the residuals have the same length as the data
         ut = np.concatenate((np.zeros((K, p)), residuals_arma), axis=1)
-
-#        sigma_u = np.cov(ut)
-        sigma_u = residuals_arma * residuals_arma.T / T
+        sigma_u = residuals_arma @ residuals_arma.T / T
 
         det_new, det_old = np.linalg.det(sigma_u), det_new
         print("Determinant of residual covariance matrix: %f" % det_new)
@@ -1730,13 +1724,10 @@ def VARMA_residuals(data, AM, p, q):
     for t in range(p, T + p):
         for i in range(p):
             Ai = AM[:, i * K: (i + 1) * K]
-            resi[:, t] -= \
-                np.squeeze(np.asarray(Ai * data[:, t - i - 1].reshape(K, -1)))
+            resi[:, t] -= Ai @ data[:, t - i - 1].reshape(K, -1)
         for i in range(p, p + q):
             Mi = AM[:, i * K: (i + 1) * K]
-            resi[:, t] -= \
-                np.squeeze(np.asarray(Mi *
-                                      resi[:, t - i + p - 1].reshape(K, -1)))
+            resi[:, t] -= Mi @ resi[:, t - i + p - 1].reshape(K, -1)
     return resi
 
 
