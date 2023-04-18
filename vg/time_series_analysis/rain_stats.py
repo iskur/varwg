@@ -160,7 +160,7 @@ def richardson_model(T, trans_pp):
     Returns
     -------
     occs : (T,) bool ndarray
-        Rain occurrences.
+        Rain occurrence.
 
     References
     ----------
@@ -182,6 +182,17 @@ def richardson_model(T, trans_pp):
         occs[t] = rr[t] < (pp[int(occs[t - 1]), 1] /
                            pp[:, int(occs[t - 1])].sum())
     return occs
+
+
+def richardson_model(T, rain, thresh=.0001):
+    if T is None:
+        T = len(rain)
+    trans_pp = trans_prob(rain)
+    occs = richardson_model_occ(T, trans_pp)
+    rain_sim = np.zeros(int(round(T)))
+    rain_sim[occs] = np.random.choice(rain[rain > thresh],
+                                      np.sum(occs))
+    return rain_sim
 
 
 if __name__ == "__main__":
