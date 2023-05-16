@@ -44,6 +44,7 @@ from vg.time_series_analysis import phase_randomization
 
 mgarch_param_factory = namedtuple("mgarch_params",
                                   ("gamma0", "Gammas", "Gs", "cov_residuals"))
+rng = np.random.default_rng()
 
 
 def MGARCH_ML(residuals, q, m):
@@ -274,7 +275,7 @@ def VAR_LS(data, p=2):
         inv = np.linalg.inv(Z @ Z.T)
     except np.linalg.LinAlgError:
         print("Adding a little random noise in order to invert matrix...")
-        Z += (np.random.randn(Z.size) * Z.std() * 1e-9).reshape(Z.shape)
+        Z += (rng.normal(Z.size) * Z.std() * 1e-9).reshape(Z.shape)
         inv = np.linalg.inv(Z @ Z.T)
     B = Y @ Z.T @ inv
 
@@ -494,8 +495,8 @@ def SVAR_LS_sim(Bs, sigma_us, doys, m=None, ia=None, m_trend=None,
             u, rphases = u
     if u is None:
         u = np.array(
-            [np.random.multivariate_normal(K * [0],
-                                           sigma_us[..., doy_i])
+            [rng.multivariate_normal(K * [0],
+                                     sigma_us[..., doy_i])
              for doy_i in doys_ii])
         u = u.T
     for t, doy_i in enumerate(doys_ii):
@@ -611,9 +612,9 @@ def VAR_LS_sim_asy(B, sigma_u, T, data, p, skewed_i,
     def swap(data):
         # i, j, k = np.random.randint(data.shape[1], size=3)
         width = 10
-        j = np.random.randint(1, data.shape[1] - 2)
-        i = np.random.randint(max(0, j - 2), j)
-        k = np.random.randint(j + 1, min(data.shape[1] - 1, j + width))
+        j = rng.randint(1, data.shape[1] - 2)
+        i = rng.randint(max(0, j - 2), j)
+        k = rng.randint(j + 1, min(data.shape[1] - 1, j + width))
         di, dj, dk = data[skewed_i, [i, j, k]]
         if di < dj < dk:
             data[:, [j, k]] = dk, dj
@@ -664,7 +665,7 @@ def VAR_LS_sim_asy(B, sigma_u, T, data, p, skewed_i,
         accept[m] = True
         if error_new > error_old:
             p = np.exp(old_div((error_old - error_new), temp))
-            if not np.random.rand() < p:
+            if not rng.rand() < p:
                 accept[m] = False
 
         if error_new < error_best:
@@ -813,7 +814,7 @@ def VAR_LS_sim(B, sigma_u, T, m=None, ia=None, m_trend=None, u=None,
                                             taboo_period_min=None,
                                             taboo_period_max=None)
     elif u is None:
-        u = np.random.multivariate_normal(K * [0], sigma_u, n_sim_steps - p)
+        u = rng.multivariate_normal(K * [0], sigma_u, n_sim_steps - p)
         u = u.T
 
     Y[:, -u.shape[1]:] += u
@@ -933,7 +934,7 @@ def VAREX_LS_sim(B, sigma_u, T, ex, m=None, ia=None, m_trend=None, u=None,
     C = B[:, -1]
 
     if u is None:
-        u = np.random.multivariate_normal(K * [0], sigma_u, n_sim_steps - p)
+        u = rng.multivariate_normal(K * [0], sigma_u, n_sim_steps - p)
         u = u.T
 
     Y[:, -u.shape[1]:] += u
@@ -1234,12 +1235,12 @@ def VARMA_LS_sim(AM, p, q, sigma_u, means, T, S=None, m=None, ia=None,
 
     Y[:, -m.shape[1]:] += m
     start_t = Y.shape[1] - T
-    ut = np.array([np.random.multivariate_normal(K * [0], sigma_u)
+    ut = np.array([rng.multivariate_normal(K * [0], sigma_u)
                    for i in range(q)]).reshape((K, q))
     for t in range(p, n_sim_steps):
         # shift the old values back and draw a new random vector
         ut[:, :-1] = ut[:, 1:]
-        ut[:, -1] = np.random.multivariate_normal(K * [0], sigma_u)
+        ut[:, -1] = rng.multivariate_normal(K * [0], sigma_u)
         Y[:, t] = ut[:, -1][np.newaxis, :]
 
         # non-standard scenario stuff
@@ -1518,7 +1519,7 @@ def VAR_LS_predict(data_past, B, sigma_u, T=1, n_realizations=1):
         for r in range(n_realizations):
             Y[:, t, r] = nu
             if n_realizations > 1:
-                Y[:, t, r] += np.random.multivariate_normal(K * [0], sigma_u)
+                Y[:, t, r] += rng.multivariate_normal(K * [0], sigma_u)
 
             for i in range(p):
                 Ai = np.asarray(B[:, 1 + i * K: 1 + (i + 1) * K])
@@ -1593,7 +1594,7 @@ def VAR_YW_sim(A, sigma_u, T):
     Y = np.zeros((K, T + p))
 
     for t in range(p, T + p):
-        ut = np.random.multivariate_normal(K * [0], sigma_u).reshape(K, 1)
+        ut = rng.multivariate_normal(K * [0], sigma_u).reshape(K, 1)
         Y[:, t] = ut
         for i in range(p):
             Ai = A[:, i * K: (i + 1) * K]
