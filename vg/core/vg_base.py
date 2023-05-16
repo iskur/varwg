@@ -13,6 +13,7 @@ from builtins import object, range, zip
 from past.builtins import basestring
 
 import numpy as np
+from numpy.random import default_rng
 import pandas as pd
 from past.utils import old_div
 from scipy import interpolate, stats
@@ -46,9 +47,9 @@ except ImportError:
 
 
 PY2 = sys.version_info.major == 2
-
 cache_filename = ("seasonal_solutions_{version}.sh"
                   .format(version="py2" if PY2 else "py3"))
+rng = default_rng()
 
 
 def detrend(values):

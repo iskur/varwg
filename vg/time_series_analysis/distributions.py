@@ -7,6 +7,7 @@ from collections import namedtuple
 
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.random import default_rng
 import scipy.optimize as sp_optimize
 from future import standard_library
 from future.backports import urllib
@@ -26,6 +27,7 @@ from vg import helpers as my
 from vg.time_series_analysis import _kde as kde
 
 standard_library.install_aliases()
+rng = default_rng()
 
 try:
     from vg.time_series_analysis import owens
