@@ -469,9 +469,13 @@ def B2A(B):
     return A
 
 
-def SVAR_LS_sim(Bs, sigma_us, doys, m=None, ia=None, m_trend=None,
-              u=None, n_presim_steps=100, fixed_data=None,
-              phase_randomize=False):
+@my.cache("ut")
+def SVAR_LS_sim(Bs, sigma_us, doys, m=None, ia=None, m_trend=None, u=None,
+              n_presim_steps=100, fixed_data=None, phase_randomize=False,
+              rphases=None, return_rphases=False, p_kwds=None,
+              taboo_period_min=None, taboo_period_max=None):
+    if p_kwds is None:
+        p_kwds = dict()
     doys_ii = (doys % 365) / 365. * len(np.unique(doys))
     # doys_ii = doys % len(np.unique(doys))
     doys_ii = doys_ii.astype(int)
@@ -499,6 +503,7 @@ def SVAR_LS_sim(Bs, sigma_us, doys, m=None, ia=None, m_trend=None,
                                      sigma_us[..., doy_i])
              for doy_i in doys_ii])
         u = u.T
+    SVAR_LS_sim.ut = u
     for t, doy_i in enumerate(doys_ii):
         # B = Bs[..., doy_i].copy()
         # if t > 0:
@@ -509,17 +514,20 @@ def SVAR_LS_sim(Bs, sigma_us, doys, m=None, ia=None, m_trend=None,
         #                              Bs[:, islice, doy_i - j])
         Y[:, t + p] = \
             VAR_LS_sim(
-                       # B,
-                       Bs[..., doy_i],
-                       sigma_us[..., doy_i],
-                       1,
-                       None if m is None else m[:, t, None],
-                       None if ia is None else ia[:, t, None],
-                       m_trend,
-                       n_presim_steps=0,
-                       # u=None if u is None else u[:, t, None],
-                       u=u[:, t, None],
-                       prev_data=Y[:, t:t + p]).ravel()
+                Bs[..., doy_i],
+                # ignored when using phase_randomization!
+                sigma_us[..., doy_i],
+                1,
+                None if m is None else m[:, t, None],
+                None if ia is None else ia[:, t, None],
+                m_trend,
+                n_presim_steps=0,
+                # u=None if u is None else u[:, t, None],
+                u=u[:, t, None],
+                prev_data=Y[:, t:t + p],
+                # u is already phase randomized above if requested
+                phase_randomize=False,
+            ).ravel()
     Y = Y[:, p:]
     Y_new = Y
 
@@ -555,6 +563,8 @@ def SVAR_LS_sim(Bs, sigma_us, doys, m=None, ia=None, m_trend=None,
     # axs[0, 1].legend(loc="best")
     # plt.show()
 
+    if return_rphases:
+        return Y_new, rphases
     return Y_new
 
 
