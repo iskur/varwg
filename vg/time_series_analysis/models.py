@@ -482,7 +482,16 @@ def SVAR_LS_sim(Bs, sigma_us, doys, m=None, ia=None, m_trend=None,
     if phase_randomize:
         if u is None:
             raise RuntimeError("u must be passed for phase randomization!")
-        u = phase_randomization.randomize2d(u)
+        u = phase_randomization.randomize2d(
+            u,
+            T=T,
+            taboo_period_min=taboo_period_min,
+            taboo_period_max=taboo_period_max,
+            return_rphases=return_rphases,
+            rphases=rphases,
+            **p_kwds)
+        if return_rphases:
+            u, rphases = u
     if u is None:
         u = np.array(
             [np.random.multivariate_normal(K * [0],
@@ -800,7 +809,9 @@ def VAR_LS_sim(B, sigma_u, T, m=None, ia=None, m_trend=None, u=None,
     if phase_randomize:
         if u is None:
             raise RuntimeError("u must be passed for phase randomization!")
-        u = phase_randomization.randomize2d(u)
+        u = phase_randomization.randomize2d(u, T=T,
+                                            taboo_period_min=None,
+                                            taboo_period_max=None)
     elif u is None:
         u = np.random.multivariate_normal(K * [0], sigma_u, n_sim_steps - p)
         u = u.T
