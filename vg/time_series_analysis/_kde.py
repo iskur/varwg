@@ -85,7 +85,7 @@ def apply_kernel_np(kernel_width, data, eval_points=None, mask=None,
 try:
     from multiprocessing import cpu_count
     import numexpr as ne
-    ne.set_num_threads(cpu_count())
+    ne.set_num_threads(min(64, cpu_count()))
     apply_kernel = apply_kernel_ne
     NE = True
 except ImportError:

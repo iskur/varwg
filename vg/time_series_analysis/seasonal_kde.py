@@ -16,7 +16,9 @@ from vg.time_series_analysis import _kde as kde, seasonal
 
 
 try:
+    from multiprocessing import cpu_count
     import numexpr as ne
+    ne.set_num_threads(min(64, cpu_count()))
     NE = True
 except ImportError:
     warnings.warn("Could not import numexpr. Using numpy for KDE instead.")

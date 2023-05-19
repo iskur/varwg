@@ -38,7 +38,7 @@ import numpy as np
 try:
     from multiprocessing import cpu_count
     import numexpr as ne
-    ne.set_num_threads(cpu_count())
+    ne.set_num_threads(min(64, cpu_count()))
     NE = True
 except ImportError:
     NE = False
