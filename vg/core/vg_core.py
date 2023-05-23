@@ -114,8 +114,16 @@ def metfile2hdf5(met_file, h5_filename=None, key="met"):
     met_df.to_hdf(h5_filename, key)
 
 
-def seasonal_back(dist_sol, norm_data, var_names, doys=None,
-                  solution_template="%s"):
+def seasonal_back(
+    dist_sol,
+    norm_data,
+    var_names,
+    doys=None,
+    solution_template="%s",
+    pass_doys=True,
+    var_names_back=None,
+    mean_shifts=None,
+):
     """Transform variables from normal to real-world marginals.
 
     Parameter
@@ -137,6 +145,8 @@ def seasonal_back(dist_sol, norm_data, var_names, doys=None,
         Re-transformed data
     """
     data = np.empty_like(norm_data)
+    if mean_shifts is None:
+        mean_shifts = defaultdict(lambda: None)
     for var_ii, (var_name, var) in enumerate(zip(var_names, norm_data)):
         distribution, solution = dist_sol[solution_template % var_name]
         if (hasattr(distribution, "dist") and
@@ -149,8 +159,14 @@ def seasonal_back(dist_sol, norm_data, var_names, doys=None,
             mus, sigmas = distribution.trig2pars(solution, _T)
             data[var_ii] = var * sigmas + mus
         else:
-            quantiles = distributions.norm.cdf(var, 0, 1)
-            data[var_ii] = distribution.ppf(solution, quantiles, doys=doys)
+            quantiles = distributions.norm.cdf(var)
+            doys_ = doys if pass_doys else None
+            data[var_i] = distribution.ppf(
+                solution,
+                quantiles,
+                doys=doys_,
+                mean_shift=(mean_shifts.get(var_name, None)),
+            )
     return data
 
 
@@ -502,10 +518,13 @@ class VG(vg_plotting.VGPlotting):
             All disturbances (mean_arrival, distrubance_std, theta_incr,
             theta_grad and climate_signal) correspond to changes in this
             variable.
+        scale_prim : boolean, optional
+            Allow primary variables to influence each other.
+            Only effective when using multiple primary variables!
         climate_signal : (T,) ndarray
             A time series of the 'primary_var'. Differences between
             'climate_signal' and the seasonal mean are used to perturb the
-            VAR(MA) process.
+            VAR process.
         start_str : str of format '%m-%d %H', optional
             String representation of the start date of the simulation.
         stop_str : str of format '%m-%d %H', optional
@@ -546,7 +565,6 @@ class VG(vg_plotting.VGPlotting):
         sim_sea : (K, T) float ndarray
 
         """
-
         if isinstance(random_state, basestring):
             with open(random_state, "rb") as pi_file:
                 random_state = pickle.load(pi_file)
@@ -621,6 +639,7 @@ class VG(vg_plotting.VGPlotting):
             print("Simulating a time-series.")
         if type(seed_before_sim) is int:
             np.random.seed(seed_before_sim)
+        var_names_back = None
         if sim_func is not None:
             if sim_func_kwds is None:
                 sim_func_kwds = {}
@@ -740,8 +759,21 @@ class VG(vg_plotting.VGPlotting):
         #     #     r_index = self.var_names.index("R")
         #     #     sim_sea[r_index] *= self.sum_interval[r_index]
 
-        sim_sea = seasonal_back(self.dist_sol, sim, self.var_names,
-                                doys=self.sim_doys)
+        if self.theta_incr:
+            mean_shifts = dict(
+                theta=self.theta_incr * self.sum_interval[self.primary_var_ii]
+            )
+        else:
+            mean_shifts = None
+        sim_sea = seasonal_back(
+            self.dist_sol,
+            sim,
+            self.var_names,
+            doys=self.sim_doys,
+            var_names_back=var_names_back,
+            mean_shifts=mean_shifts,
+            # pass_doys=(not self.sim_times_is_times)
+        )
         sim_sea /= self.sum_interval
 
         # spicyness can lead to infs

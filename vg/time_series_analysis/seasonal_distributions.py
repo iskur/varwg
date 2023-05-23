@@ -316,9 +316,28 @@ class SeasonalDist(seasonal.Seasonal):
         return self._complete_dist_call(self.dist.cdf, trig_pars, x, doys,
                                         **kwds)
 
-    def ppf(self, trig_pars, quantiles=None, doys=None, **kwds):
-        return self._complete_dist_call(self.dist.ppf, trig_pars, quantiles,
-                                        doys, **kwds)
+    def ppf(self, trig_pars, quantiles=None, doys=None, mean_shift=None, **kwds):
+        if mean_shift is None:
+            return self._dist_method(self.dist.ppf, trig_pars, quantiles, doys, **kwds)
+        else:
+            # normalize quantiles and shift the target distribution
+            # normalize quantiles
+            stdn = distributions.norm.ppf(quantiles)
+            quantiles = distributions.norm.cdf(stdn - stdn.mean())
+            # TODO: neither "loc" nor "mu" have to be the mean of the
+            # distribution directly! This needs to be more
+            # sophisticated for a lot of distributions.
+            # mean_par_name = "loc" if self.dist.isscipy else "mu"
+            # mean_par_i = self.dist.parameter_names.index(mean_par_name)
+            # trig_pars = np.copy(trig_pars)
+            # trig_pars[mean_par_i, 0] += mean_shift * 2 * trig_pars.shape[1]
+            # xx = self._dist_method(
+            #     self.dist.ppf, trig_pars, quantiles, doys, **kwds
+            # )
+            return (
+                self._dist_method(self.dist.ppf, trig_pars, quantiles, doys, **kwds)
+                + mean_shift
+            )
 
     @property
     def solution(self):
