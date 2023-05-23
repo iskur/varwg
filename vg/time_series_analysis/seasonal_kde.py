@@ -401,11 +401,14 @@ class SeasonalKDE(seasonal.Seasonal):
             quantiles = my.interp_nan(quantiles, max_interp=3)
         return quantiles
 
-    def ppf(self, solution, quantiles, doys=None):
+    def ppf(self, solution, quantiles, doys=None, mean_shift=None):
         if solution is not None:
             self.solution = solution
         if doys is None:
             doys = self.doys
+        if mean_shift is not None:
+            raise NotImplementedError(f"mean_shift not implemented"
+                                      f"for {type(self)} yet.")
         quantiles, doys = np.atleast_1d(quantiles, doys)
         # for the purpose of distribution parameters: assume February
         # 29th behaves as February 28th
