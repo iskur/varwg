@@ -5,6 +5,7 @@ from past.types import basestring
 import warnings
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 from vg import helpers as my
 
 
@@ -60,8 +61,9 @@ def spell_lengths(rain, thresh=.001):
     return dry, wet
 
 
-def plot_exceedance(obs, sim=None, kind="depth", thresh=.001,
-                    fig=None, axs=None, lkwds=None):
+def plot_exceedance(obs, sim=None, kind="depth", thresh=.001, fig=None,
+                  axs=None, figsize=None, lkwds=None, draw_scatter=None,
+                  *pargs, **pkwds):
     """Plot exceedance probability.
 
     Parameter
@@ -81,27 +83,36 @@ def plot_exceedance(obs, sim=None, kind="depth", thresh=.001,
         threshold a value must exceed to be interpreted as rain [m].
         only needed if kind != "depth".
     """
+    if draw_scatter is None:
+        draw_scatter = not bool(fig)
     if kind == "all":
         if fig is None:
-            fig, axs = plt.subplots(ncols=3, subplot_kw=dict(aspect="equal"))
+            fig, axs = plt.subplots(ncols=3,
+                                    sharey=True,
+                                    figsize=figsize,
+                                    constrained_layout=True)
         kinds = "depth", "dry", "wet"
-    else:
-        if fig is None or axs is None:
-            fig, axs = plt.subplots(subplot_kw=dict(aspect="equal"))
-            axs = axs,
+    elif isinstance(kind, basestring):
+        kinds = kind,
+    elif fig is None or axs is None:
+        fig, axs = plt.subplots(figsize=figsize,
+                                sharey=True,
+                                constrained_layout=True)
+        axs = axs,
         kinds = kind,
     if lkwds is None:
         lkwds = {}
 
     def rel_ranks(n):
-        return (np.arange(float(n)) - .5) / n
+        return (np.arange(float(n)) + .5) / n
 
     def plot_sim_single(ax, sim):
         sim_conv = conv(sim)
         ranks = rel_ranks(len(sim_conv))
         sim_sorted = np.sort(sim_conv)[::-1]
-        ax.loglog(sim_sorted, ranks, color="grey")
+        ax.loglog(sim_sorted, ranks, *pargs, **pkwds)
 
+    edgecolor = lkwds.pop("edgecolor", "black")
     for ax_i, kind in enumerate(kinds):
         ax = axs[ax_i]
 
@@ -130,17 +141,21 @@ def plot_exceedance(obs, sim=None, kind="depth", thresh=.001,
             for sim_ in sim:
                 plot_sim_single(ax, sim_)
 
-        obs_conv = conv(obs)
-        ranks = rel_ranks(len(obs_conv))
-        obs_sorted = np.sort(obs_conv)[::-1]
-        ax.scatter(obs_sorted, ranks, marker="o", edgecolor="black",
-                   facecolor=(0, 0, 0, 0), **lkwds)
-        ax.set_xscale("log")
-        ax.set_yscale("log")
-        ax.set_ylim(ranks[0], ranks[-1])
-        ax.grid()
-    axs[0].set_ylabel("F(X)")
-    fig.tight_layout(rect=(0, .1, 1, 1))
+        if draw_scatter:
+            obs_conv = conv(obs)
+            ranks = rel_ranks(len(obs_conv))
+            obs_sorted = np.sort(obs_conv)[::-1]
+            ax.scatter(obs_sorted, ranks, marker="o",
+                       edgecolor=edgecolor,
+                       # edgecolor=(1, 0, 0, .5),
+                       facecolor=(0, 0, 0, 0), **lkwds)
+            ax.set_xscale("log")
+            ax.set_yscale("log")
+            ax.set_ylim(max(5e-4, ranks[0]), ranks[-1])
+            # ax.set_ylim(ranks[0], ranks[-1])
+            ax.grid(True)
+    axs[0].set_ylabel("1 - F(X)")
+    # fig.tight_layout(rect=(0, .1, 1, 1))
     return fig, axs
 
 
