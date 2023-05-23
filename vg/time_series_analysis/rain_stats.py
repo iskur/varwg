@@ -159,7 +159,7 @@ def plot_exceedance(obs, sim=None, kind="depth", thresh=.001, fig=None,
     return fig, axs
 
 
-def richardson_model(T, trans_pp):
+def richardson_model_occ(T, trans_pp):
     """Simulate rain occurrence with Richardson's (1981) model (2 state, first
     order Markov Chain).
 
