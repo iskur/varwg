@@ -144,7 +144,6 @@ def _transform_theta_incr(theta_incr, cache_dir=None, verbose=False,
         fig, ax = plt.subplots()
         ax.plot(np.ravel(bias))
         plt.show()
-        import ipdb; ipdb.set_trace()
 
     # if verbose:
     #     import matplotlib.pyplot as plt
@@ -219,8 +218,10 @@ def resample(data, dtimes, p=3, n_sim_steps=None, theta_incr=0.0,
     K, T = data.shape
     if n_candidates is None:
         n_candidates = int(np.sqrt(T))
+        if verbose:
+            print(f"Setting {n_candidates=}")
     candidate_series = np.empty((K, n_sim_steps, n_candidates))
-    chosen_indices = np.empty(n_sim_steps, dtype=np.int)
+    chosen_indices = np.empty(n_sim_steps, dtype=int)
     doys = times.datetime2doy(dtimes)
     # this is the hardest part
     # want to have T-1 chunks of (K, p) - shape
@@ -305,27 +306,28 @@ if __name__ == "__main__":
                    # refit=True,
                    verbose=True)
     met_vg.fit(p=3)
+    theta_i = met_vg.var_names.index("theta")
     simt, sim = met_vg.simulate(res_kwds=dict(recalibrate=True,
                                               cy=True,
                                               n_candidates=20),
                                 theta_incr=0.)
 
-    theta_incrs = np.linspace(.5, 4, 11)
-    data_mean = np.mean(met_vg.data_raw[0]) / 24.
+    theta_incrs = np.linspace(.5, 4, 15)
+    data_mean = np.mean(met_vg.data_raw[theta_i]) / 24.
     delta_means = []
     for theta_incr in theta_incrs:
         simt, sim = met_vg.simulate(res_kwds=dict(cy=True,
                                                   n_candidates=20,
                                                   doy_tolerance=15),
                                     theta_incr=theta_incr)
-        delta_means += [np.mean(sim[0]) - data_mean]
+        delta_means += [np.mean(sim[theta_i]) - data_mean]
         print(theta_incr,
-              "%.3f" % np.mean(met_vg.m[0]),
-              "%.3f" % met_vg.sim[0].mean(),
+              "%.3f" % np.mean(met_vg.m[theta_i]),
+              "%.3f" % met_vg.sim[theta_i].mean(),
               "%.3f" % delta_means[-1])
         # fig, ax = plt.subplots(nrows=1, ncols=1)
-        # ax.plot(met_vg.times, met_vg.m[0], label="m")
-        # ax.plot(met_vg.times, met_vg.sim[0], label="sim")
+        # ax.plot(met_vg.times, met_vg.m[theta_i], label="m")
+        # ax.plot(met_vg.times, met_vg.sim[theta_i], label="sim")
         # ax.legend(loc="best")
         # plt.show()
 
