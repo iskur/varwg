@@ -307,7 +307,7 @@ class Dist(metaclass=DistMeta):
             invalid_x = self._invalid_x(x, *args, **kwds)
         else:
             invalid_x = self._invalid_x(args[0], *args[1:], **kwds)
-        return np.where(invalid_x, np.nan, densities)
+        return np.where(invalid_x | np.isinf(densities), np.nan, densities)
 
     @my.asscalar
     def cdf(self, *args, **kwds):
@@ -317,7 +317,7 @@ class Dist(metaclass=DistMeta):
             invalid_x = self._invalid_x(x, *args, **kwds)
         else:
             invalid_x = self._invalid_x(args[0], *args[1:], **kwds)
-        return np.where(invalid_x, np.nan, qq)
+        return np.where(invalid_x | np.isinf(qq), np.nan, qq)
 
     @my.asscalar
     def ppf(self, *args, **kwds):
@@ -963,6 +963,8 @@ class TruncatedNormal(Dist):
 
     def _pdf(self, x, mu=0, sigma=1, lc=-np.inf, uc=np.inf):
         x, mu, sigma, lc, uc = np.atleast_1d(x, mu, sigma, lc, uc)
+        if (x.shape != lc.shape) or (x.shape != uc.shape):
+            x, mu, sigma, lc, uc = np.broadcast_arrays(x, mu, sigma, lc, uc)
         un_trunc = np.atleast_1d(
             norm.pdf(x, mu, sigma) /
             (norm.cdf(uc, mu, sigma) - norm.cdf(lc, mu, sigma)))
@@ -977,6 +979,8 @@ class TruncatedNormal(Dist):
 
     def _cdf(self, x, mu=0, sigma=1, lc=-np.inf, uc=np.inf):
         x, mu, sigma, lc, uc = np.atleast_1d(x, mu, sigma, lc, uc)
+        if (x.shape != lc.shape) or (x.shape != uc.shape):
+            x, mu, sigma, lc, uc = np.broadcast_arrays(x, mu, sigma, lc, uc)
         qq = ((norm.cdf(x, mu, sigma) - norm.cdf(lc, mu, sigma)) /
               (norm.cdf(uc, mu, sigma) - norm.cdf(lc, mu, sigma)))
         qq = np.atleast_1d(qq)
@@ -989,6 +993,8 @@ class TruncatedNormal(Dist):
     def _ppf(self, qq, mu=0, sigma=1, lc=-np.inf, uc=np.inf):
         qq, mu, sigma, lc, uc = \
             np.atleast_1d(qq, mu, sigma, lc, uc)
+        if (qq.shape != lc.shape) or (qq.shape != uc.shape):
+            qq, mu, sigma, lc, uc = np.broadcast_arrays(qq, mu, sigma, lc, uc)
         x = norm.ppf(qq * norm.cdf(uc, mu, sigma) +
                      (1 - qq) * norm.cdf(lc, mu, sigma),
                      mu, sigma)
@@ -1426,7 +1432,7 @@ weibull = Weibull()
 class Kumaraswamy(Dist):
     """Resembles the Beta distribution, but does not need a transcendental
     function."""
-    _feasible_start = (1, 1, 0, 1)
+    _feasible_start = (2, 5, 0, 1)
 
     def _pdf(self, x, a, b, l=0, u=1):
         x = np.atleast_1d(x).astype(float)
@@ -1462,7 +1468,7 @@ class Kumaraswamy(Dist):
     def _constraints(self, x, a, b, l=0, u=1):
         mask = ((a < 0) |
                 (b < 0) |
-                (x < l) |
+                (x <= l) |
                 (x > u))
         return mask
 
@@ -1533,9 +1539,14 @@ class Beta(Dist):
             pass
 
         xmean = (x.mean() - l) / (u - l)
-        xvar = x.var() / (u - l) ** 2
-        alpha = xmean * (xmean * (1 - xmean) / xvar - 1)
-        beta = (1 - xmean) * alpha / xmean
+        xvar = x.var()
+        if xvar == 0:
+            alpha = np.full_like(u, np.nan)
+            beta = np.full_like(u, np.nan)
+        else:
+            xvar /= (u - l) ** 2
+            alpha = xmean * (xmean * (1 - xmean) / xvar - 1)
+            beta = (1 - xmean) * alpha / xmean
 
         return_list = [abs(alpha), abs(beta)]
         if return_l:
@@ -1822,7 +1833,6 @@ class MDFt(object):
     @staticmethod
     def fit(data):
         K = data.shape[0]
-        data = np.asmatrix(data)
 
         def unlikelihood(params):
             sigma = fill_lower(params[:-K])
@@ -1832,14 +1842,12 @@ class MDFt(object):
         sigma = np.cov(data)
         sigma_upper = sigma[np.triu_indices_from(sigma)]
         df = np.array(
-            [student_t.fit(np.asarray(values))[1] for values in data])
-        # df[df < 5] = 5.
-        from scipy import optimize
+            [student_t.fit(values) for values in data])
         x0 = np.concatenate((sigma_upper, df))
         bounds = [(0, None) if i == j else (None, None)
                   for i in range(K) for j in range(i + 1)]
         bounds += K * [(5, None)]
-        result = optimize.minimize(
+        result = sp_optimize.minimize(
             unlikelihood, x0=x0, bounds=bounds, options=dict(disp=True))
         sigma = fill_lower(result.x[:-K])
         df = result.x[-K:]
