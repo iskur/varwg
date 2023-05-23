@@ -1,14 +1,12 @@
 """Tools to fit seasonal distributions by describing the yearly cycle of
 distribution parameters with triangular functions."""
-from __future__ import division, print_function
-
-import collections
-from builtins import range, zip
+from collections import abc
+import hashlib
+import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
-from past.utils import old_div
 from scipy import stats
 
 from vg import helpers as my
@@ -447,8 +445,8 @@ class SeasonalDist(seasonal.Seasonal):
             # k = int(n ** .5)
             k = n_parameters + 2
         observed = np.histogram(quantiles[np.isfinite(quantiles)], k)[0]
-        expected = old_div(float(n), k)
-        chi_test = np.sum(old_div((observed - expected) ** 2, expected))
+        expected = float(n) / k
+        chi_test = np.sum((observed - expected) ** 2 / expected)
         # degrees of freedom:
         dof = k - n_parameters - 1
         return stats.chi2.sf(chi_test, dof)
