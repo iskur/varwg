@@ -59,7 +59,7 @@ def _calibrate(**res_kwds):
     # biases = theta_incr - theta_min + np.linspace(0, 5, 15)[:, None]
 
     theta_incrs = np.concatenate((np.linspace(0, 1, 10),
-                                  np.linspace(1.1, 15, 5)))
+                                  np.linspace(1.1, 8, 5)))
     biases = theta_incrs
     # theta_incrs = np.linspace(0, 4, 15)
 
@@ -267,8 +267,10 @@ cpdef resample(data, dtimes, p=3, n_sim_steps=None, theta_incr=0.0,
     K, T = data.shape
     if n_candidates is None:
         n_candidates = int(np.sqrt(T))
+        if verbose:
+            print(f"Setting n_candidates={n_candidates}")
     candidate_series = np.empty((K, n_sim_steps, n_candidates))
-    chosen_indices = np.empty(n_sim_steps, dtype=np.int)
+    chosen_indices = np.empty(n_sim_steps, dtype=int)
     doys = times.datetime2doy(dtimes)
     # this is the hardest part
     # want to have T-1 chunks of (K, p) - shape
