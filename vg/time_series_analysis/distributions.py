@@ -9,10 +9,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy.random import default_rng
 import scipy.optimize as sp_optimize
-from future import standard_library
-from future.backports import urllib
-from future.utils import with_metaclass
-from past.utils import old_div
 from scipy import interpolate, linalg, special, stats
 from scipy.integrate import cumtrapz
 
@@ -28,7 +24,6 @@ except ImportError:
 from vg import helpers as my
 from vg.time_series_analysis import _kde as kde
 
-standard_library.install_aliases()
 rng = default_rng()
 
 try:
@@ -167,8 +162,8 @@ def min_ks(cdf, x0, values, opt_func=None, disp=False, *args, **kwds):
         opt_func = sp_optimize.fmin
     n = len(values)
     values_sorted = np.sort(values)
-    ranks_plus = old_div(np.arange(0., n), n)
-    ranks_minus = old_div(np.arange(1., n + 1), n)
+    ranks_plus = np.arange(0., n) / n
+    ranks_minus = np.arange(1., n + 1) / n
 
     def ks(params):
         # we have to express fixed values in terms of kwds, because there
@@ -198,8 +193,8 @@ def min_fsum(cdf, x0, values, opt_func=None, disp=False, *args, **kwds):
         opt_func = sp_optimize.fmin
     n = len(values)
     values_sorted = np.sort(values)
-    ranks_plus = old_div(np.arange(0., n), n)
-    ranks_minus = old_div(np.arange(1., n + 1), n)
+    ranks_plus = np.arange(0., n) / n
+    ranks_minus = np.arange(1., n + 1) / n
 
     def ks(params):
         # we have to express fixed values in terms of kwds, because there
@@ -864,73 +859,94 @@ norm = Normal()
 #         return self._ppf(qq, alpha) * omega + zeta
 
 
-class SkewNormal(Dist):
-    _feasible_start = (0, 1, .5)
+# class SkewNormal(Dist):
+#     _feasible_start = (0, 1, .5)
 
-    def _pdf(self, x, zeta=0, omega=1, alpha=0):
-        x, zeta, omega, alpha = np.atleast_1d(x, zeta, omega, alpha)
-        t = old_div((x - zeta), omega)
-        dens = 2. / omega * norm.pdf(t) * norm.cdf(t * alpha)
-        return dens
+#     def _pdf(self, x, zeta=0, omega=1, alpha=0):
+#         x, zeta, omega, alpha = np.atleast_1d(x, zeta, omega, alpha)
+#         t = (x - zeta) / omega
+#         dens = 2. / omega * norm.pdf(t) * norm.cdf(t * alpha)
+#         return dens
 
-    def _cdf(self, x, zeta=0, omega=1, alpha=0):
-        x, zeta, omega, alpha = np.atleast_1d(x, zeta, omega, alpha)
-        t = old_div((x - zeta), omega)
-        qq = norm.cdf(t) - 2. * owens_t(t, alpha)
-        return qq
+#     def _cdf(self, x, zeta=0, omega=1, alpha=0):
+#         x, zeta, omega, alpha = np.atleast_1d(x, zeta, omega, alpha)
+#         t = (x - zeta) / omega
+#         qq = norm.cdf(t) - 2. * owens_t(t, alpha)
+#         return qq
 
-    def _ppf(self, qq, zeta=0, omega=1, alpha=0):
-        qq, zeta, omega, alpha = \
-            np.atleast_1d(qq, zeta, omega, alpha)
-        if len(zeta) == 1:
-            zeta = np.full_like(qq, zeta)
-        if len(omega) == 1:
-            omega = np.full_like(qq, omega)
-        if len(alpha) == 1:
-            alpha = np.full_like(qq, alpha)
+#     def _ppf(self, qq, zeta=0, omega=1, alpha=0):
+#         qq, zeta, omega, alpha = \
+#             np.atleast_1d(qq, zeta, omega, alpha)
+#         if len(zeta) == 1:
+#             zeta = np.full_like(qq, zeta)
+#         if len(omega) == 1:
+#             omega = np.full_like(qq, omega)
+#         if len(alpha) == 1:
+#             alpha = np.full_like(qq, alpha)
 
-        qq0 = norm.cdf(qq) * omega + zeta
-        x = np.empty_like(qq)
-        for i in range(len(qq0)):
-            q_exp = qq[i]
+#         qq0 = norm.cdf(qq) * omega + zeta
+#         x = np.empty_like(qq)
+#         for i in range(len(qq0)):
+#             q_exp = qq[i]
 
-            def error(x):
-                q_act = self.cdf(x, zeta[i], omega[i], alpha[i])
-                return (q_act - q_exp) ** 2
+#             def error(x):
+#                 q_act = self.cdf(x, zeta[i], omega[i], alpha[i])
+#                 return (q_act - q_exp) ** 2
 
-            x[i] = sp_optimize.minimize(error, qq0[i],
-                                        method="Nelder-Mead"
-                                        )["x"]
-        return x
+#             x[i] = sp_optimize.minimize(error, qq0[i],
+#                                         method="Nelder-Mead"
+#                                         )["x"]
+#         return x
 
-    def _fit(self, x, skew_max=.9):
-        skew = stats.skew(x)
-        skew_23 = np.abs(skew)**(old_div(2., 3))
-        if not (-skew_max < skew < skew_max):
-            delta = np.sqrt(np.pi / 2 * skew_max**(old_div(2., 3)) /
-                            (skew_max**(old_div(2., 3)) + (old_div(
-                                (4 - np.pi), 2))**(old_div(2., 3))))
-            delta = np.copysign(delta, skew)
+#     def _fit(self, x, skew_max=.9):
+#         skew = stats.skew(x)
+#         skew_23 = np.abs(skew)**(2. / 3)
+#         if not (-skew_max < skew < skew_max):
+#             delta = np.sqrt(np.pi / 2 * skew_max**(2. / 3) /
+#                             (skew_max**(2. / 3) + (
+#                                 (4 - np.pi) / 2)**(2. / 3)))
+#             delta = np.copysign(delta, skew)
 
-#             warnings.warn("Sample skew %.2f not in feasible range ~(-1,1)!" %
-#                           skew)
-        else:
-            delta = np.sqrt(np.pi / 2 * skew_23 / (skew_23 + (old_div(
-                (4 - np.pi), 2))**(old_div(2., 3))))
-        delta = np.copysign(delta, skew)
-        alpha = old_div(delta, np.sqrt(1 - delta**2))
-        omega = np.sqrt(old_div(np.var(x), (1 - 2 * delta**2 / np.pi)))
-        zeta = np.mean(x) - omega * np.sqrt(old_div(2, np.pi)) * delta
-        return self.fit_ml(x, x0=(zeta, omega, alpha)).x
-        if not (-skew_max < skew < skew_max):
-            zeta, omega, alpha = self.fit_ml(
-                x, x0=(zeta, omega, old_div(alpha, 2)))
-            delta = old_div(alpha, np.sqrt(1 + alpha**2))
-        return zeta, omega, alpha
-if owens:
-    skewnorm = SkewNormal()
+# #             warnings.warn("Sample skew %.2f not in feasible range ~(-1,1)!" %
+# #                           skew)
+#         else:
+#             delta = np.sqrt(np.pi / 2 * skew_23 / (skew_23 + (
+#                 (4 - np.pi) / 2)**(2. / 3)))
+#         delta = np.copysign(delta, skew)
+#         alpha = delta / np.sqrt(1 - delta**2)
+#         omega = np.sqrt(np.var(x) / (1 - 2 * delta**2 / np.pi))
+#         zeta = np.mean(x) - omega * np.sqrt(2 / np.pi) * delta
+#         return self.fit_ml(x, x0=(zeta, omega, alpha)).x
+#         if not (-skew_max < skew < skew_max):
+#             zeta, omega, alpha = self.fit_ml(
+#                 x, x0=(zeta, omega, alpha / 2))
+#             delta = alpha / np.sqrt(1 + alpha**2)
+#         return zeta, omega, alpha
+# if owens:
+#     skewnorm = SkewNormal()
 
 
+# class ExGauss(Dist):
+#     _feasible_start = (0, 1, 1)
+#     _bounds = [(-np.inf, np.inf),
+#                (1e-9, np.inf),
+#                (1e-9, np.inf)]
+
+#     def _pdf(self, x, mu, sigma, gamma):
+#         x, mu, sigma, gamma = np.atleast_1d(x, mu, sigma, gamma)
+#         gamma_sigma_sqr = gamma * sigma ** 2
+#         return (gamma / 2 *
+#            np.exp(gamma / 2 * (2 * mu + gamma_sigma_sqr - 2 * x)) *
+#            special.erfc((mu + gamma_sigma_sqr - x) / (sqrt2 * sigma)))
+
+#     def _cdf(self, x, mu, sigma, gamma):
+#         x, mu, sigma, gamma = np.atleast_1d(x, mu, sigma, gamma)
+#         return norm.cdf(x, mu, sigma) - self._pdf(x, mu, sigma, gamma) / gamma
+
+#     def _ppf(self, q, mu, sigma, gamma):
+#         q, mu, sigma, gamma = np.atleast_1d(q, mu, sigma, gamma)
+        
+    
 class TruncatedNormal(Dist):
     _feasible_start = (0, 1, -1, 1)
     _additional_kwds = {"lc": -1, "uc": 1}

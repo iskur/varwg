@@ -102,8 +102,8 @@ class Spectral(object):
         self.size = self.npoints = size
         # eigenvalues of decomposition (??)
         self.sqrt_fft_covs = np.sqrt(old_div(fft_covs, self.npoints))
-        self.mslice = (slice(int((size - T) / 2),
-                             int((size + T) / 2)),)
+        self.mslice = (slice(int(old_div((size - T), 2)),
+                             int(old_div((size + T), 2))),)
         if pool_size:
             self.pool = self.sim_n(pool_size)
 
