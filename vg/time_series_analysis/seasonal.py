@@ -7,6 +7,24 @@ import calendar
 import numpy as np
 from vg import times
 from vg import helpers as my
+from vg.smoothing import smooth
+
+
+def build_doy_mask(doys, doy_width, doys_unique=None):
+    """Mask to access doy neighborhood in data."""
+    if doys_unique is None:
+        doys_unique = np.unique(doys)
+    doy_mask = np.empty((len(doys_unique), len(doys)), dtype=bool)
+    for doy_i, doy in enumerate(doys_unique):
+        ii = (doys > doy - doy_width) & (doys <= doy + doy_width)
+        if (doy - doy_width) < 0:
+            ii |= doys > (365.0 - doy_width + doy)
+        if (doy + doy_width) > 365:
+            ii |= doys < (doy + doy_width - 365.0)
+        doy_mask[doy_i] = ii
+    # # take into account whether doys do not start at 1
+    # doy_mask = np.roll(doy_mask, -doys.argmin())
+    return doy_mask
 
 
 class Seasonal(object):
@@ -226,3 +244,4 @@ class Torus(Seasonal):
             time_distances[:] = temp[..., None]
             self._doy_hour_weights = time_distances
         return self._doy_hour_weights.ravel()
+
