@@ -10,7 +10,7 @@ import numpy as np
 from numpy.random import default_rng
 import scipy.optimize as sp_optimize
 from scipy import interpolate, linalg, special, stats
-from scipy.integrate import cumtrapz
+from scipy.integrate import cumtrapz, quad
 
 
 try:
@@ -336,6 +336,14 @@ class Dist(metaclass=DistMeta):
         x[(quantiles_finite < 0) | (quantiles_finite > 1)] = np.nan
         return x
 
+    @my.asscalar
+    def mean(self, *args, **kwds):
+        """Crude estimation of the expected value. Heavy tails break this!"""
+        epsilon = 1e-6
+        x_min, x_max = self.ppf([epsilon, 1 - epsilon], *args, **kwds)
+        result = quad(lambda x: x * self.pdf(x, *args, **kwds), x_min, x_max)
+        return result[0]
+
     def __call__(self, *params):
         return Frozen(self, *params)
 
@@ -438,6 +446,15 @@ class Frozen(object):
 
     def sample(self, size):
         return self.dist.sample(size, **self.parameter_dict)
+
+    @property
+    def mean(self):
+        """Crude estimation of the expected value. Heavy tails break this!"""
+        return self.dist.mean(**self.parameter_dict)
+
+    @property
+    def median(self):
+        return self.ppf(0.5)
 
     @property
     def parameter_dict(self):
