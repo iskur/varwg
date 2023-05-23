@@ -210,6 +210,39 @@ def richardson_model(T, rain, thresh=.0001):
     return rain_sim
 
 
+def get_hyd_years_mask(times):
+    return (times.month == 10) & (times.day == 1) & (times.hour == 0)
+
+
+def hyd_year_sums(data_xar, fun_name="sum", full_years=True):
+    time = data_xar.time
+    hyd_years_mask = get_hyd_years_mask(time.dt)
+    hyd_year = hyd_years_mask.cumsum() - 1
+    hyd_year += hyd_year.time[0].dt.year
+    if fun_name == "sum":
+        summed = data_xar.groupby(hyd_year).sum("time").rename(group="hydyear")
+    elif fun_name == "mean":
+        summed = (
+            data_xar.groupby(hyd_year).mean("time").rename(group="hydyear")
+        )
+    time_first = time[0]
+    month = int(time_first.dt.month)
+    day = int(time_first.dt.day)
+    hyd_year_coord = pd.date_range(
+        f"{summed.hydyear.values[0]}-{month}-{day}",
+        f"{summed.hydyear.values[-1] + 1}-{month}-{day}",
+        freq="Y",
+    )
+    summed = summed.assign_coords(dict(hydyear=hyd_year_coord))
+    if full_years:
+        if not hyd_years_mask[0]:
+            summed = summed.isel(hydyear=slice(1, None))
+        time_last = time[-1]
+        if not ((time_last.dt.month == 9) & (time_last.dt.day == 30)):
+            summed = summed.isel(hydyear=slice(None, -1))
+    return summed
+
+
 if __name__ == "__main__":
 
     import vg
