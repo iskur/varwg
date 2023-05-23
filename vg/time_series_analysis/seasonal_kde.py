@@ -57,7 +57,7 @@ class SeasonalKDE(seasonal.Seasonal):
             returns lower and upper bounds.
         verbose : boolean
         """
-        seasonal.Seasonal.__init__(self, data, datetimes, kill_leap)
+        super().__init__(data, datetimes, kill_leap)
         self.doy_width = doy_width
         self.nx = int(nx)
         self.verbose = verbose
@@ -156,6 +156,8 @@ class SeasonalKDE(seasonal.Seasonal):
                 add = np.zeros_like(diffs)
                 argmax = np.argmax(diffs)
                 diff_max = diffs[argmax]
+                if np.isclose(diff_max, 0):
+                    diff_max += 1e-6
                 add[argmax] = diff_max
                 add = smooth(add, self.smooth_len, periodic=True)
                 add *= (1 + diff_thresh) * self.smooth_len / diff_max
@@ -204,7 +206,7 @@ class SeasonalKDE(seasonal.Seasonal):
     @property
     def density_grid(self):
         if self._density_grid is None:
-            densities = np.empty_like(self.x_grid)
+            densities = np.zeros_like(self.x_grid)
             for doy_i, doy in enumerate(self.doys_unique):
                 kernel_width = self.kernel_widths[doy_i]
                 ii = self.doy_mask_dict[doy]
@@ -222,6 +224,10 @@ class SeasonalKDE(seasonal.Seasonal):
         if self._quantile_grid is None:
             quantiles = cumtrapz(y=self.density_grid, x=self.x_grid,
                                  axis=1, initial=0)
+            # if there is only zero-valued data at some doys
+            quantiles[:, -1] = np.where(quantiles[:, -1] != 0,
+                                        quantiles[:, -1],
+                                        1)
             # this normalizes the quantiles
             quantiles *= (quantiles[:, -1] ** -1)[:, np.newaxis]
             # just making it sure...
@@ -314,6 +320,16 @@ class SeasonalKDE(seasonal.Seasonal):
         if self.verbose:
             print()
         kernel_widths = np.abs(kernel_widths)
+
+        nan_ii = np.where(np.isnan(kernel_widths))[0]
+        if len(nan_ii):
+            left_ii = np.maximum(nan_ii - 2, 0)
+            right_ii = np.minimum(nan_ii + 2, len(kernel_widths) - 1)
+            kernel_widths[left_ii] = np.nan
+            kernel_widths[right_ii] = np.nan
+            kernel_widths = my.interp_nan(kernel_widths, pad_periodic=True)
+            assert len(kernel_widths) == len(self.doys_unique)
+
         kernel_widths = smooth(kernel_widths, self.doy_width, periodic=True)
         self._kernel_widths = kernel_widths
         return kernel_widths, self.quantile_grid
