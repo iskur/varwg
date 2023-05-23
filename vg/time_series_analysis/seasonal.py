@@ -83,6 +83,23 @@ class Seasonal(object):
     def hours_per_day(self):
         return int(self.timestep ** -1)
 
+    def _set_monthly_ticks(self, ax):
+        ax.set_xticks(
+            (1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335))
+        ax.set_xticklabels(("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"),
+                           rotation=45)
+
+    def rain_probs(self, threshold, doys=None):
+        if doys is None:
+            doys = self.doys
+        probs_per_doy = np.zeros_like(self.doys_unique)
+        for doy_i in (self.doys_unique.astype(int) - 1):
+            data = self.data[self.doy_mask[doy_i]]
+            probs_per_doy[doy_i] = np.mean(data > threshold)
+        probs_per_doy = smooth(probs_per_doy, self.doy_width, periodic=True)
+        return probs_per_doy[doys.astype(int) - 1]
+
 
 class Torus(Seasonal):
 

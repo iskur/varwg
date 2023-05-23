@@ -442,28 +442,25 @@ class SeasonalKDE(seasonal.Seasonal):
             s_kwds = dict(marker="o")
         doys = \
             self.doys_unique.repeat(self.nx).reshape(len(self.doys_unique), -1)
-        fig = plt.figure(figsize=figsize)
-        ax1 = fig.gca()
+        fig, ax1 = plt.subplots(figsize=figsize)
         ax1.contourf(doys, self.x_grid / n_sumup, self.density_grid, 15)
         plt.set_cmap("coolwarm")
-        plt.scatter(self.doys, self.data / n_sumup, facecolors=(0, 0, 0, 0),
+        ax1.scatter(self.doys, self.data / n_sumup, facecolors=(0, 0, 0, 0),
                     edgecolors=(0, 0, 0, opacity), **s_kwds)
         ax1.set_ylim(self.x_grid.min() / n_sumup, self.x_grid.max() / n_sumup)
 
         if plot_kernel_width:
-            ax2 = plt.gca().twinx()
+            ax2 = ax1.twinx()
             ax2.plot(self.doys_unique, self.kernel_widths.T.ravel(), "r-",
                      label="Kernel width")
             ax2.set_ylim(self.kernel_widths.min(), self.kernel_widths.max())
 
-        plt.xlim(0, 366)
-        plt.xticks((1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335),
-                   ('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug',
-                    'Sep', 'Oct', 'Nov', 'Dec'), rotation=45)
+        ax1.set_xlim(0, 366)
+        self._set_monthly_ticks(ax1)
 
-        plt.grid()
+        ax1.grid()
         if title is not None:
-            plt.title(title)
+            ax1.set_title(title)
         return fig, ax1
 
     def scatter_cdf(self, solution, n_sumup=1, figsize=None, title=None):
