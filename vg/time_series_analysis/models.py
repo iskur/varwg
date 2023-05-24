@@ -563,6 +563,61 @@ def SVAR_LS_sim(Bs, sigma_us, doys, m=None, ia=None, m_trend=None, u=None,
     return Y_new
 
 
+@my.cache("ut")
+def SVAR_LS_fill(Bs, sigma_us, doys, Y, A=None, m=None, ia=None, m_trend=None,
+               n_presim_steps=100, fixed_data=None, p_kwds=None):
+    if p_kwds is None:
+        p_kwds = dict()
+    doys_ii = (doys % 365) / 365. * len(np.unique(doys))
+    doys_ii = doys_ii.astype(int)
+    K = Bs.shape[0]
+    p = (Bs.shape[1] - 1) // K
+    Y = np.hstack((np.zeros((K, p)), Y))
+    Y[:, :p] = VAR_mean(Bs[..., doys_ii[-1]])
+    for t, doy_i in enumerate(doys_ii):
+        if np.any(np.isnan(Y[:, t + p])):
+            Y_p = \
+                VAR_LS_sim(
+                    Bs[..., doy_i],
+                    # ignored when using phase_randomization!
+                    sigma_us[..., doy_i],
+                    1,
+                    None if m is None else m[:, t, None],
+                    None if ia is None else ia[:, t, None],
+                    m_trend,
+                    n_presim_steps=0,
+                    u=np.zeros(K)[:, None],
+                    prev_data=Y[:, t:t + p],
+                    # u is already phase randomized above if requested
+                    phase_randomize=False,
+                ).ravel()
+            u_t = Y[:, t + p] - Y_p
+            u_t = _cholesky_partial(u_t, sigma_us[..., doy_i], A=A)
+            Y[:, t + p] = Y_p + u_t
+    return Y[:, p:]
+
+
+def scale_z(z, i, x_i, A):
+    z = np.copy(z)
+    z[i] = (x_i - np.sum(A[i, :i] * z[:i])) / A[i, i]
+    return z
+
+
+def _cholesky_partial(u, sigma_us, A=None):
+    if A is None:
+        A = np.linalg.cholesky(sigma_us)
+    finite_mask = np.isfinite(u)
+    z = np.empty_like(u)
+    z[~finite_mask] = rng.normal(size=np.sum(~finite_mask))
+    z[finite_mask] = u[finite_mask]
+    ii = np.where(finite_mask)[0]
+    for i, u_i in zip(ii, u[finite_mask]):
+        z = scale_z(z, i, u_i, A)
+    z = A @ z
+    # assert np.all(np.isclose(z[finite_mask], u[finite_mask]))
+    return z
+
+
 def VAR_LS_asy(data, skewed_i, p=None):
     """Skewness of the differences of the residuals."""
     if p is None:
