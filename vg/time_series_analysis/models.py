@@ -115,10 +115,8 @@ def _MGARCH_likelihood(params, ut, q, m, sigma0):
             # import ipdb; ipdb.set_trace()
             llh += variance_min ** 2
         elif sigma_det <= 0:
-            # import ipdb; ipdb.set_trace()
             llh += sigma_det ** 2
         elif not np.isfinite(sigma_det):
-            # import ipdb; ipdb.set_trace()
             llh += 1e9
         else:
             llh += (-np.log(sigma_det)
@@ -181,9 +179,11 @@ def MGARCH_sim(params, T, sigma0, epsilon=None, n_presim_steps=100):
     K = cov_residuals.shape[0]
     n_sim_steps = T + max(q, m) + n_presim_steps
     if epsilon is None:
-        epsilon = np.random.multivariate_normal(K * [0], cov_residuals,
-                                                n_sim_steps - max(q, m))
-        epsilon = np.asmatrix(epsilon.T)
+        # epsilon = np.random.multivariate_normal(K * [0], cov_residuals,
+        #                                         n_sim_steps - max(q, m))
+        epsilon = rng.multivariate_normal(K * [0], cov_residuals,
+                                    n_sim_steps - max(q, m))
+        epsilon = epsilon.T
     ut = np.zeros((K, n_sim_steps))
     ut[:, :max(q, m)] = epsilon[:, :max(q, m)]
     sigmas = q * [sigma0]
@@ -353,7 +353,7 @@ def VAREX_LS(data, p, ex):
 
     # covariance matrix of the noise of data
     sigma_u = Y @ Y.T - B @ Z @ Y.T
-    sigma_u /= Y_nan_cols.size - K * p - 1
+    sigma_u /= Y.shape[1] - K * p - 1
 
     return B, sigma_u
 
@@ -454,7 +454,7 @@ def VAR_cov(B, sigma_u):
     sigma_U = np.zeros_like(A)
     sigma_U[:K, :K] = sigma_u
     cov_vec = np.linalg.inv(Ikp2 - np.kron(A, A)) @ vec(sigma_U)
-    return unvec(cov_vec, K)
+    return unvec(cov_vec, K)[:K, :K]
 
 
 def B2A(B):
@@ -505,13 +505,6 @@ def SVAR_LS_sim(Bs, sigma_us, doys, m=None, ia=None, m_trend=None, u=None,
         u = u.T
     SVAR_LS_sim.ut = u
     for t, doy_i in enumerate(doys_ii):
-        # B = Bs[..., doy_i].copy()
-        # if t > 0:
-        #     for j in range(1, p):
-        #         islice = slice(j * K + 1, (j + 1) * K + 1)
-        #         # B[:, islice] = Bs[:, islice, doy_i - j]
-        #         B[:, islice] = .5 * (B[:, islice] +
-        #                              Bs[:, islice, doy_i - j])
         Y[:, t + p] = \
             VAR_LS_sim(
                 Bs[..., doy_i],
@@ -539,7 +532,7 @@ def SVAR_LS_sim(Bs, sigma_us, doys, m=None, ia=None, m_trend=None, u=None,
     # stds = np.array([np.sqrt(np.diag(
     #     VAR_cov(Bs[..., doys_ii[t]],
     #             sigma_us[..., doys_ii[t]])))
-    #          for t in range(T)]).T
+    #                  for t in range(T)]).T
     # means_mean = means.mean(axis=-1)[:, None]
     # stds_mean = stds.mean(axis=-1)[:, None]
     # Y_new = (Y - means_mean) / stds_mean * stds + means
@@ -604,10 +597,6 @@ def VAR_LS_sim_asy(B, sigma_u, T, data, p, skewed_i,
     fig = my.splom(u)
     fig.suptitle("Simulated residuals")
 
-    # if True:
-    #     return VAR_LS_sim(B, sigma_u, T, u=u, *args, **kwds)
-
-    # u = np.asmatrix(u.T)
     if var_names is None:
         var_names = [str(i) for i in range(K)]
 
@@ -1117,7 +1106,7 @@ def SVAR_residuals(data, doys, B, p=2):
         mean_adjusted = True
         i_shift = 0
         # estimate the process means from the data.
-        mu = np.asmatrix(np.mean(data, axis=1)[:, np.newaxis])
+        mu = np.mean(data, axis=1)[:, np.newaxis]
 
     # set the pre-sample period to the process means
     data = np.concatenate((np.empty((K, p)), data), axis=1)
@@ -1423,7 +1412,7 @@ def VARMA_order_selection(data, p_max=5, q_max=5, criterion=SC,
     # chokes on that
     for p in range(1, p_max + 1):
         for q in range(q_max + 1):
-            if q is 0:
+            if q == 0:
                 sigma_us[p, q] = VAR_LS(data, p, *args, **kwds)[1]
             sigma_us[p, q] = VARMA_LS_prelim(data, p, q, *args, **kwds)[1]
 
@@ -1475,7 +1464,7 @@ def _scale_additive(additive, A, p=None):
     A = np.asarray(A)
     K = A.shape[0]
     if p is None:
-        p = A.shape[1] / K
+        p = int(A.shape[1] / K)
         if p * K != A.shape[1]:
             raise ValueError("A is not (K,K*p)-shape.")
 
@@ -1532,8 +1521,8 @@ def VAR_LS_predict(data_past, B, sigma_u, T=1, n_realizations=1):
                 Y[:, t, r] += rng.multivariate_normal(K * [0], sigma_u)
 
             for i in range(p):
-                Ai = np.asarray(B[:, 1 + i * K: 1 + (i + 1) * K])
-                Y[:, t, r] += np.squeeze(np.dot(Ai, Y[:, t - i - 1, r]))
+                Ai = B[:, 1 + i * K: 1 + (i + 1) * K]
+                Y[:, t, r] += np.squeeze(Ai @ Y[:, t - i - 1, r])
 
     return np.squeeze(Y[:, -T:])
 
@@ -1546,11 +1535,11 @@ def VAR_YW(data, p=2):
     """
     # number of variables
     K, T = data.shape[0], data.shape[1] - p
-    # Y is a (K, T) matrix
-    Y = np.asmatrix(data[:, p:])
+    # Y is a (K, T) array
+    Y = data[:, p:]
 
     # X is nearly the same as Z in VAR_LS, but without the first row of ones
-    X = np.asmatrix(np.empty((K * p, T)))
+    X = np.empty((K * p, T))
     Xt = np.empty((K * p, 1))
     for t in range(p, T + p):
         for subt in range(p):
@@ -1678,8 +1667,8 @@ def VARMA_LS(data, p, q, rel_change=1e-3):
     # set det_old to something that will cause the while loop to execute at
     # least one time
     det_old = rel_change ** -1 * det_new
-    print ("Determinant of preliminary residual covariance matrix: %f" %
-           det_old)
+    print("Determinant of preliminary residual covariance matrix: %f" %
+          det_old)
 
     AM = AM_pre
     gamma = vec(AM)
