@@ -447,6 +447,8 @@ def VAR_mean(B):
 
 
 def VAR_cov(B, sigma_u):
+    """see p. 27-28
+    """
     K = B.shape[0]
     p = (B.shape[1] - 1) // K
     A = B2A(B)
@@ -1275,15 +1277,17 @@ def vec(A):
     """The vec operator stacks 2dim matrices into 1dim vectors column-wise.
     See p.661f.
 
-    >>> A = np.arange(4).reshape(2, 2)
+    >>> A = np.arange(6).reshape(2, 3)
     >>> A
-    array([[0, 1],
-           [2, 3]])
+    array([[0, 1, 2],
+           [3, 4, 5]])
     >>> vec(A)
     array([[0],
-           [2],
+           [3],
            [1],
-           [3]])
+           [4],
+           [2],
+           [5]])
     """
     return A.T.ravel()[:, None]
 
@@ -1291,12 +1295,16 @@ def vec(A):
 def unvec(sequence, K):
     """The inverse of vec.
 
-    >>> a = range(4)
+    >>> a = list(range(6))
     >>> a
-    [0, 1, 2, 3]
+    [0, 1, 2, 3, 4, 5]
     >>> unvec(a, K=2)
-    array([[0, 2],
-           [1, 3]])
+    array([[0, 2, 4],
+           [1, 3, 5]])
+    >>> A = np.array([[0, 3, 1, 4, 2, 5]]).T
+    >>> unvec(A, K=2)
+    array([[0, 1, 2],
+           [3, 4, 5]])    
     """
     return np.array(sequence).reshape(K, -1, order="F")
 
@@ -1324,8 +1332,8 @@ def unvech(sequence, K):
 
     >>> a = np.array([0, 2, 3])
     >>> unvech(a, K=2)
-    array([[ 0.,  2.],
-           [ 2.,  3.]])
+    array([[0., 2.],
+           [2., 3.]])
     """
     A = np.empty((K, K))
     A[np.tril_indices_from(A)] = np.squeeze(sequence)
