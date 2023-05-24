@@ -358,8 +358,8 @@ def VAREX_LS(data, p, ex):
     return B, sigma_u
 
 
-def SVAR_LS(data, doys, p=2, doy_width=10, fft_order=4, var_names=None,
-            verbose=True):
+def SVAR_LS(data, doys, p=2, doy_width=60, fft_order=2, var_names=None,
+          verbose=True):
     """Seasonal version of the least squares estimator."""
     K, T = data.shape
     Bs, sigma_us = [], []
