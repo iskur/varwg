@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-from __future__ import division, print_function
-
 import collections
 import copy
 import datetime
@@ -8,23 +6,24 @@ import os
 import warnings
 import shutil
 import pickle
-from builtins import range, str, zip
-from collections import namedtuple
-from six import string_types as basestring
+from collections import namedtuple, defaultdict
+import functools
 
 import matplotlib.pyplot as plt
 import numpy as np
-from past.utils import old_div
+import pandas as pd
 
 from vg.time_series_analysis import seasonal_distributions as sd
 from vg import helpers as my, times
 from vg.meteo import avrwind, meteox2y
 from vg.meteo.meteox2y import pot_s_rad, sunshine_riseset
-from vg.time_series_analysis import (conditional_sim as
-                                     csim, distributions,
-                                     models,
-                                     resample as resampler,
-                                     time_series as ts)
+from vg.time_series_analysis import (
+    conditional_sim as csim,
+    distributions,
+    models,
+    resample as resampler,
+    time_series as ts,
+)
 from vg.core import vg_base, vg_plotting
 
 
@@ -43,6 +42,7 @@ try:
     from vg import config as conf
 except ImportError:
     from vg import config_template as conf
+
     conf_filepath = conf.__file__
     if conf_filepath.endswith(".pyc"):
         conf_filepath = conf_filepath[:-1]
@@ -54,8 +54,17 @@ def delete_cache():
     shutil.rmtree(conf.cache_dir)
 
 
-def dump_data(times_, data, var_names, p, q, extra="", random_state=None,
-              out_dir=None, conversions=None):
+def dump_data(
+    times_,
+    data,
+    var_names,
+    p,
+    q,
+    extra="",
+    random_state=None,
+    out_dir=None,
+    conversions=None,
+):
     """Dumps the given datetimes and data in an ascii file and random state in
     a pickle file."""
     if out_dir is None:
@@ -71,12 +80,17 @@ def dump_data(times_, data, var_names, p, q, extra="", random_state=None,
     with open(outfilepath, "w") as txt_file:
         txt_file.write("time\t" + "\t".join(var_names) + os.linesep)
         for time, values in zip(times_, data.T):
-            txt_file.write("%s\t%s%s" %
-                           (time.isoformat(),
-                            "\t".join(conf.out_format[var_name] % val
-                                      for var_name, val in
-                                      zip(var_names, values)),
-                            os.linesep))
+            txt_file.write(
+                "%s\t%s%s"
+                % (
+                    time.isoformat(),
+                    "\t".join(
+                        conf.out_format[var_name] % val
+                        for var_name, val in zip(var_names, values)
+                    ),
+                    os.linesep,
+                )
+            )
 
     if random_state is not None:
         with open(outfilepath + ".random_state", "wb") as pi_file:
@@ -86,25 +100,32 @@ def dump_data(times_, data, var_names, p, q, extra="", random_state=None,
 
 
 def metfile2df(met_file):
-    import pandas as pd
     try:
-        pd_kwds = dict(skiprows=5, index_col=0, parse_dates=True,
-                       date_parser=times.cwr2datetime)
-        met_df = pd.read_table(met_file, **pd_kwds).astype(float)
+        pd_kwds = dict(
+            skiprows=5,
+            index_col=0,
+            parse_dates=True,
+            sep="\t",
+            date_parser=times.cwr2datetime,
+        )
+        met_df = pd.read_csv(met_file, **pd_kwds).astype(float)
     except TypeError:
+
         def date_hour2datetime(date_str, hour_str):
-            return times.str2datetime("%s %s" % (date_str, hour_str),
-                                      "%d. %m %y %H")
-        pd_kwds = dict(index_col=0, parse_dates=[[0, 1]],
-                       date_parser=date_hour2datetime)
-        met_df = pd.read_table(met_file, **pd_kwds).astype(float)
+            return times.str2datetime(
+                "%s %s" % (date_str, hour_str), "%d. %m %y %H"
+            )
+
+        pd_kwds = dict(
+            index_col=0, parse_dates=[[0, 1]], date_parser=date_hour2datetime
+        )
+        met_df = pd.read_csv(met_file, **pd_kwds).astype(float)
     return met_df
 
 
 def outfile2df(outfile):
-    import pandas as pd
-    pd_kwds = dict(index_col=0, parse_dates=[0])
-    return pd.read_table(outfile, **pd_kwds).astype(float)
+    pd_kwds = dict(index_col=0, parse_dates=[0], sep="\t")
+    return pd.read_csv(outfile, **pd_kwds).astype(float)
 
 
 def metfile2hdf5(met_file, h5_filename=None, key="met"):
@@ -149,8 +170,9 @@ def seasonal_back(
         mean_shifts = defaultdict(lambda: None)
     for var_ii, (var_name, var) in enumerate(zip(var_names, norm_data)):
         distribution, solution = dist_sol[solution_template % var_name]
-        if (hasattr(distribution, "dist") and
-                isinstance(distribution.dist, distributions.Normal)):
+        if hasattr(distribution, "dist") and isinstance(
+            distribution.dist, distributions.Normal
+        ):
             # in this case, we do not need a qenuine qq-transform, the normal
             # inverse Z transform suffices, AND is immune to producing nans
             # for "extreme" values in the standard-normal world!
@@ -171,9 +193,9 @@ def seasonal_back(
 
 
 def sim_byvariable(values, times, p=2, aggregation="%w"):
-    aggr_values, aggr_times = \
-        ts.time_part_average(values, times, aggregation, expand=False,
-                             return_times=True)
+    aggr_values, aggr_times = ts.time_part_average(
+        values, times, aggregation, expand=False, return_times=True
+    )
     dist = sd.SeasonalDist(distributions.norm, aggr_values, aggr_times)
     solution = dist.fit(T0=50)
     trans = distributions.norm.ppf(dist.cdf(solution), 0, 1)
@@ -185,23 +207,29 @@ def sim_byvariable(values, times, p=2, aggregation="%w"):
     return retrans
 
 
-def interannual_variability(T, mean_arrival=30, disturbance_std=.1):
+def interannual_variability(T, mean_arrival=30, disturbance_std=0.1):
     """Generate a time series used as a disturbance within the std-norm world.
     Disturbances are simulated as gaussian changes occuring after t timesteps,
     where t is drawn from an exponential distribution.
     """
 
     def arrival():
-        return distributions.expon.ppf(np.random.rand(),
-                                       lambd=1. / mean_arrival,
-                                       # loc=1 weil wir taegliche Werte
-                                       # berechnen und daher 1 Tag die
-                                       # kuerzest moegliche Dauer ist
-                                       x0=1)
+        return distributions.expon.ppf(
+            np.random.rand(),
+            lambd=1.0 / mean_arrival,
+            # loc=1 weil wir taegliche Werte
+            # berechnen und daher 1 Tag die
+            # kuerzest moegliche Dauer ist
+            x0=1,
+        )
 
     def disturbance():
-        return abs(distributions.norm.ppf(np.random.rand(),
-                                          sigma=float(disturbance_std)))
+        return abs(
+            distributions.norm.ppf(
+                np.random.rand(), sigma=float(disturbance_std)
+            )
+        )
+
     m_t = np.zeros(T)
     breaks_ii = [t] = [int(round(arrival()))]
     while t < T:
@@ -209,11 +237,10 @@ def interannual_variability(T, mean_arrival=30, disturbance_std=.1):
         t = breaks_ii[-1]
     sign = 1
     for break_, next_break in zip(breaks_ii[:-1], breaks_ii[1:]):
-        period_length = min(int(round(next_break - break_)),
-                            len(m_t) - break_)
+        period_length = min(int(round(next_break - break_)), len(m_t) - break_)
         window = np.bartlett(period_length + 1)[:-1]
         if window.mean() <= 0:
-            window = old_div(np.ones(period_length), period_length)
+            window = np.ones(period_length) / period_length
         else:
             window /= window.mean()
         m_t[break_:next_break] = sign * disturbance() * window
@@ -222,7 +249,7 @@ def interannual_variability(T, mean_arrival=30, disturbance_std=.1):
 
 
 def sw_diurnal(date, daily_sw_data, del_t=3600):
-    """ add standard daily cycle to daily mean sw data
+    """add standard daily cycle to daily mean sw data
     Parameters
     ----------
     date: array
@@ -237,12 +264,15 @@ def sw_diurnal(date, daily_sw_data, del_t=3600):
         output date in unix timestamps
     data_: array
         sw data in del_t-steps"""
-    nn = old_div(86400., del_t)
+    nn = 86400.0 / del_t
     date_ = np.arange(date[0], date[-1] + 86400, del_t)
-    swmax = meteox2y.pot_s_rad(times.unix2str(date_, "%Y-%m-%dT%H:%M"),
-                               lat=conf.latitude, longt=conf.longitude)
+    swmax = pot_s_rad(
+        times.unix2str(date_, "%Y-%m-%dT%H:%M"),
+        lat=conf.latitude,
+        longt=conf.longitude,
+    )
     swmax_daily = np.average(swmax.reshape(-1, nn), axis=1).repeat(nn)
-    fkt = old_div(swmax, swmax_daily)
+    fkt = swmax / swmax_daily
     data_ = daily_sw_data.repeat(nn) * fkt
     return date_, data_
 
@@ -256,12 +286,25 @@ class VG(vg_plotting.VGPlotting):
     >>> times_out, sim_data = my_vg.simulate()
     """
 
-    def __init__(self, var_names, met_file=None, sum_interval=24,
-               plot=False, separator="\t", refit=None,
-               detrend_vars=None, verbose=True, data_dir=None,
-               cache_dir=None, dump_data=True, non_rain=None,
-               rain_method="regression", conf_update=None,
-               station_name=None, **met_kwds):
+    def __init__(
+        self,
+        var_names,
+        met_file=None,
+        sum_interval=24,
+        plot=False,
+        separator="\t",
+        refit=None,
+        detrend_vars=None,
+        verbose=True,
+        data_dir=None,
+        cache_dir=None,
+        dump_data=True,
+        non_rain=None,
+        rain_method="regression",
+        conf_update=None,
+        station_name=None,
+        **met_kwds
+    ):
         """A vector autoregressive moving average (VARMA) weather generator.
         Initializing a VG-object does the following:
             - read input data from a met-file
@@ -326,24 +369,31 @@ class VG(vg_plotting.VGPlotting):
         self.station_name = station_name
         if conf_update is not None:
             self._conf_update(conf_update)
-        super(VG, self).__init__(var_names, met_file=met_file,
-                                 sum_interval=sum_interval, plot=plot,
-                                 separator=separator, refit=refit,
-                                 detrend_vars=detrend_vars,
-                                 verbose=verbose, data_dir=data_dir,
-                                 cache_dir=cache_dir,
-                                 seasonal_fitting=True,
-                                 dump_data=dump_data,
-                                 non_rain=non_rain,
-                                 rain_method=rain_method, **met_kwds)
+        super(VG, self).__init__(
+            var_names,
+            met_file=met_file,
+            sum_interval=sum_interval,
+            plot=plot,
+            separator=separator,
+            refit=refit,
+            detrend_vars=detrend_vars,
+            verbose=verbose,
+            data_dir=data_dir,
+            cache_dir=cache_dir,
+            seasonal_fitting=True,
+            dump_data=dump_data,
+            non_rain=non_rain,
+            rain_method=rain_method,
+            **met_kwds
+        )
         # simulated residuals
         self.ut = None
 
     def _conf_update(self, conf_update):
-            for name, value in conf_update.items():
-                setattr(conf, name, value)
-                setattr(vg_base.conf, name, value)
-                setattr(vg_plotting.conf, name, value)
+        for name, value in conf_update.items():
+            setattr(conf, name, value)
+            setattr(vg_base.conf, name, value)
+            setattr(vg_plotting.conf, name, value)
 
     def __getattribute__(self, name):
         # VGPlotting overwrites __getattribute__ to do a seasonal fitting
@@ -351,18 +401,26 @@ class VG(vg_plotting.VGPlotting):
         # when creating a VGPlotting instance
         return vg_base.VGBase.__getattribute__(self, name)
 
-    def fit(self, p=None, q=0, p_max=10, seasonal=False, ex=None,
-            ex_kwds=None, extro=False):
+    def fit(
+        self,
+        p=None,
+        q=0,
+        p_max=10,
+        seasonal=False,
+        ex=None,
+        ex_kwds=None,
+        extro=False,
+    ):
         """p is the order of autoregressive process.
         q the order of the moving average process
         If p is not given, it is selected using the Schwartz Information
         Criterion."""
         self.p, self.q, self.seasonal = p, q, seasonal
         self.ex_in = ex
-        if q is 0:
+        if q == 0:
             if p is None:
                 if self.verbose:
-                    print("Perfoming VAR order selection: ", end=' ')
+                    print("Perfoming VAR order selection: ", end=" ")
                 try:
                     if ex is None:
                         p = models.VAR_order_selection(self.data_trans, p_max)
@@ -370,63 +428,79 @@ class VG(vg_plotting.VGPlotting):
                         est_kwds = {} if ex_kwds is None else ex_kwds
                         est_kwds["ex"] = ex
                         o_select = models.VAR_order_selection
-                        p = o_select(self.data_trans, p_max,
-                                     estimator=models.VAREX_LS,
-                                     est_kwds=est_kwds)
+                        p = o_select(
+                            self.data_trans,
+                            p_max,
+                            estimator=models.VAREX_LS,
+                            est_kwds=est_kwds,
+                        )
                     self.p = p
                 except ValueError:
-                    warnings.warn("Could not fit the VAR process. Trying to "
-                                  "remove extreme values.")
+                    warnings.warn(
+                        "Could not fit the VAR process. Trying to "
+                        "remove extreme values."
+                    )
                     mi, ma = np.min(self.data_trans), np.max(self.data_trans)
                     if ma > -mi:
-                        self.data_trans.ravel()[np.argmax(self.data_trans)] = \
-                            np.nan
+                        self.data_trans.ravel()[
+                            np.argmax(self.data_trans)
+                        ] = np.nan
                     else:
-                        self.data_trans.ravel()[np.argmin(self.data_trans)] = \
-                            np.nan
+                        self.data_trans.ravel()[
+                            np.argmin(self.data_trans)
+                        ] = np.nan
                     self.data_trans = my.interp_nan(self.data_trans)
                     self.fit(p, q, p_max, seasonal, ex, ex_kwds)
                 if self.verbose:
                     print("p=%d seems parsimonious to me" % self.p)
                     if p == 0:
-                        print("Wow, you should not do any autoregressive "
-                              "modeling.")
+                        print(
+                            "Wow, you should not do any autoregressive "
+                            "modeling."
+                        )
             # fit a VAR-model
             if self.seasonal:
                 if self.verbose:
                     print("Fitting the seasonal VAR model.")
-                self.Bs, self.sigma_us = \
-                    models.SVAR_LS(self.data_trans, self.data_doys, self.p,
-                                   var_names=self.var_names,
-                                   verbose=self.verbose)
-                self.residuals = \
-                    models.SVAR_residuals(self.data_trans, self.data_doys,
-                                          self.Bs, self.p)
+                self.Bs, self.sigma_us = models.SVAR_LS(
+                    self.data_trans,
+                    self.data_doys,
+                    self.p,
+                    var_names=self.var_names,
+                    verbose=self.verbose,
+                )
+                self.residuals = models.SVAR_residuals(
+                    self.data_trans, self.data_doys, self.Bs, self.p
+                )
             else:
                 if self.verbose:
                     print("Fitting the VAR model.")
                 if extro:
+
                     def transforms(x):
-                        sim_sea = seasonal_back(self.dist_sol, x,
-                                                self.var_names,
-                                                self.data_doys)
+                        sim_sea = seasonal_back(
+                            self.dist_sol, x, self.var_names, self.data_doys
+                        )
                         return sim_sea / self.sum_interval
 
                     def backtransforms(x):
-                        return self._fit_seasonal(values=x,
-                                                  filter_nans=False)[0]
+                        return self._fit_seasonal(values=x, filter_nans=False)[
+                            0
+                        ]
 
-                    B, self.sigma_u = \
-                        models.VAR_LS_extro(self.data_trans,
-                                            self.data_raw / self.sum_interval,
-                                            transforms,
-                                            backtransforms,
-                                            p=self.p)
+                    B, self.sigma_u = models.VAR_LS_extro(
+                        self.data_trans,
+                        self.data_raw / self.sum_interval,
+                        transforms,
+                        backtransforms,
+                        p=self.p,
+                    )
                     self.residuals = models.VAR_LS_extro.residuals
                 elif ex is None:
                     B, self.sigma_u = models.VAR_LS(self.data_trans, self.p)
-                    self.residuals = models.VAR_residuals(self.data_trans, B,
-                                                          self.p)
+                    self.residuals = models.VAR_residuals(
+                        self.data_trans, B, self.p
+                    )
                 else:
                     B, self.sigma_u = models.VAREX_LS(self.data_trans, p, ex)
                 # we call it AM to have one place for VARMA parameters
@@ -436,10 +510,10 @@ class VG(vg_plotting.VGPlotting):
         else:
             if (p is None) and (q is None):
                 if self.verbose:
-                    print("Perfoming VARMA order selection: ", end=' ')
-                self.p, self.q = p, q = \
-                    models.VARMA_order_selection(self.data_trans, p_max,
-                                                 plot_table=self.plot)
+                    print("Perfoming VARMA order selection: ", end=" ")
+                self.p, self.q = p, q = models.VARMA_order_selection(
+                    self.data_trans, p_max, plot_table=self.plot
+                )
                 if self.verbose:
                     print("p=%d and q=%d seems parsimonious to me" % (p, q))
             else:
@@ -454,8 +528,9 @@ class VG(vg_plotting.VGPlotting):
             self.means = self.data_trans.mean(axis=1)[:, np.newaxis]
             self.data_trans -= self.means
 
-            AM, sigma_u, residuals = \
-                models.VARMA_LS_prelim(self.data_trans, p, q)
+            AM, sigma_u, residuals = models.VARMA_LS_prelim(
+                self.data_trans, p, q
+            )
 
             self.data_trans += self.means
             self.AM, self.sigma_u, self.residuals = AM, sigma_u, residuals
@@ -478,15 +553,31 @@ class VG(vg_plotting.VGPlotting):
 
         return transform
 
-    def simulate(self, T=None, mean_arrival=None,
-                 disturbance_std=None, theta_incr=None, r_fact=None,
-                 theta_grad=None, fixed_variables=None,
-                 primary_var="theta", climate_signal=None,
-                 start_str=None, stop_str=None, random_state=None,
-                 ex=None, ex_kwds=None, seed_before_sim=None,
-                 loc_shift=False, resample=False, res_kwds=None,
-                 asy=False, residuals=None, sim_func=None,
-                 sim_func_kwds=None):
+    def simulate(
+        self,
+        T=None,
+        mean_arrival=None,
+        disturbance_std=None,
+        theta_incr=None,
+        r_fact=None,
+        theta_grad=None,
+        fixed_variables=None,
+        primary_var="theta",
+        climate_signal=None,
+        start_str=None,
+        stop_str=None,
+        random_state=None,
+        ex=None,
+        ex_kwds=None,
+        seed_before_sim=None,
+        loc_shift=False,
+        resample=False,
+        res_kwds=None,
+        asy=False,
+        residuals=None,
+        sim_func=None,
+        sim_func_kwds=None,
+    ):
         """Simulate based on data from __init__ and the fit from calling
         self.fit().
         To choose a specific order of AR and MA call fit(p, q) before calling
@@ -574,18 +665,29 @@ class VG(vg_plotting.VGPlotting):
         pre_sim_random_state = np.random.get_state()
 
         self.T = T
-        (self.disturbance_std, self.theta_incr, self.r_fact,
-         self.theta_grad, self.mean_arrival) = \
-            [None if x is None else np.atleast_1d(x).astype(float)
-             for x in (disturbance_std, theta_incr, r_fact, theta_grad,
-                       mean_arrival)]
+        (
+            self.disturbance_std,
+            self.theta_incr,
+            self.r_fact,
+            self.theta_grad,
+            self.mean_arrival,
+        ) = [
+            None if x is None else np.atleast_1d(x).astype(float)
+            for x in (
+                disturbance_std,
+                theta_incr,
+                r_fact,
+                theta_grad,
+                mean_arrival,
+            )
+        ]
         self.fixed_variables = fixed_variables
         self.climate_signal = np.atleast_2d(climate_signal)
         if self.climate_signal.dtype == object:
             # we have to back up, this has not worked
             self.climate_signal = tuple(self.climate_signal[0])
-        if isinstance(primary_var, basestring):
-            self.primary_var = primary_var,
+        if isinstance(primary_var, str):
+            self.primary_var = (primary_var,)
         else:
             self.primary_var = primary_var
         for var_name in self.primary_var:
@@ -598,8 +700,9 @@ class VG(vg_plotting.VGPlotting):
                 # signal can be None. we also have to be careful, because the
                 # number of primary variables could be interpreted as T
                 climate_signal = np.atleast_2d(climate_signal)
-                _signal = np.array([_ for _ in climate_signal
-                                    if _ is not None])
+                _signal = np.array(
+                    [_ for _ in climate_signal if _ is not None]
+                )
                 self.T = _signal.shape[1]
             else:
                 self.T = self.T_summed
@@ -610,8 +713,9 @@ class VG(vg_plotting.VGPlotting):
         if self.p is None and sim_func is None:
             self.fit()
 
-        self.sim_times = self._gen_sim_times(start_str=start_str,
-                                             stop_str=stop_str)
+        self.sim_times = self._gen_sim_times(
+            start_str=start_str, stop_str=stop_str
+        )
         # self.T has to be reset when self._gen_sim_times is called, but not
         # inside self.disaggregate
         self.T = len(self.sim_times)
@@ -655,74 +759,112 @@ class VG(vg_plotting.VGPlotting):
                 res_kwds = my.ADict()
             cy = "cy" in res_kwds and res_kwds["cy"]
             if cy:
-                sim, self.res_indices, self.candidates = \
-                    cresample.resample(self.data_trans,
-                                       self.times,
-                                       self.p,
-                                       n_sim_steps=self.T,
-                                       theta_incr=m_resampler,
-                                       theta_i=self.primary_var_ii,
-                                       cache_dir=conf.cache_dir,
-                                       verbose=self.verbose,
-                                       return_candidates=True,
-                                       **(res_kwds - "cy"))
+                sim, self.res_indices, self.candidates = cresample.resample(
+                    self.data_trans,
+                    self.times,
+                    self.p,
+                    n_sim_steps=self.T,
+                    theta_incr=m_resampler,
+                    theta_i=self.primary_var_ii,
+                    cache_dir=conf.cache_dir,
+                    verbose=self.verbose,
+                    return_candidates=True,
+                    **(res_kwds - "cy")
+                )
             else:
-                sim, self.res_indices, self.candidates = \
-                    resampler.resample(data=self.data_trans,
-                                       dtimes=self.times,
-                                       p=self.p,
-                                       n_sim_steps=self.T,
-                                       theta_incr=m_resampler,
-                                       bias=None,
-                                       theta_i=self.primary_var_ii,
-                                       cache_dir=conf.cache_dir,
-                                       verbose=self.verbose,
-                                       return_candidates=True,
-                                       **res_kwds)
+                sim, self.res_indices, self.candidates = resampler.resample(
+                    data=self.data_trans,
+                    dtimes=self.times,
+                    p=self.p,
+                    n_sim_steps=self.T,
+                    theta_incr=m_resampler,
+                    bias=None,
+                    theta_i=self.primary_var_ii,
+                    cache_dir=conf.cache_dir,
+                    verbose=self.verbose,
+                    return_candidates=True,
+                    **res_kwds
+                )
         elif self.q in (0, None):
             # simulate VAR-time-series
             if self.seasonal:
-                sim = models.SVAR_LS_sim(self.Bs, self.sigma_us, self.sim_doys,
-                                         m, ia=m_t, m_trend=m_trend,
-                                         fixed_data=fixed_data, u=residuals)
+                sim = models.SVAR_LS_sim(
+                    self.Bs,
+                    self.sigma_us,
+                    self.sim_doys,
+                    m,
+                    ia=m_t,
+                    m_trend=m_trend,
+                    fixed_data=fixed_data,
+                    u=residuals,
+                )
             else:
                 if asy:
-                    if isinstance(asy, basestring):
+                    if isinstance(asy, str):
                         asy = [self.var_names.index(asy)]
                     elif asy:
                         asy = self.var_names
-                    sim = models.VAR_LS_sim_asy(self.AM, self.sigma_u,
-                                                self.T,
-                                                self.data_trans,
-                                                self.p, skewed_i=asy,
-                                                verbose=self.verbose,
-                                                var_names=self.var_names,
-                                                u=residuals)
+                    sim = models.VAR_LS_sim_asy(
+                        self.AM,
+                        self.sigma_u,
+                        self.T,
+                        self.data_trans,
+                        self.p,
+                        skewed_i=asy,
+                        verbose=self.verbose,
+                        var_names=self.var_names,
+                        u=residuals,
+                    )
                     self.ut = models.VAR_LS_sim_asy.ut
                 elif ex is None:
-                    sim = models.VAR_LS_sim(self.AM, self.sigma_u, self.T, m,
-                                            ia=m_t, m_trend=m_trend,
-                                            fixed_data=fixed_data,
-                                            transform=transform,
-                                            u=residuals)
+                    sim = models.VAR_LS_sim(
+                        self.AM,
+                        self.sigma_u,
+                        self.T,
+                        m,
+                        ia=m_t,
+                        m_trend=m_trend,
+                        fixed_data=fixed_data,
+                        transform=transform,
+                        u=residuals,
+                    )
                 else:
-                    sim, self.ex_out = \
-                        models.VAREX_LS_sim(self.AM, self.sigma_u, self.T, ex,
-                                            m, ia=m_t, m_trend=m_trend,
-                                            ex_kwds=ex_kwds, u=residuals)
+                    sim, self.ex_out = models.VAREX_LS_sim(
+                        self.AM,
+                        self.sigma_u,
+                        self.T,
+                        ex,
+                        m,
+                        ia=m_t,
+                        m_trend=m_trend,
+                        ex_kwds=ex_kwds,
+                        u=residuals,
+                    )
         else:
-            sim = models.VARMA_LS_sim(self.AM, self.p, self.q, self.sigma_u,
-                                      # process means that are used as
-                                      # starting values there is some
-                                      # confusion here...
-                                      self.means,
-                                      self.T, m, ia=m_t, m_trend=m_trend,
-                                      fixed_data=fixed_data,
-                                      u=residuals)
+            sim = models.VARMA_LS_sim(
+                self.AM,
+                self.p,
+                self.q,
+                self.sigma_u,
+                # process means that are used as
+                # starting values there is some
+                # confusion here...
+                self.means,
+                self.T,
+                m,
+                ia=m_t,
+                m_trend=m_trend,
+                fixed_data=fixed_data,
+                u=residuals,
+            )
 
         if self.plot:
-            ts.matr_img(self.sigma_u, "Noise Covariance matrix",
-                        self.var_names, self.var_names)
+            ts.matr_img(
+                self.sigma_u,
+                "Noise Covariance matrix",
+                self.var_names,
+                self.var_names,
+            )
 
         # location shifting
         if loc_shift:
@@ -788,20 +930,25 @@ class VG(vg_plotting.VGPlotting):
             # try:
             # mean_before = my.nanavg(self.data_raw[self.primary_var_ii] /
             #                         self.sum_interval[self.primary_var_ii])
-            mean_before = [np.nanmean(self.data_raw[var_i] /
-                                      self.sum_interval[var_i])
-                           for var_i in self.primary_var_ii]
-            mean_after = np.nanmean(sim_sea[self.primary_var_ii],
-                                    axis=1)
-            print(("\t%s mean (data): %s, %s mean (sim): %s, "
-                   "diff: %s")  # , mean(m): %.4f")
-                  % (", ".join(self.primary_var),
-                     ", ".join("%.3f" % mean for mean in mean_before),
-                     ", ".join(self.primary_var),
-                     ", ".join("%.3f" % mean for mean in mean_after),
-                     ", ".join("%.3f" % diff for diff in
-                               mean_after - mean_before),
-                     ))  # m[self.primary_var_ii].mean()))
+            mean_before = [
+                np.nanmean(self.data_raw[var_i] / self.sum_interval[var_i])
+                for var_i in self.primary_var_ii
+            ]
+            mean_after = np.nanmean(sim_sea[self.primary_var_ii], axis=1)
+            print(
+                (
+                    "\t%s mean (data): %s, %s mean (sim): %s, " "diff: %s"
+                )  # , mean(m): %.4f")
+                % (
+                    ", ".join(self.primary_var),
+                    ", ".join("%.3f" % mean for mean in mean_before),
+                    ", ".join(self.primary_var),
+                    ", ".join("%.3f" % mean for mean in mean_after),
+                    ", ".join(
+                        "%.3f" % diff for diff in mean_after - mean_before
+                    ),
+                )
+            )  # m[self.primary_var_ii].mean()))
             # except (UnboundLocalError, NameError, ValueError, TypeError):
             #     pass
 
@@ -810,16 +957,17 @@ class VG(vg_plotting.VGPlotting):
 
         if self.dump:
             extra = "" if self.station_name is None else self.station_name
-            self.outfilepath = \
-                dump_data(self.sim_times,
-                          self.sim_sea,
-                          self.var_names,
-                          self.p,
-                          0 if self.q is None else self.q,
-                          extra=extra,
-                          random_state=pre_sim_random_state,
-                          out_dir=self.data_dir,
-                          conversions=conf.conversions)
+            self.outfilepath = dump_data(
+                self.sim_times,
+                self.sim_sea,
+                self.var_names,
+                self.p,
+                0 if self.q is None else self.q,
+                extra=extra,
+                random_state=pre_sim_random_state,
+                out_dir=self.data_dir,
+                conversions=conf.conversions,
+            )
 
         return self.sim_times, sim_sea
 
@@ -839,8 +987,9 @@ class VG(vg_plotting.VGPlotting):
         # the nans mess up the calculation of the covariance matrix
         data_hourly = data_hourly[:, np.all(np.isfinite(data_hourly), axis=0)]
         if isinstance(self.sum_interval, collections.Iterable):
-            warnings.warn("Per-variable sum_interval is not supported "
-                          "anymore.")
+            warnings.warn(
+                "Per-variable sum_interval is not supported " "anymore."
+            )
             disagg_len = self.sum_interval[0]
         else:
             disagg_len = self.sum_interval
@@ -851,10 +1000,12 @@ class VG(vg_plotting.VGPlotting):
             if self.verbose:
                 print("Transforming 'negative rain'")
             # rain_old = np.copy(dht[0])
-            dht = self._negative_rain(dht, self.met["R"],
-                                      self.data_doys_raw,
-                                      # var_names=("theta", "ILWR", "u", "v")
-                                      )
+            dht = self._negative_rain(
+                dht,
+                self.met["R"],
+                self.data_doys_raw,
+                # var_names=("theta", "ILWR", "u", "v")
+            )
 
             # fig, axs = plt.subplots(self.K, sharex=True)
             # for val, ax in zip(dht, axs):
@@ -877,28 +1028,40 @@ class VG(vg_plotting.VGPlotting):
         # read timesteps per day (abbreviation, because it is used a lot as an
         # index modifier below
         tpd = len(hours_unique)
-        self.dis_times = self._gen_sim_times(self.T * tpd,
-                                             output_resolution=1.)
+        self.dis_times = self._gen_sim_times(
+            self.T * tpd, output_resolution=1.0
+        )
 
         def trans(data, doys):
-            return seasonal_back(self.dist_sol, data, self.var_names,
-                                 doys, solution_template="%s_hourly")
+            return seasonal_back(
+                self.dist_sol,
+                data,
+                self.var_names,
+                doys,
+                solution_template="%s_hourly",
+            )
+
         t_kwds = dict(doys=times.datetime2doy(self.dis_times))
-        self.sim_dis = csim.disaggregate_piecewice(self.sim,
-                                                   autocov=data_hourly_trans,
-                                                   disagg_len=disagg_len,
-                                                   cov=cov,
-                                                   pool_size=25,
-                                                   trans=trans,
-                                                   t_kwds=t_kwds,
-                                                   verbose=True,
-                                                   sum_vars=sum_vars)
+        self.sim_dis = csim.disaggregate_piecewice(
+            self.sim,
+            autocov=data_hourly_trans,
+            disagg_len=disagg_len,
+            cov=cov,
+            pool_size=25,
+            trans=trans,
+            t_kwds=t_kwds,
+            verbose=True,
+            sum_vars=sum_vars,
+        )
 
         # retransform disaggregated variables
-        sim_sea_dis = seasonal_back(self.dist_sol, self.sim_dis,
-                                    self.var_names,
-                                    doys=times.datetime2doy(self.dis_times),
-                                    solution_template="%s_hourly")
+        sim_sea_dis = seasonal_back(
+            self.dist_sol,
+            self.sim_dis,
+            self.var_names,
+            doys=times.datetime2doy(self.dis_times),
+            solution_template="%s_hourly",
+        )
         # housekeeping
         self.sim_sea_dis = sim_sea_dis
         # some of the plotting routines depend on the availability of
@@ -906,8 +1069,9 @@ class VG(vg_plotting.VGPlotting):
         self.var_names_dis = self.var_names
         return self.dis_times, sim_sea_dis
 
-    def disaggregate(self, var_names_dis=None, event_dt=None, factors=None,
-                     doy_tolerance=15):
+    def disaggregate(
+        self, var_names_dis=None, event_dt=None, factors=None, doy_tolerance=15
+    ):
         """Disaggregate variables to hourly time steps by drawing from the
         residuals of the measured data
 
@@ -940,7 +1104,7 @@ class VG(vg_plotting.VGPlotting):
         elif isinstance(var_names_dis, basestring):
             if self.verbose:
                 print("Disaggregating selected variables.")
-            var_names_dis = var_names_dis,
+            var_names_dis = (var_names_dis,)
 
         # how many timesteps are there per day in the input data?
         # we assume that the data is not finer than hours
@@ -949,51 +1113,55 @@ class VG(vg_plotting.VGPlotting):
         # lot as an index modifier below)
         tpd = len(hours_unique)
 
-        self.dis_times = self._gen_sim_times((self.T - 1) * tpd,
-                                             output_resolution=1.)
+        self.dis_times = self._gen_sim_times(
+            (self.T - 1) * tpd, output_resolution=1.0
+        )
 
         if factors is not None:
             factors = np.asarray(factors)[:, None]
 
-        deltas_input, sim_interps = self._gen_deltas_input(var_names_dis,
-                                                           tpd)
-        deltas_drawn, sim_sea_dis = \
-            self._add_deltas(deltas_input, sim_interps, var_names_dis,
-                             tpd, event_dt=event_dt, factors=factors,
-                             doy_tolerance=doy_tolerance)
+        deltas_input, sim_interps = self._gen_deltas_input(var_names_dis, tpd)
+        deltas_drawn, sim_sea_dis = self._add_deltas(
+            deltas_input,
+            sim_interps,
+            var_names_dis,
+            tpd,
+            event_dt=event_dt,
+            factors=factors,
+            doy_tolerance=doy_tolerance,
+        )
 
         #  check for variables with limits
         for var_name in var_names_dis:
             var_i = self.var_names.index(var_name)
             limits = copy.copy(conf.par_known[var_name])
             if var_name.startswith("Qsw"):
+
                 def pot_s(doys):
-                    hourly = pot_s_rad(doys,
-                                       lat=conf.latitude,
-                                       longt=conf.longitude)
+                    hourly = pot_s_rad(
+                        doys, lat=conf.latitude, longt=conf.longitude
+                    )
                     return hourly * self.sum_interval[var_i]
+
                 limits["u"] = pot_s
             elif var_name.startswith("sun"):
+
                 def sun_hours(doys):
                     dtimes = times.doy2datetime(doys)
-                    sunrise, sunset = sunshine_riseset(dtimes,
-                                                       conf.longitude,
-                                                       conf.latitude,
-                                                       tz_offset=None)
+                    sunrise, sunset = sunshine_riseset(
+                        dtimes, conf.longitude, conf.latitude, tz_offset=None
+                    )
                     doy_hours = (doys - doys.astype(int)) * 24
                     max_hours = np.full_like(doys, 60)
-                    max_hours[(doy_hours < sunrise) &
-                              (doy_hours > sunset)] = 0
+                    max_hours[(doy_hours < sunrise) & (doy_hours > sunset)] = 0
                     sunrise_dist = 60 * (sunrise - doy_hours)
                     sunset_dist = 60 * (sunset - doy_hours)
-                    sunrise_mask = ((sunrise_dist > 0) &
-                                    (sunrise_dist < 60))
-                    sunset_mask = ((sunset_dist < 0) &
-                                   (sunset_dist > -60))
+                    sunrise_mask = (sunrise_dist > 0) & (sunrise_dist < 60)
+                    sunset_mask = (sunset_dist < 0) & (sunset_dist > -60)
                     max_hours[sunrise_mask] = sunrise_dist[sunrise_mask]
                     max_hours[sunset_mask] = 60 + sunset_dist[sunset_mask]
                     return max_hours * self.sum_interval[var_i]
- 
+
                 limits["u"] = sun_hours
 
             sim_interp = sim_interps[var_i]
@@ -1003,18 +1171,21 @@ class VG(vg_plotting.VGPlotting):
             # we have to interpret a threshold as a lower limit (no negative
             # rain, please)
             seas_dist, _ = self.dist_sol[var_name]
-            if (hasattr(seas_dist, "dist") and
-                    hasattr(seas_dist.dist, "thresh")):
+            if hasattr(seas_dist, "dist") and hasattr(
+                seas_dist.dist, "thresh"
+            ):
                 if limits is None:
                     limits = {}
                 # limits["l"] = conf.array_gen(seas_dist.dist.thresh)
-                limits["l"] = conf.array_gen(0.)
+                limits["l"] = conf.array_gen(0.0)
                 # limits["u"] = conf.array_gen(1.e12)
 
             if limits is not None and ("u" in limits or "uc" in limits):
                 upper_func = limits["u"] if "u" in limits else limits["uc"]
-                upper = (upper_func(self.dis_doys[pos_mask]) /
-                         self.sum_interval[var_i])
+                upper = (
+                    upper_func(self.dis_doys[pos_mask])
+                    / self.sum_interval[var_i]
+                )
                 upper_perc = deltas_drawn[var_i, pos_mask]
                 interps = sim_interp[pos_mask]
                 upper_dis = interps + upper_perc * (upper - interps)
@@ -1022,8 +1193,10 @@ class VG(vg_plotting.VGPlotting):
 
             if limits is not None and ("l" in limits or "lc" in limits):
                 lower_func = limits["l"] if "l" in limits else limits["lc"]
-                lower = (lower_func(self.dis_doys[neg_mask]) /
-                         self.sum_interval[var_i])
+                lower = (
+                    lower_func(self.dis_doys[neg_mask])
+                    / self.sum_interval[var_i]
+                )
                 lower_perc = deltas_drawn[var_i, neg_mask]
                 interps = sim_interp[neg_mask]
                 lower_dis = interps + lower_perc * (interps - lower)
@@ -1046,10 +1219,16 @@ class VG(vg_plotting.VGPlotting):
 
         if self.dump:
             # if varnames_dis==None, daily values are returned and dumped:
-            self.outfilepath = \
-                dump_data(self.dis_times, sim_sea_dis, self.var_names, self.p,
-                          0 if self.q is None else self.q, "_disaggregated",
-                          out_dir=self.data_dir, conversions=conf.conversions)
+            self.outfilepath = dump_data(
+                self.dis_times,
+                sim_sea_dis,
+                self.var_names,
+                self.p,
+                0 if self.q is None else self.q,
+                "_disaggregated",
+                out_dir=self.data_dir,
+                conversions=conf.conversions,
+            )
 
         return self.dis_times, sim_sea_dis
 
@@ -1059,17 +1238,20 @@ class VG(vg_plotting.VGPlotting):
         if self.sim_sea_dis is None:
             raise RuntimeError("Call disaggregate first.")
 
-        dtimes, data, var_names = \
-            self.dis_times, self.sim_sea_dis, self.var_names
+        dtimes, data, var_names = (
+            self.dis_times,
+            self.sim_sea_dis,
+            self.var_names,
+        )
         if conf.conversions:
             for conversion in list(conf.conversions):
                 times, data, var_names = conversion(dtimes, data, var_names)
-        met = {var_name: vals
-               for var_name, vals in zip(var_names, data)}
+        met = {var_name: vals for var_name, vals in zip(var_names, data)}
         return dtimes, met
 
-    def to_dyresm(self, outfilepath, ts=3600, info=None, wind_fct=1.0,
-                  output_rh=False):
+    def to_dyresm(
+        self, outfilepath, ts=3600, info=None, wind_fct=1.0, output_rh=False
+    ):
         """Converts output to a DYRESM input file.
 
         Parameters
@@ -1089,37 +1271,54 @@ class VG(vg_plotting.VGPlotting):
         # emperor stringettes - just the right length!
         now_str = datetime.datetime.now().isoformat(" ")
         moist_varname = "rh" if output_rh else "e"
-        template_filepath = os.path.join(os.path.dirname(__file__),
-                                         "dyresm_header_template")
+        template_filepath = os.path.join(
+            os.path.dirname(__file__), "dyresm_header_template"
+        )
         with open(template_filepath) as template_file:
             template = template_file.read()
-        dyresm_header = template.format(now_str=now_str, info=info,
-                                        ts=ts, moist_varname=moist_varname)
+        dyresm_header = template.format(
+            now_str=now_str, info=info, ts=ts, moist_varname=moist_varname
+        )
 
         if not output_rh:
             if "e" not in met_dict:
-                met_dict["e"] = meteox2y.rel2vap_p(met_dict["rh"],
-                                                   met_dict["theta"])
+                met_dict["e"] = meteox2y.rel2vap_p(
+                    met_dict["rh"], met_dict["theta"]
+                )
         if "U" not in met_dict:
-            met_dict["U"] = avrwind.component2angle(met_dict["u"],
-                                                    met_dict["v"])[1]
+            met_dict["U"] = avrwind.component2angle(
+                met_dict["u"], met_dict["v"]
+            )[1]
         met_dict["U"] *= wind_fct
         if "R" not in met_dict:
             met_dict["R"] = np.zeros_like(met_dict["theta"])
-        data = np.array([times.datetime2cwr(times_)] +
-                        [met_dict[var_name] for var_name in
-                         ("Qsw", "ILWR", "theta",
-                          "rh" if output_rh else "e",
-                          "U", "R")]
-                        ).T
+        data = np.array(
+            [times.datetime2cwr(times_)]
+            + [
+                met_dict[var_name]
+                for var_name in (
+                    "Qsw",
+                    "ILWR",
+                    "theta",
+                    "rh" if output_rh else "e",
+                    "U",
+                    "R",
+                )
+            ]
+        ).T
 
         with open(outfilepath, "w") as outfile:
             outfile.write(dyresm_header)
         with open(outfilepath, "ab") as outfile:
-            np.savetxt(outfile, data,
-                       fmt=(b'%10.5f\t%7.3f\t%7.3f\t%6.2f\t' +
-                            (b"%.3f" if output_rh else b"%4.1f") +
-                            b'\t%5.2f\t%.6f'))
+            np.savetxt(
+                outfile,
+                data,
+                fmt=(
+                    b"%10.5f\t%7.3f\t%7.3f\t%6.2f\t"
+                    + (b"%.3f" if output_rh else b"%4.1f")
+                    + b"\t%5.2f\t%.6f"
+                ),
+            )
 
     def to_glm(self, outfilepath):
         """Converts output to a GLM input file.
@@ -1131,8 +1330,10 @@ class VG(vg_plotting.VGPlotting):
         """
         dtimes, met = self._prepare_output()
 
-        header = ("time,ShortWave,LongWave, AirTemp,RelHum, WindSpeed,Rain,"
-                  "Snow" + os.linesep)
+        header = (
+            "time,ShortWave,LongWave, AirTemp,RelHum, WindSpeed,Rain,"
+            "Snow" + os.linesep
+        )
         if "U" not in met:
             try:
                 met["U"] = avrwind.component2angle(met["u"], met["v"])[1]
@@ -1140,17 +1341,23 @@ class VG(vg_plotting.VGPlotting):
                 warnings.warn("No wind information found. Filling in 0's!!")
                 met["U"] = np.zeros_like(met[list(met.keys())[0]])
         if "R" not in met:
-            warnings.warn("No precipitation information available. Filling "
-                          " in with 0's!!")
+            warnings.warn(
+                "No precipitation information available. Filling "
+                " in with 0's!!"
+            )
             met["R"] = np.zeros_like(met[list(met.keys())[0]])
         times_str = times.datetime2str(dtimes, "%Y-%m-%d %H:%M")
-        lines = [",".join([time_str] +
-                          ["%.6f" % met[key][i]
-                           for key in
-                           ("Qsw", "ILWR", "theta", "rh", "U", "R")] +
-                          ["0.0" + os.linesep]  # snow
-                          )
-                 for i, time_str in enumerate(times_str)]
+        lines = [
+            ",".join(
+                [time_str]
+                + [
+                    "%.6f" % met[key][i]
+                    for key in ("Qsw", "ILWR", "theta", "rh", "U", "R")
+                ]
+                + ["0.0" + os.linesep]  # snow
+            )
+            for i, time_str in enumerate(times_str)
+        ]
         with open(outfilepath, "w") as glm_file:
             glm_file.write(header)
             glm_file.writelines(lines)
@@ -1169,33 +1376,37 @@ class VG(vg_plotting.VGPlotting):
             GOTM precipitation bc file
         """
         if sw_outfilepath is None:
-            sw_outfilepath = outfilepath[:-len(".dat")] + "_swr.dat"
+            sw_outfilepath = outfilepath[: -len(".dat")] + "_swr.dat"
         if rain_outfilepath is None:
-            rain_outfilepath = outfilepath[:-len(".dat")] + "_precip_file.dat"
+            rain_outfilepath = outfilepath[: -len(".dat")] + "_precip_file.dat"
         dtimes, met = self._prepare_output()
 
         if "U" not in met:
             try:
-                met["wdir"], met["U"] = \
-                    avrwind.component2angle(met["u"], met["v"])
+                met["wdir"], met["U"] = avrwind.component2angle(
+                    met["u"], met["v"]
+                )
                 # gideon: "I think the cloud cover and wind direction
                 # should both be 0 (for the time being...)"
                 met["wdir"][:] = 0
             except KeyError:
                 warnings.warn("No wind information found. Filling in 0's!!")
-                met["wdir"] = met["U"] = \
-                    np.zeros_like(met[list(met.keys())[0]])
+                met["wdir"] = met["U"] = np.zeros_like(
+                    met[list(met.keys())[0]]
+                )
         if "R" not in met:
-            warnings.warn("No precipitation information available. Filling "
-                          " in with 0's!!")
+            warnings.warn(
+                "No precipitation information available. Filling "
+                " in with 0's!!"
+            )
             met["R"] = np.zeros_like(met[list(met.keys())[0]])
         if "air_pressure" not in met:
             met["air_pressure"] = np.full_like(met[list(met.keys())[0]], 1000)
         if "cloud_cover" not in met:
             ilwr = meteox2y.temp2lw(met["theta"])
-            met["cloud_cover"] = meteox2y.lw2clouds(ilwr,
-                                                    met["theta"],
-                                                    rh=met["rh"])
+            met["cloud_cover"] = meteox2y.lw2clouds(
+                ilwr, met["theta"], rh=met["rh"]
+            )
             met["cloud_cover"][:] = 0
 
         # relative humidity has to be in %
@@ -1206,51 +1417,58 @@ class VG(vg_plotting.VGPlotting):
         times_str = times.datetime2str(dtimes, "%Y-%m-%d %H:%M:%S")
         var_names = "U", "cloud_cover", "air_pressure", "theta", "rh", "wdir"
         # fmts = "%.2f", "%.6f", "%.0f", "%.3f", "%.6f"
-        lines = ["\t".join([time_str] +
-                           [conf.out_format[key] % met[key][i]
-                            for key in var_names] +
-                           [os.linesep])
-                 for i, time_str in enumerate(times_str)]
+        lines = [
+            "\t".join(
+                [time_str]
+                + [conf.out_format[key] % met[key][i] for key in var_names]
+                + [os.linesep]
+            )
+            for i, time_str in enumerate(times_str)
+        ]
 
         with open(outfilepath, "w") as gotm_file:
             # gotm_file.write(header)
             gotm_file.writelines(lines)
 
         # separate short-wave file
-        lines = ["%s\t%s%s" % (time_str,
-                               conf.out_format["Qsw"] % met["Qsw"][i],
-                               os.linesep)
-                 for i, time_str in enumerate(times_str)]
+        lines = [
+            "%s\t%s%s"
+            % (time_str, conf.out_format["Qsw"] % met["Qsw"][i], os.linesep)
+            for i, time_str in enumerate(times_str)
+        ]
         with open(sw_outfilepath, "w") as gotm_file:
             gotm_file.writelines(lines)
 
         # separate precipitation file
-        lines = ["%s\t%s%s" % (time_str,
-                               conf.out_format["R"] % met["R"][i],
-                               os.linesep)
-                 for i, time_str in enumerate(times_str)]
+        lines = [
+            "%s\t%s%s"
+            % (time_str, conf.out_format["R"] % met["R"][i], os.linesep)
+            for i, time_str in enumerate(times_str)
+        ]
         with open(rain_outfilepath, "w") as gotm_file:
             gotm_file.writelines(lines)
 
     def to_df(self, kind="hourly input", var_names=None):
         import pandas as pd
+
         if var_names is None:
             var_names = self.var_names
 
         if kind == "hourly input":
             if "e" in var_names and "e" not in self.met:
-                self.met["e"] = meteox2y.rel2vap_p(self.met["rh"],
-                                                   self.met["theta"])
+                self.met["e"] = meteox2y.rel2vap_p(
+                    self.met["rh"], self.met["theta"]
+                )
             data = np.array([self.met[var_name] for var_name in var_names]).T
-            df_kwds = dict(index=self.times_orig,
-                           data=data,
-                           columns=var_names)
+            df_kwds = dict(index=self.times_orig, data=data, columns=var_names)
         elif kind == "hourly output":
-            data = np.array([self.sim_sea_dis[self.var_names.index(name)]
-                             for name in var_names]).T
-            df_kwds = dict(index=self.dis_times,
-                           data=data,
-                           columns=var_names)
+            data = np.array(
+                [
+                    self.sim_sea_dis[self.var_names.index(name)]
+                    for name in var_names
+                ]
+            ).T
+            df_kwds = dict(index=self.dis_times, data=data, columns=var_names)
         return pd.DataFrame(**df_kwds)
 
     def predict(self, dtimes=None, data_past=None, T=1, n_realizations=1):
@@ -1277,30 +1495,37 @@ class VG(vg_plotting.VGPlotting):
         if self.p is None:
             self.fit()
         if dtimes is None:
-            dtimes = self.times[-self.p:]
+            dtimes = self.times[-self.p :]
         if data_past is None:
-            data_past = self.data_raw[:, -self.p:]
+            data_past = self.data_raw[:, -self.p :]
         past_doys = times.datetime2doy(dtimes)
-        data_past_trans = \
-            self._fit_seasonal(values=data_past, doys=past_doys)[0]
-        prediction = models.VAR_LS_predict(data_past_trans, self.AM,
-                                           self.sigma_u, T, n_realizations)
+        data_past_trans = self._fit_seasonal(values=data_past, doys=past_doys)[
+            0
+        ]
+        prediction = models.VAR_LS_predict(
+            data_past_trans, self.AM, self.sigma_u, T, n_realizations
+        )
         prediction = prediction.reshape((-1, T, n_realizations))
 
         # calculate the output resolution in days
         first_doy, second_doy = times.datetime2doy(self.times[:2])
         delta_doy = second_doy - first_doy
         prediction_doys = past_doys[-1] + delta_doy * np.arange(1, T + 1)
-        prediction_dtimes = times.doy2datetime(prediction_doys,
-                                               year=dtimes[-1].year)
-        prediction_doys = np.where(prediction_doys > 366,
-                                   prediction_doys - 366, prediction_doys)
+        prediction_dtimes = times.doy2datetime(
+            prediction_doys, year=dtimes[-1].year
+        )
+        prediction_doys = np.where(
+            prediction_doys > 366, prediction_doys - 366, prediction_doys
+        )
         prediction_sea = np.atleast_3d(np.empty_like(prediction))
 
         for r in range(n_realizations):
-            prediction_sea[..., r] = \
-                seasonal_back(self.dist_sol, prediction[..., r],
-                              self.var_names, doys=prediction_doys)
+            prediction_sea[..., r] = seasonal_back(
+                self.dist_sol,
+                prediction[..., r],
+                self.var_names,
+                doys=prediction_doys,
+            )
         prediction_sea /= self.sum_interval[:, np.newaxis, :]
         return prediction_dtimes, np.squeeze(prediction_sea)
 
@@ -1317,17 +1542,21 @@ class VG(vg_plotting.VGPlotting):
         if data_past is None:
             data_past = self.data_raw[:, -n_prev_steps:]
 
-        prediction_dtimes, prediction = \
-            self.predict(dtimes[-self.p:], data_past[:, -self.p:], T)
+        prediction_dtimes, prediction = self.predict(
+            dtimes[-self.p :], data_past[:, -self.p :], T
+        )
 
         fig, axes = plt.subplots(nrows=self.K, sharex=True, squeeze=True)
-        fig.suptitle("Prediction made on %s" %
-                     times.datetime2str(times.datetime.now()))
+        fig.suptitle(
+            "Prediction made on %s" % times.datetime2str(times.datetime.now())
+        )
         for var_i, (ax, var_name) in enumerate(zip(axes, self.var_names)):
-            ax.plot(dtimes[self.p:],
-                    old_div(data_past[var_i, self.p:],
-                            self.sum_interval[var_i]),
-                    "k", linewidth=2)
+            ax.plot(
+                dtimes[self.p :],
+                data_past[var_i, self.p :] / self.sum_interval[var_i],
+                "k",
+                linewidth=2,
+            )
             ax.plot(prediction_dtimes, prediction[var_i], "b-x", linewidth=2)
             ax.grid()
             ax.set_ylabel(r"%s %s" % (var_name, conf.units[var_name]))
@@ -1335,31 +1564,49 @@ class VG(vg_plotting.VGPlotting):
 
         if hindcast:
             for shift in range(self.p + 1, n_prev_steps):
-                hindcast_dtimes, hindcast = \
-                    self.predict(dtimes[:shift], data_past[:, :shift],
-                                 n_prev_steps - shift, 1)
-                col = plt.cm.jet(1 -
-                                 old_div(float(shift - self.p - 1),
-                                         (n_prev_steps - self.p - 1)),
-                                 alpha=.5)
+                hindcast_dtimes, hindcast = self.predict(
+                    dtimes[:shift],
+                    data_past[:, :shift],
+                    n_prev_steps - shift,
+                    1,
+                )
+                col = plt.cm.jet(
+                    1
+                    - float(shift - self.p - 1) / (n_prev_steps - self.p - 1),
+                    alpha=0.5,
+                )
                 for var_i, ax in enumerate(axes):
-                    ax.plot(hindcast_dtimes, hindcast[var_i], "-",
-                            color=col, linewidth=1)
+                    ax.plot(
+                        hindcast_dtimes,
+                        hindcast[var_i],
+                        "-",
+                        color=col,
+                        linewidth=1,
+                    )
                     # connect the hindcast with the end of its supporting data
-                    ax.plot([dtimes[shift - 1], hindcast_dtimes[0]],
-                            [old_div(data_past[var_i, shift - 1],
-                             self.sum_interval[var_i]),
-                             np.atleast_1d(hindcast[var_i])[0]], "-x",
-                            color=col, linewidth=1)
+                    ax.plot(
+                        [dtimes[shift - 1], hindcast_dtimes[0]],
+                        [
+                            data_past[var_i, shift - 1]
+                            / self.sum_interval[var_i],
+                            np.atleast_1d(hindcast[var_i])[0],
+                        ],
+                        "-x",
+                        color=col,
+                        linewidth=1,
+                    )
         ti = plt.xticks()[0]
-        la_ = [times.datetime2str(times.ordinal2datetime(tii), "%d.%m. %H h")
-               for tii in ti]
+        la_ = [
+            times.datetime2str(times.ordinal2datetime(tii), "%d.%m. %H h")
+            for tii in ti
+        ]
         plt.xticks(ti, la_, rotation=30)
 
         self.verbose = verbose
 
-    def _gen_m_trend(self, prim_i, prim_index, prim_is_normal, sigma, scale,
-                     scale_nn):
+    def _gen_m_trend(
+        self, prim_i, prim_index, prim_is_normal, sigma, scale, scale_nn
+    ):
         theta_grad = self.theta_grad[prim_i]
         if np.isnan(theta_grad):
             self._m_trend_single += [np.zeros(self.K)]
@@ -1368,28 +1615,30 @@ class VG(vg_plotting.VGPlotting):
         primvar_trend = theta_grad * self.sum_interval[prim_index]
         # looking for the mean of the standard deviation
         if prim_is_normal:
-            m_trend_primvar = old_div(primvar_trend, np.mean(sigma))
+            m_trend_primvar = primvar_trend / np.mean(sigma)
         else:
             # TODO: the following is most likely wrong!!!
             m_trend_primvar = np.mean(scale_nn(primvar_trend))
         self._m_trend_single += [m_trend_primvar * scale]
         return self._m_trend_single[-1]
 
-    def _gen_m(self, prim_i, prim_index, prim_is_normal, sigma, scale,
-               scale_nn):
+    def _gen_m(
+        self, prim_i, prim_index, prim_is_normal, sigma, scale, scale_nn
+    ):
         theta_incr = self.theta_incr[prim_i]
         if np.isnan(theta_incr):
             self._m_single += [np.zeros((self.K, self.T))]
             return self._m_single[-1]
 
-        intercept = (self.data_trans.mean(axis=1) -
-                     scale * self.data_trans[prim_index].mean()
-                     ).reshape((self.K, 1))
+        intercept = (
+            self.data_trans.mean(axis=1)
+            - scale * self.data_trans[prim_index].mean()
+        ).reshape((self.K, 1))
         intercept[prim_index] = 0
         # change in mean in the real world
         delta_primvar = theta_incr * self.sum_interval[prim_index]
         if prim_is_normal:
-            m_primvar = old_div(delta_primvar, sigma)
+            m_primvar = delta_primvar / sigma
         else:
             m_primvar = scale_nn(delta_primvar)
         self._m_single += [m_primvar * scale.reshape((self.K, 1)) + intercept]
@@ -1398,8 +1647,9 @@ class VG(vg_plotting.VGPlotting):
         #     cod = np.corrcoef()
         return self._m_single[-1]
 
-    def _gen_m_t(self, prim_i, prim_index, prim_is_normal, sigma, scale,
-                 scale_nn, _T):
+    def _gen_m_t(
+        self, prim_i, prim_index, prim_is_normal, sigma, scale, scale_nn, _T
+    ):
         m_t = np.zeros((self.K, self.T))
         # das war an der Tafel im Seminarraum 2:
         # mean_arrival: mittlere Zeit zwischen Aenderungen (kalte/warme
@@ -1413,13 +1663,16 @@ class VG(vg_plotting.VGPlotting):
                 disturbance_std /= np.mean(sigma)
             else:
                 disturbance_std = np.mean(scale_nn(disturbance_std))
-            m_t_primvar = \
-                interannual_variability(self.T, mean_arrival, disturbance_std)
+            m_t_primvar = interannual_variability(
+                self.T, mean_arrival, disturbance_std
+            )
             m_t += m_t_primvar * scale.reshape((self.K, 1))
 
-        if (self.climate_signal is not None and
-                np.array(self.climate_signal).ndim > 1 and
-                self.climate_signal[prim_i] is not None):
+        if (
+            self.climate_signal is not None
+            and np.array(self.climate_signal).ndim > 1
+            and self.climate_signal[prim_i] is not None
+        ):
             climate_diff = self._get_climate_diff(_T, prim_i)
             if prim_is_normal:
                 climate_diff /= sigma
@@ -1438,16 +1691,21 @@ class VG(vg_plotting.VGPlotting):
             if self.seasonal:
                 covs = []
                 for doy_ii, doy in enumerate(self.unique_doys):
-                    ii = ((self.data_doys > doy - self.doy_width) &
-                          (self.data_doys <= doy + self.doy_width))
+                    ii = (self.data_doys > doy - self.doy_width) & (
+                        self.data_doys <= doy + self.doy_width
+                    )
                     if (doy - self.doy_width) < 0:
-                        ii |= self.doys > (365. - self.doy_width + doy)
+                        ii |= self.doys > (365.0 - self.doy_width + doy)
                     if (doy + self.doy_width) > 365:
-                        ii |= self.doys < (doy + self.doy_width - 365.)
+                        ii |= self.doys < (doy + self.doy_width - 365.0)
                     covs += np.cov(self.data_trans[ii])
-                covs = [[my.fourier_approx(covs[:, i, j], 4)
-                         for i in range(self.K)]
-                        for j in range(self.K)]
+                covs = [
+                    [
+                        my.fourier_approx(covs[:, i, j], 4)
+                        for i in range(self.K)
+                    ]
+                    for j in range(self.K)
+                ]
                 self._cov_trans = np.array(covs)
             else:
                 self._cov_trans = np.cov(self.data_trans)
@@ -1459,12 +1717,13 @@ class VG(vg_plotting.VGPlotting):
         m = np.zeros((self.K, self.T))
         m_t = np.zeros_like(m)
         m_trend = np.zeros(self.K)
-        ScenParameters = namedtuple("scenario_parameters",
-                                    ("m", "m_t", "m_trend"))
+        ScenParameters = namedtuple(
+            "scenario_parameters", ("m", "m_t", "m_trend")
+        )
 
         # oddly enough, we allow more than one primary variable
-        if isinstance(self.primary_var, basestring):
-            prim_vars = self.primary_var,
+        if isinstance(self.primary_var, str):
+            prim_vars = (self.primary_var,)
         else:
             prim_vars = self.primary_var
 
@@ -1473,8 +1732,9 @@ class VG(vg_plotting.VGPlotting):
             # prim_index is index inside sequence of all variables.
             prim_index = self.primary_var_ii[prim_i]
             # scale other variables according to linear regression
-            scale = (np.cov(self.data_trans)[prim_index] /
-                     np.var(self.data_trans[prim_index]))
+            scale = np.cov(self.data_trans)[prim_index] / np.var(
+                self.data_trans[prim_index]
+            )
 
             # do not change the primary variable by itself
             # scale[prim_index] = 1
@@ -1483,20 +1743,26 @@ class VG(vg_plotting.VGPlotting):
             if prim in self.var_names:
                 seas_dist, trig_params = self.dist_sol[prim]
                 if hasattr(seas_dist, "dist"):
-                    prim_is_normal = \
+                    prim_is_normal = (
                         type(seas_dist.dist) == distributions.Normal
+                    )
                 else:
                     prim_is_normal = False
 
                 if not prim_is_normal:
-                    medians = seas_dist.ppf(trig_params,
-                                            .5 * np.ones(len(self.sim_doys)),
-                                            self.sim_doys)
+                    medians = seas_dist.ppf(
+                        trig_params,
+                        0.5 * np.ones(len(self.sim_doys)),
+                        self.sim_doys,
+                    )
 
                     def scale_nn(x):
                         return distributions.norm.ppf(
-                            seas_dist.cdf(trig_params, medians + x,
-                                          self.sim_doys))
+                            seas_dist.cdf(
+                                trig_params, medians + x, self.sim_doys
+                            )
+                        )
+
                 else:
                     scale_nn = None
 
@@ -1508,20 +1774,38 @@ class VG(vg_plotting.VGPlotting):
                     sigma = None
 
                 if self.theta_grad is not None:
-                    m_trend += self._gen_m_trend(prim_i, prim_index,
-                                                 prim_is_normal, sigma, scale,
-                                                 scale_nn)
+                    m_trend += self._gen_m_trend(
+                        prim_i,
+                        prim_index,
+                        prim_is_normal,
+                        sigma,
+                        scale,
+                        scale_nn,
+                    )
                 else:
                     self._m_trend_single += [np.zeros(self.K)]
 
                 if self.theta_incr is not None:
-                    m += self._gen_m(prim_i, prim_index, prim_is_normal, sigma,
-                                     scale, scale_nn)
+                    m += self._gen_m(
+                        prim_i,
+                        prim_index,
+                        prim_is_normal,
+                        sigma,
+                        scale,
+                        scale_nn,
+                    )
                 else:
                     self._m_single += [np.zeros((self.K, self.T))]
 
-                m_t += self._gen_m_t(prim_i, prim_index, prim_is_normal, sigma,
-                                     scale, scale_nn, _T)
+                m_t += self._gen_m_t(
+                    prim_i,
+                    prim_index,
+                    prim_is_normal,
+                    sigma,
+                    scale,
+                    scale_nn,
+                    _T,
+                )
 
         return ScenParameters(m, m_t, m_trend)
 
@@ -1529,9 +1813,9 @@ class VG(vg_plotting.VGPlotting):
         """Calculates the difference between the seasonal mean of the primary
         variable and the given climate signal."""
         var_name = self.primary_var[prim_i]
-        return ((self.climate_signal[prim_i] -
-                 self.fitted_medians(var_name)) *
-                self.sum_interval_dict[var_name])
+        return (
+            self.climate_signal[prim_i] - self.fitted_medians(var_name)
+        ) * self.sum_interval_dict[var_name]
 
     def _location_shift_normal(self, sim):
         for prim_i, prim in enumerate(self.primary_var):
@@ -1540,7 +1824,7 @@ class VG(vg_plotting.VGPlotting):
             m = self._m_single[prim_i][prim_index]
             m_t = self._m_t_single[prim_i][prim_index]
             m_trend = self._m_trend_single[prim_i][prim_index]
-            sim[prim_index] -= (m + m_t + dummy_time / self.T * m_trend)
+            sim[prim_index] -= m + m_t + dummy_time / self.T * m_trend
         return sim
 
     def _location_shift_back(self, sim_sea):
@@ -1563,13 +1847,23 @@ class VG(vg_plotting.VGPlotting):
                     # get the doy-specific distribution parameters
                     _T = (2 * np.pi / 365 * self.sim_doys)[np.newaxis, :]
                     climate_diff = self._get_climate_diff(_T, prim_i)
-                    sim_sea[prim_index] += (old_div(climate_diff,
-                                            self.sum_interval[prim_index]))
+                    sim_sea[prim_index] += (
+                        climate_diff / self.sum_interval[prim_index]
+                    )
         return sim_sea
 
-    def random_dryness(self, T=None, start_str=None, stop_str=None,
-                       n_events=None, duration_min=2, duration_max=7,
-                       month_start=6, month_end=9, event_dryness=.4):
+    def random_dryness(
+        self,
+        T=None,
+        start_str=None,
+        stop_str=None,
+        n_events=None,
+        duration_min=2,
+        duration_max=7,
+        month_start=6,
+        month_end=9,
+        event_dryness=0.4,
+    ):
         """This is a very special method designed to generate dry hot events
         for Lake Kinneret.
 
@@ -1610,20 +1904,21 @@ class VG(vg_plotting.VGPlotting):
             self.T = T
         self.sim_times = self._gen_sim_times(T, start_str, stop_str)
         if n_events is None:
-            n_events = 3 * int(old_div(len(self.sim_doys), 365.))
+            n_events = 3 * int(len(self.sim_doys) / 365.0)
 
         rh_signal = np.copy(self.fitted_medians("rh", self.sim_doys))
         months = times.time_part(self.sim_times, "%m")
-        summer_ii = np.where((months >= month_start) &
-                             (months <= month_end))[0]
+        summer_ii = np.where((months >= month_start) & (months <= month_end))[
+            0
+        ]
         durations = np.random.randint(duration_min, duration_max + 1, n_events)
 
         for event_i in range(n_events):
             i = np.random.choice(summer_ii)
             duration = durations[event_i]
-            rh_signal[i:i + duration] = event_dryness
+            rh_signal[i : i + duration] = event_dryness
 
-        event_mask = np.where(rh_signal <= .4)[0]
+        event_mask = np.where(rh_signal <= 0.4)[0]
         event_dt = self.sim_times[event_mask]
 
         return rh_signal, event_dt
@@ -1635,13 +1930,15 @@ if __name__ == "__main__":
     # import config_konstanz_disag as conf
     import config_konstanz as conf
     from vg.core import vg_plotting
+
     vg_base.conf = vg_plotting.conf = conf
-    met_vg = VG(("R", "theta", "ILWR",
-                 "Qsw", "rh", "u", "v"
-                 ),
-                # non_rain=("theta", "Qsw", "rh"),
-                refit=True,
-                verbose=True, dump_data=True)
+    met_vg = VG(
+        ("R", "theta", "ILWR", "Qsw", "rh", "u", "v"),
+        # non_rain=("theta", "Qsw", "rh"),
+        refit=True,
+        verbose=True,
+        dump_data=True,
+    )
     simt, sim = met_vg.simulate()
     met_vg.disaggregate()
     # simt, sim = met_vg.simulate(start_str="01.01.2000 00:00:00",
