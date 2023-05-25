@@ -1,5 +1,3 @@
-from __future__ import division, print_function
-
 import copy
 import datetime
 import os
@@ -9,20 +7,16 @@ import shlex
 import sys
 import warnings
 from tqdm import tqdm
-from builtins import object, range, zip
-from past.builtins import basestring
 
 import numpy as np
 from numpy.random import default_rng
 import pandas as pd
-from past.utils import old_div
 from scipy import interpolate, stats
 
 import vg.time_series_analysis.seasonal_kde as skde
 from vg import helpers as my, times
 from vg.meteo import avrwind, meteox2y
-from vg.time_series_analysis import (distributions,
-                                     seasonal_distributions as sd)
+from vg.time_series_analysis import distributions, seasonal_distributions as sd
 
 # import pyximport
 # pyximport.install(setup_args={'include_dirs': np.get_include(),
@@ -39,16 +33,20 @@ try:
     from vg import config as conf
 except ImportError:
     from vg import config_template as conf
+
     conf_filepath = conf.__file__
     if conf_filepath.endswith(".pyc"):
         conf_filepath = conf_filepath[:-1]
-    warnings.warn('Could not import "config.py".\n' +
-                  'Edit "%s" and rename it to "config.py"' % conf_filepath)
+    warnings.warn(
+        'Could not import "config.py".\n'
+        + 'Edit "%s" and rename it to "config.py"' % conf_filepath
+    )
 
 
 PY2 = sys.version_info.major == 2
-cache_filename = ("seasonal_solutions_{version}.sh"
-                  .format(version="py2" if PY2 else "py3"))
+cache_filename = "seasonal_solutions_{version}.sh".format(
+    version="py2" if PY2 else "py3"
+)
 rng = default_rng()
 
 
@@ -84,8 +82,9 @@ def met_as_array(met, p=0, T=None, var_names=None):
 
 
 def met2array(filepath, met_kwds=None, as_array_kwds=None, sumup_kwds=None):
-    met_kwds, as_array_kwds, sumup_kwds = \
-        [{} if x is None else x for x in (met_kwds, as_array_kwds, sumup_kwds)]
+    met_kwds, as_array_kwds, sumup_kwds = [
+        {} if x is None else x for x in (met_kwds, as_array_kwds, sumup_kwds)
+    ]
     dt_hourly, met = read_met(filepath, **met_kwds)
     data_hourly = met_as_array(met, **as_array_kwds)
     data, dt = my.sumup(data_hourly, times_=dt_hourly, **sumup_kwds)
@@ -93,7 +92,7 @@ def met2array(filepath, met_kwds=None, as_array_kwds=None, sumup_kwds=None):
         n_sumup = sumup_kwds["width"]
     except KeyError:
         n_sumup = 24
-    return old_div(data, n_sumup), dt, met_as_array.var_names
+    return data / n_sumup, dt, met_as_array.var_names
 
 
 def dyresm2array(filepath, *args, **kwds):
@@ -107,12 +106,17 @@ def _parse_time(var_dict):
     This code is adjusted every time someone throws new data at me."""
     datetimes = None
     if "Date" in var_dict and "hour" in var_dict:
-        datetimes = \
-            times.str2datetime(np.array(["%s %s" % (date_str, hour_str)
-                                         for date_str, hour_str
-                                         in zip(var_dict["Date"],
-                                                var_dict["hour"])]),
-                               "%d. %m %y %H")
+        datetimes = times.str2datetime(
+            np.array(
+                [
+                    "%s %s" % (date_str, hour_str)
+                    for date_str, hour_str in zip(
+                        var_dict["Date"], var_dict["hour"]
+                    )
+                ]
+            ),
+            "%d. %m %y %H",
+        )
         del var_dict["Date"]
         del var_dict["hour"]
     if "Julian" in var_dict:
@@ -125,8 +129,9 @@ def _parse_time(var_dict):
         datetimes = times.cwr2datetime(var_dict["jd"])
         del var_dict["jd"]
     if "chron" in var_dict:
-        datetimes = times.str2datetime(var_dict["chron"],
-                                       "(%m/%d/%y %H:%M:%S)")
+        datetimes = times.str2datetime(
+            var_dict["chron"], "(%m/%d/%y %H:%M:%S)"
+        )
         del var_dict["chron"]
     elif "date" in var_dict:
         datetimes = times.str2datetime(var_dict["date"])
@@ -139,21 +144,29 @@ def _parse_time(var_dict):
         del var_dict["times"]
     if "year" in var_dict and "doy" in var_dict:
         datetimes = times.str2datetime(var_dict["year"], "%Y")
-        datetimes += np.array([datetime.timedelta(int(doy))
-                               for doy in var_dict["doy"]])
+        datetimes += np.array(
+            [datetime.timedelta(int(doy)) for doy in var_dict["doy"]]
+        )
         del var_dict["year"], var_dict["doy"]
     if "Date" in var_dict and "Time" in var_dict:
         # as seen in Excel
         datetimes = times.xls2datetime([int(day) for day in var_dict["Date"]])
-        datetimes += \
-            np.array([datetime.timedelta(hours=int(hour.split(":")[0]))
-                      for hour in var_dict["Time"]])
+        datetimes += np.array(
+            [
+                datetime.timedelta(hours=int(hour.split(":")[0]))
+                for hour in var_dict["Time"]
+            ]
+        )
         del var_dict["Date"], var_dict["Time"]
     if "ta" in var_dict and "mo" in var_dict and "jahr" in var_dict:
-        datetimes = \
-            np.array([datetime.datetime(int(year), int(month), int(day))
-                      for year, month, day in
-                      zip(var_dict["jahr"], var_dict["mo"], var_dict["ta"])])
+        datetimes = np.array(
+            [
+                datetime.datetime(int(year), int(month), int(day))
+                for year, month, day in zip(
+                    var_dict["jahr"], var_dict["mo"], var_dict["ta"]
+                )
+            ]
+        )
         del var_dict["ta"]
         del var_dict["mo"]
         del var_dict["jahr"]
@@ -165,27 +178,40 @@ def _parse_time(var_dict):
 
 
 # @my.pickle_cache(os.path.join(conf.cache_dir, "met_%s.pkl"))  # , warn=False)
-def read_met(filepath=None, minimum_water_temp=.1, delimiter="\t",
-             verbose=True, main_diff=None, **kwds):
+def read_met(
+    filepath=None,
+    minimum_water_temp=0.1,
+    delimiter="\t",
+    verbose=True,
+    main_diff=None,
+    **kwds,
+):
     if filepath is None:
         filepath = conf.met_file
     var_dict = my.csv2dict(filepath, delimiter=delimiter, **kwds)
     # get rid of quotes around filenames
-    var_dict = {shlex.split(var_name)[0]: values
-                for var_name, values in list(var_dict.items())}
+    var_dict = {
+        shlex.split(var_name)[0]: values
+        for var_name, values in list(var_dict.items())
+    }
 
     var_dict, datetimes = _parse_time(var_dict)
 
-    met = {key: np.array([val if val != "" else np.nan for val in values],
-                         dtype=float)
-           for key, values in list(var_dict.items())}
+    met = {
+        key: np.array(
+            [val if val != "" else np.nan for val in values], dtype=float
+        )
+        for key, values in list(var_dict.items())
+    }
 
-    met = {key: times.regularize(val, datetimes, nan=True,
-                                 main_diff=main_diff)[0]
-           for key, val in list(met.items())}
+    met = {
+        key: times.regularize(val, datetimes, nan=True, main_diff=main_diff)[0]
+        for key, val in list(met.items())
+    }
     # get also the regularized datetimes
-    datetimes = times.regularize(np.empty(len(datetimes)), datetimes,
-                                 main_diff=main_diff)[1]
+    datetimes = times.regularize(
+        np.empty(len(datetimes)), datetimes, main_diff=main_diff
+    )[1]
 
     if verbose:
         n_nan = np.sum([np.isnan(val) for val in list(met.values())])
@@ -200,16 +226,22 @@ def read_met(filepath=None, minimum_water_temp=.1, delimiter="\t",
                     if start == end:
                         print("\t\t", datetimes[start])
                     else:
-                        print("\t\t%s - %s (%d)" %
-                              (datetimes[start], datetimes[end],
-                               end - start + 1))
+                        print(
+                            "\t\t%s - %s (%d)"
+                            % (
+                                datetimes[start],
+                                datetimes[end],
+                                end - start + 1,
+                            )
+                        )
 
     if "Cloud_Cover" not in var_dict:
         try:
-            var_dict["Cloud_Cover"] = \
-                meteox2y.lw2clouds(np.array(var_dict["ILWR"], dtype=float),
-                                   np.array(var_dict["theta"], dtype=float),
-                                   e=np.array(var_dict["e"], dtype=float))
+            var_dict["Cloud_Cover"] = meteox2y.lw2clouds(
+                np.array(var_dict["ILWR"], dtype=float),
+                np.array(var_dict["theta"], dtype=float),
+                e=np.array(var_dict["e"], dtype=float),
+            )
         except KeyError:
             pass
 
@@ -223,29 +255,41 @@ def read_met(filepath=None, minimum_water_temp=.1, delimiter="\t",
         n_too_dry = np.sum(too_dry_ii)
         if n_too_dry > 0:
             if verbose:
-                warnings.warn(("Input of e and theta caused %d rel. " +
-                               "humidities to be < 0. Capping them at 0.")
-                              % n_too_dry)
+                warnings.warn(
+                    (
+                        "Input of e and theta caused %d rel. "
+                        + "humidities to be < 0. Capping them at 0."
+                    )
+                    % n_too_dry
+                )
             met["rh"][too_dry_ii] = np.nan
         too_moist_ii = met["rh"] > 1.01
         n_too_moist = np.sum(too_moist_ii)
         if n_too_moist > 0:
             if verbose:
-                warnings.warn(("Input of e and theta caused %d rel. " +
-                               "humidities to be > 1. Capping them at 1.")
-                              % n_too_moist)
+                warnings.warn(
+                    (
+                        "Input of e and theta caused %d rel. "
+                        + "humidities to be > 1. Capping them at 1."
+                    )
+                    % n_too_moist
+                )
             met["rh"][too_moist_ii] = 1.01  # np.nan
     if "rh" in met and np.nanmax(met["rh"]) > 50:
-        met["rh"] /= 100.
+        met["rh"] /= 100.0
     for var_name in list(met.keys()):
         if var_name.startswith("wtemp"):
             too_cold_ii = met[var_name] < 0
             n_too_cold = np.sum(too_cold_ii)
             if n_too_cold > 0:
                 if verbose:
-                    warnings.warn(("%d temperatures < 0 in %s. Capping them " +
-                                   "at %.3f")
-                                  % (n_too_cold, var_name, minimum_water_temp))
+                    warnings.warn(
+                        (
+                            "%d temperatures < 0 in %s. Capping them "
+                            + "at %.3f"
+                        )
+                        % (n_too_cold, var_name, minimum_water_temp)
+                    )
                 met[var_name][too_cold_ii] = minimum_water_temp
 
     return datetimes, met
@@ -255,11 +299,23 @@ class VGBase(object):
 
     """Handle everything except plotting."""
 
-    def __init__(self, var_names, met_file=None, sum_interval=24,
-                 plot=False, separator="\t", refit=None, detrend_vars=None,
-                 verbose=False, data_dir=None, cache_dir=None,
-                 dump_data=True, non_rain=None, rain_method=None,
-                 **met_kwds):
+    def __init__(
+        self,
+        var_names,
+        met_file=None,
+        sum_interval=24,
+        plot=False,
+        separator="\t",
+        refit=None,
+        detrend_vars=None,
+        verbose=False,
+        data_dir=None,
+        cache_dir=None,
+        dump_data=True,
+        non_rain=None,
+        rain_method=None,
+        **met_kwds,
+    ):
         # external_var_names=None,
         # external_var_names : sequence of str, optional
         #     Must be present in the met-file.
@@ -277,10 +333,14 @@ class VGBase(object):
                 # py2/3 are incompatible here, so we write different cache
                 # files depending on the python version
                 name_parts = self.seasonal_cache_file.rsplit(".")
-                self.seasonal_cache_file = ".".join((name_parts[0],
-                                                     "_",
-                                                     "py2" if PY2 else "py3",
-                                                     name_parts[1]))
+                self.seasonal_cache_file = ".".join(
+                    (
+                        name_parts[0],
+                        "_",
+                        "py2" if PY2 else "py3",
+                        name_parts[1],
+                    )
+                )
         self.dump = dump_data
         # will be used in _load_and_prepare_data
         self.met = self.times_orig = None
@@ -290,8 +350,9 @@ class VGBase(object):
             self.sum_interval = np.array(sum_interval)[:, np.newaxis]
         except IndexError:
             # let's make this the same shape, so life gets easier later on
-            self.sum_interval = \
-                np.array(self.K * [sum_interval])[:, np.newaxis]
+            self.sum_interval = np.array(self.K * [sum_interval])[
+                :, np.newaxis
+            ]
         self.plot = plot
 
         # attributes that will be set with meaningfull values in fit()
@@ -315,8 +376,9 @@ class VGBase(object):
 
         if self.verbose:
             print("Loading input data.")
-        self.times, self.data_raw = self._load_and_prepare_data(separator,
-                                                                **met_kwds)
+        self.times, self.data_raw = self._load_and_prepare_data(
+            separator, **met_kwds
+        )
 
         if detrend_vars:
             for var_name in detrend_vars:
@@ -333,25 +395,29 @@ class VGBase(object):
                 print("Transforming 'negative rain'")
             rain_i = self.var_names.index("R")
             rain = self.data_raw[rain_i]
-            self.data_trans = self._negative_rain(self.data_trans,
-                                                  rain,
-                                                  self.data_doys,
-                                                  non_rain,
-                                                  method=rain_method)
+            self.data_trans = self._negative_rain(
+                self.data_trans,
+                rain,
+                self.data_doys,
+                non_rain,
+                method=rain_method,
+            )
 
     @property
     def sum_interval_dict(self):
         """Maps var_name to sum_interval."""
-        return dict((var_name,
-                     self.sum_interval[self.var_names.index(var_name)])
-                    for var_name in self.var_names)
+        return dict(
+            (var_name, self.sum_interval[self.var_names.index(var_name)])
+            for var_name in self.var_names
+        )
 
     @property
     def primary_var_ii(self):
         """The row index of the primary variable."""
         try:
-            return [self.var_names.index(prim_var)
-                    for prim_var in self.primary_var]
+            return [
+                self.var_names.index(prim_var) for prim_var in self.primary_var
+            ]
         except ValueError:
             warnings.warn("No %s in input." % self.primary_var)
             return None
@@ -362,8 +428,10 @@ class VGBase(object):
         delta = self.times[1] - self.times[0]
         # there is timedelta.total_seconds in python 2.7, but lets be kind to
         # the conservative people -- oh, thank you ;-)
-        return (24 * delta.days +
-                old_div((delta.seconds + 1e-3 * delta.microseconds), 60 ** 2))
+        return (
+            24 * delta.days
+            + (delta.seconds + 1e-3 * delta.microseconds) / 60**2
+        )
 
     @property
     def K(self):
@@ -423,8 +491,8 @@ class VGBase(object):
             `data_doys`.
 
         """
-        if isinstance(var_name, basestring):
-            var_names = var_name,
+        if isinstance(var_name, str):
+            var_names = (var_name,)
         else:
             var_names = var_name
         medians = []
@@ -436,28 +504,45 @@ class VGBase(object):
                     doys = self.data_doys
                 else:
                     doys = self.sim_doys
-            medians += [(dist.ppf(solution, np.full_like(doys, .5), doys) /
-                         self.sum_interval[var_i])]
+            medians += [
+                (
+                    dist.ppf(solution, np.full_like(doys, 0.5), doys)
+                    / self.sum_interval[var_i]
+                )
+            ]
         return np.squeeze(medians)
 
-    def _shuffle(self, nn, m, tpd=24, autocorr_len=48, doys_in=None,
-                 doys_out=None, doy_tolerance=15, nan_mask=None):
+    def _shuffle(
+        self,
+        nn,
+        m,
+        tpd=24,
+        autocorr_len=48,
+        doys_in=None,
+        doys_out=None,
+        doy_tolerance=15,
+        nan_mask=None,
+    ):
         """Draw a clustered sample of size m with elements [0,nn]."""
-        # like a normal modulus, but knows how to divide by 0!!1
+
         def mod0(x, y):
+            # like a normal modulus, but knows how to divide by 0!!1
             return x % y if y != 0 else 0
 
         seasonal = doys_in is not None and doys_out is not None
         if seasonal:
-            pool0 = np.where(times.doy_distance(doys_out[0], doys_in) <=
-                             doy_tolerance)[0]
+            pool0 = np.where(
+                times.doy_distance(doys_out[0], doys_in) <= doy_tolerance
+            )[0]
             # pool_len = len(pool0)
 
         if nan_mask is not None:
             finite_ii = np.where(~nan_mask)[0]
             # shrink pool
-            pool0 = pool0[(pool0 >= (finite_ii[0] - mod0(0, tpd))) &
-                          (pool0 <= (finite_ii[-1] - mod0(0, tpd)))]
+            pool0 = pool0[
+                (pool0 >= (finite_ii[0] - mod0(0, tpd)))
+                & (pool0 <= (finite_ii[-1] - mod0(0, tpd)))
+            ]
             finite_ii = set(finite_ii)
             # pool_len = len(pool0)
         else:
@@ -469,23 +554,21 @@ class VGBase(object):
                 if seasonal:
                     # pool = (pool0 + dst_point) % nn
                     doy_out = doys_out[dst_point % m]
-                    pool = np.where(ctimes.doy_distance(doy_out, doys_in)
-                                    <= doy_tolerance)[0]
+                    pool = np.where(
+                        ctimes.doy_distance(doy_out, doys_in) <= doy_tolerance
+                    )[0]
                     pool = list(set(pool) & finite_ii)
                     src_point = pool[np.random.randint(len(pool))]
-                    # src_point = pool[np.random.randint(pool_len)]
                     while src_point >= (nn - autocorr_len):
                         src_point = pool[np.random.randint(len(pool))]
-                        # src_point = pool[np.random.randint(pool_len)]
                 else:
-                    # src_point = np.random.randint(nn - autocorr_len)
                     src_point = np.random.choice(finite_ii[:-autocorr_len])
+                # src_point -= self.start_hour_of_src
                 # hour of day from 0 to 23 in destination
                 hour_of_dst = mod0(dst_point, tpd)
                 # ensure the same hour of day in source
                 src_point += -mod0(src_point, tpd) + hour_of_dst
                 src_point = min(src_point, nn - autocorr_len)
-                # chunk_ii = list(range(src_point, src_point + autocorr_len))
                 chunk_ii = np.arange(src_point, src_point + autocorr_len)
                 # while np.any(nan_mask[chunk_ii]):
                 #     import ipdb; ipdb.set_trace()
@@ -496,11 +579,12 @@ class VGBase(object):
                     nan_in_output = False
             return chunk_ii
 
-        indices = np.array([choose_chunk(dst_point)
-                            for dst_point
-                            in tqdm(range(0,
-                                         m + autocorr_len,
-                                         autocorr_len))])
+        indices = np.array(
+            [
+                choose_chunk(dst_point)
+                for dst_point in tqdm(range(0, m + autocorr_len, autocorr_len))
+            ]
+        )
         return indices.ravel()[:m]
 
     def _gen_deltas_input(self, var_names_dis, tpd):
@@ -519,7 +603,7 @@ class VGBase(object):
         for var_name in var_names_dis:
             var_i = self.var_names.index(var_name)
             # hourly measured values
-            var_h = my.interp_nan(self.met[var_name][:nn + tpd], max_interp=3)
+            var_h = my.interp_nan(self.met[var_name][: nn + tpd], max_interp=3)
             # daily averages of measured values:
             var_d = np.nanmean(var_h.reshape(-1, tpd), axis=1)
             # 'time' array for interp1d
@@ -534,11 +618,13 @@ class VGBase(object):
             # the distance covered between the interpolated line and the limit
             limits = copy.copy(conf.par_known[var_name])
             if var_name.startswith("Qsw"):
+
                 def pot_s(doys):
-                    hourly = meteox2y.pot_s_rad(doys,
-                                                lat=conf.latitude,
-                                                longt=conf.longitude)
+                    hourly = meteox2y.pot_s_rad(
+                        doys, lat=conf.latitude, longt=conf.longitude
+                    )
                     return hourly * self.sum_interval[var_i]
+
                 limits["u"] = pot_s
 
             pos_mask = deltas_input[var_i] > 0
@@ -547,49 +633,60 @@ class VGBase(object):
             # we have to interpret a threshold as a lower limit (no negative
             # rain, please)
             seas_dist, _ = self.dist_sol[var_name]
-            if (hasattr(seas_dist, "dist") and
-                    hasattr(seas_dist.dist, "thresh")):
+            if hasattr(seas_dist, "dist") and hasattr(
+                seas_dist.dist, "thresh"
+            ):
                 if limits is None:
                     limits = {}
-                # limits["l"] = conf.array_gen(seas_dist.dist.thresh)
                 limits["l"] = conf.array_gen(conf.threshold)
                 # limits["l"] = conf.array_gen(0.)
-                # limits["u"] = conf.array_gen(1.e12)
 
             if limits is not None and ("l" in limits or "lc" in limits):
                 lower_func = limits["l"] if "l" in limits else limits["lc"]
-                lower = (lower_func(doys_in[neg_mask]) /
-                         self.sum_interval[var_i])
+                lower = (
+                    lower_func(doys_in[neg_mask]) / self.sum_interval[var_i]
+                )
                 deltas = deltas_input[var_i, neg_mask]
                 interps = var_interp[neg_mask]
                 div_mask = ~np.isclose(interps, lower)
                 lower_perc = np.full_like(interps, 1e-12)
-                lower_perc[div_mask] = deltas[div_mask] / (interps[div_mask]
-                                                           - lower[div_mask])
-                lower_perc[interps < lower] = 1.
-                lower_perc[lower_perc < -1.] = -1.
+                lower_perc[div_mask] = deltas[div_mask] / (
+                    interps[div_mask] - lower[div_mask]
+                )
+                lower_perc[interps < lower] = 0
+                lower_perc[lower_perc < -1.0] = -1.0
                 deltas_input[var_i, neg_mask] = lower_perc
             if limits is not None and ("u" in limits or "uc" in limits):
                 upper_func = limits["u"] if "u" in limits else limits["uc"]
-                upper = (old_div(upper_func(doys_in[pos_mask]),
-                         self.sum_interval[var_i]))
+                upper = (
+                    upper_func(doys_in[pos_mask]) / self.sum_interval[var_i]
+                )
                 deltas = deltas_input[var_i, pos_mask]
                 interps = var_interp[pos_mask]
                 upper_perc = old_div(deltas, (upper - interps))
                 upper_perc[interps > upper] = 1
-                upper_perc[upper_perc > 1.] = 1.
+                upper_perc[upper_perc > 1.0] = 1.0
                 deltas_input[var_i, pos_mask] = upper_perc
 
             # not a real 'time' as above
             hourly_output_times = np.arange(self.T * tpd)
             # interpolate between daily values (simulation)
-            f_interp = interpolate.interp1d(hourly_output_times[::tpd],
-                                            self.sim_sea[var_i])
+            f_interp = interpolate.interp1d(
+                hourly_output_times[::tpd], self.sim_sea[var_i]
+            )
             sim_interps[var_i] = f_interp(hourly_output_times[:-tpd])
         return deltas_input, sim_interps
 
-    def _add_deltas(self, deltas_input, sim_interps, var_names_dis, tpd,
-                    event_dt=None, factors=None, doy_tolerance=15):
+    def _add_deltas(
+        self,
+        deltas_input,
+        sim_interps,
+        var_names_dis,
+        tpd,
+        event_dt=None,
+        factors=None,
+        doy_tolerance=15,
+    ):
         # these are in "hourly" discretization
         doys_in = self.data_doys_raw[:-tpd]
         if event_dt is not None:
@@ -610,54 +707,68 @@ class VGBase(object):
             rain_i = var_names_dis.index("R")
             thresh = conf.dists_kwds["R"]["threshold"]
 
-            hourly_rain_in = my.interp_nan(self.met["R"][:nn + tpd],
-                                           max_interp=3)
+            hourly_rain_in = my.interp_nan(
+                self.met["R"][: nn + tpd], max_interp=3
+            )
 
-            daily_rain_in = (hourly_rain_in
-                             .reshape(-1, tpd)
-                             .mean(axis=1))
+            daily_rain_in = hourly_rain_in.reshape(-1, tpd).mean(axis=1)
             rain_mask_in = (daily_rain_in > thresh).repeat(tpd)[:nn]
-
-            # rain_mask_in = (hourly_rain_in > thresh)[:nn]
             daily_rain_out = self.sim_sea[rain_i]
             rain_mask_out = (daily_rain_out > 0).repeat(tpd)[:m]
-            # rain_mask_out = (daily_rain_out > thresh).repeat(tpd)[:m]
 
             # shuffle in wet chunks
-            chosen_chunks = self._shuffle(nn, m, tpd, 2 * tpd,
-                                          doys_in, self.dis_doys,
-                                          nan_mask=nan_mask | rain_mask_in,
-                                          doy_tolerance=doy_tolerance)
+            chosen_chunks = self._shuffle(
+                nn,
+                m,
+                tpd,
+                2 * tpd,
+                doys_in,
+                self.dis_doys,
+                nan_mask=nan_mask | rain_mask_in,
+                doy_tolerance=doy_tolerance,
+            )
             chosen_chunks = chosen_chunks[rain_mask_out]
             deltas_drawn[:, rain_mask_out] = deltas_input[:, chosen_chunks]
             if event_dt is not None and factors is not None:
                 deltas_drawn[:, event_ii] *= factors
-            sim_sea_dis = np.where(rain_mask_out,
-                                   sim_interps + deltas_drawn,
-                                   sim_interps)
+            sim_sea_dis = np.where(
+                rain_mask_out, sim_interps + deltas_drawn, sim_interps
+            )
             sim_sea_dis[rain_i, np.isclose(deltas_drawn[rain_i], 0)] = 0
 
             # shuffle in dry chunks
-            chosen_chunks = self._shuffle(nn, m, tpd, 2 * tpd,
-                                          doys_in, self.dis_doys,
-                                          nan_mask=nan_mask | ~rain_mask_in,
-                                          doy_tolerance=doy_tolerance)
+            chosen_chunks = self._shuffle(
+                nn,
+                m,
+                tpd,
+                2 * tpd,
+                doys_in,
+                self.dis_doys,
+                nan_mask=nan_mask | ~rain_mask_in,
+                doy_tolerance=doy_tolerance,
+            )
             chosen_chunks = chosen_chunks[~rain_mask_out]
             deltas_drawn[:, ~rain_mask_out] = deltas_input[:, chosen_chunks]
             if event_dt is not None and factors is not None:
                 deltas_drawn[:, event_ii] *= factors
-            sim_sea_dis = np.where(~rain_mask_out,
-                                   sim_sea_dis + deltas_drawn,
-                                   sim_sea_dis)
+            sim_sea_dis = np.where(
+                ~rain_mask_out, sim_sea_dis + deltas_drawn, sim_sea_dis
+            )
             sim_sea_dis[rain_i, np.isclose(deltas_drawn[rain_i], 0)] = 0
 
             # TODO: check if this worsens the hourly distribution fit
             sim_sea_dis[rain_i, ~rain_mask_out] = 0
         else:
-            chosen_chunks = self._shuffle(nn, m, tpd, 2 * tpd,
-                                          doys_in, self.dis_doys,
-                                          nan_mask=nan_mask,
-                                          doy_tolerance=doy_tolerance)
+            chosen_chunks = self._shuffle(
+                nn,
+                m,
+                tpd,
+                2 * tpd,
+                doys_in,
+                self.dis_doys,
+                nan_mask=nan_mask,
+                doy_tolerance=doy_tolerance,
+            )
             deltas_drawn = deltas_input[:, chosen_chunks]
             if event_dt is not None and factors is not None:
                 deltas_drawn[:, event_ii] *= factors
@@ -674,13 +785,17 @@ class VGBase(object):
             # get the data
             # this covers the case that a non-default met filename was given
             # that exists in the data_dir but not in the working path
-            if ((self.met_file is not None) and
-                    (not os.path.exists(self.met_file))):
+            if (self.met_file is not None) and (
+                not os.path.exists(self.met_file)
+            ):
                 self.met_file = os.path.join(self.data_dir, self.met_file)
-            self.times_orig, self.met = \
-                read_met(self.met_file, delimiter=delimiter,
-                         verbose=self.verbose, **met_kwds)
-        except TypeError as exc:
+            self.times_orig, self.met = read_met(
+                self.met_file,
+                delimiter=delimiter,
+                verbose=self.verbose,
+                **met_kwds,
+            )
+        except TypeError:
             # warnings.warn("While reading met-file:\n%s" % exc)
             try:
                 # could be a pandas DataFrame
@@ -689,9 +804,11 @@ class VGBase(object):
             except AttributeError:
                 # or just a dict
                 self.times_orig = self.met_file["datetimes"]
-                self.met = {key: val for key, val
-                            in list(self.met_file.items())
-                            if key != "datetime"}
+                self.met = {
+                    key: val
+                    for key, val in list(self.met_file.items())
+                    if key != "datetime"
+                }
 
         # convert the dictionary into an array.
         # mind the order: alpha-numeric according to var_names
@@ -701,31 +818,36 @@ class VGBase(object):
         # unfortunately stored someplace else and should be ignored here
         # so for the shape of data, we do not count to K, but something lower
         # if there are water temperatures in var_names
-        var_names_part = [var_name for var_name in self.var_names
-                          if (not var_name.startswith("wtemp") and
-                              var_name != "nao")]
-        data = np.empty((len(var_names_part),
-                         old_div(T_raw_data, self.sum_interval[0, 0])))
+        var_names_part = [
+            var_name
+            for var_name in self.var_names
+            if (not var_name.startswith("wtemp") and var_name != "nao")
+        ]
+        data = np.empty(
+            (len(var_names_part), old_div(T_raw_data, self.sum_interval[0, 0]))
+        )
         data[:] = np.nan
 
         for key in var_names_part:
             var_i = var_names_part.index(key)
             if self.sum_interval[var_i] > 1:
-                data[var_i], times_ = my.sumup(self.met[key],
-                                               self.sum_interval[var_i],
-                                               self.times_orig,
-                                               middle_time=False,
-                                               sum_to_nan=False,
-                                               acceptable_nans=12,
-                                               )
+                data[var_i], times_ = my.sumup(
+                    self.met[key],
+                    self.sum_interval[var_i],
+                    self.times_orig,
+                    middle_time=False,
+                    sum_to_nan=False,
+                    acceptable_nans=12,
+                )
             else:
                 data[var_i] = self.met[key]
                 times_ = self.times_orig
 
         if "U" in self.var_names and "U" not in self.met:
             # the wind has to be aggregated taking the direction into account
-            data[self.var_names.index("U")] = \
-                daily_wind(self.met, self.sum_interval_dict["U"])[1]
+            data[self.var_names.index("U")] = daily_wind(
+                self.met, self.sum_interval_dict["U"]
+            )[1]
 
         # if "nao" in self.var_names:
         #     import nao
@@ -758,8 +880,7 @@ class VGBase(object):
         return times_, data
 
     def _prepare_fixed_data(self):
-        """Convert the data to standard-normal an put it into (K,T)-array form.
-        """
+        """Convert the data to standard-normal an put it into (K,T)-array form."""
         if self.fixed_variables:
             sh = shelve.open(self.seasonal_cache_file, "c")
             fixed_data = np.nan * np.empty((self.K, self.T))
@@ -776,8 +897,12 @@ class VGBase(object):
                 if sum_interval != 24:
                     solution_key += "_%d" % sum_interval
                 seas_class, dist_class, solution = sh[solution_key]
-                dist = seas_class(dist_class, values, self.times,
-                                  fixed_pars=conf.par_known[var_name])
+                dist = seas_class(
+                    dist_class,
+                    values,
+                    self.times,
+                    fixed_pars=conf.par_known[var_name],
+                )
                 quantiles = np.squeeze(dist.cdf(solution))
                 transformed = distributions.norm.ppf(quantiles)
                 fixed_data[var_ii] = transformed
@@ -786,8 +911,9 @@ class VGBase(object):
         else:
             return None
 
-    def _gen_sim_times(self, T=None, start_str=None, stop_str=None,
-                       output_resolution=None):
+    def _gen_sim_times(
+        self, T=None, start_str=None, stop_str=None, output_resolution=None
+    ):
         """Generates an array of datetimes starting at start_date with T values
         and resolution hours in between.
 
@@ -831,31 +957,34 @@ class VGBase(object):
             # overwrite T setting
             end_date = times.str2datetime(stop_str)
             t_diff_seconds = (end_date - self.start_date).total_seconds()
-            T = int(old_div(t_diff_seconds, (60 ** 2 * 24)))
+            T = int(t_diff_seconds / (60**2 * 24))
         # interval_secs = 60. ** 2 * output_resolution
 
         # times_out = np.cumsum([0] + (T - 1) * [interval_secs])
         # times_out += times.datetime2unix(self.start_date)
         # times_out = times.unix2datetime(times_out)
-        resolution_timedelta = \
-            datetime.timedelta(hours=float(output_resolution))
-        times_out = np.array([self.start_date + t * resolution_timedelta
-                              for t in range(T)])
+        resolution_timedelta = datetime.timedelta(
+            hours=float(output_resolution)
+        )
+        times_out = np.array(
+            [self.start_date + t * resolution_timedelta for t in range(T)]
+        )
         return times_out
 
-    def _fit_seasonal(self, refit=None, values=None, doys=None,
-                      filter_nans=True):
+    def _fit_seasonal(
+        self, refit=None, values=None, doys=None, filter_nans=True
+    ):
         if refit is None:
             refit = tuple()
         elif refit == "all" or refit is True:
             refit = self.var_names
-        sh = shelve.open(self.seasonal_cache_file, 'c')
+        sh = shelve.open(str(self.seasonal_cache_file), "c")
         try:
             keys = list(sh.keys())
         except Exception:
             print("Cache file corrupted, refitting...")
             os.remove(self.seasonal_cache_file)
-            sh = shelve.open(self.seasonal_cache_file, 'c')
+            sh = shelve.open(str(self.seasonal_cache_file), "c")
             keys = []
         if values is None:
             values = self.data_raw
@@ -877,31 +1006,45 @@ class VGBase(object):
             if sum_interval != 24:
                 solution_key += "_%d" % sum_interval
 
-            kwds = (conf.dists_kwds[var_name]
-                    if var_name in conf.dists_kwds
-                    else {})
+            kwds = (
+                conf.dists_kwds[var_name]
+                if var_name in conf.dists_kwds
+                else {}
+            )
 
             if solution_key not in keys or plain_solution_key in refit:
                 if self.verbose:
                     print("\tFitting a distribution to ", var_name)
                 seas_class = conf.seasonal_classes[var_name]
-                if (issubclass(seas_class, skde.SeasonalKDE) or
-                        conf.dists[var_name] == "empirical"):
-                    dist = seas_class(var, self.times,
-                                      fixed_pars=conf.par_known[var_name],
-                                      verbose=self.verbose, **kwds)
-                    solution = dist.fit(
-                        silverman=(var_name == "sun")
+                if (
+                    issubclass(seas_class, skde.SeasonalKDE)
+                    or conf.dists[var_name] == "empirical"
+                ):
+                    dist = seas_class(
+                        var,
+                        self.times,
+                        fixed_pars=conf.par_known[var_name],
+                        verbose=self.verbose,
+                        **kwds,
                     )
+                    solution = dist.fit(silverman=(var_name == "sun"))
                     sh[solution_key] = [seas_class, None, solution]
                 else:
-                    dist = seas_class(conf.dists[var_name], var, self.times,
-                                      fixed_pars=conf.par_known[var_name],
-                                      verbose=self.verbose, **kwds)
+                    dist = seas_class(
+                        conf.dists[var_name],
+                        var,
+                        self.times,
+                        fixed_pars=conf.par_known[var_name],
+                        verbose=self.verbose,
+                        **kwds,
+                    )
                     solution = dist.fit()
                     try:
-                        sh[solution_key] = \
-                            [seas_class, conf.dists[var_name], solution]
+                        sh[solution_key] = [
+                            seas_class,
+                            conf.dists[var_name],
+                            solution,
+                        ]
                     except TypeError:
                         # we will rely on the distribution that is set
                         # in the config file later
@@ -911,8 +1054,7 @@ class VGBase(object):
 
             else:
                 if self.verbose:
-                    print("\tRecover previous fit from shelve for: ",
-                          var_name)
+                    print("\tRecover previous fit from shelve for: ", var_name)
                 seas_class, dist_class, solution = sh[solution_key]
                 try:
                     supplements = sh[solution_key + "suppl"]
@@ -928,23 +1070,34 @@ class VGBase(object):
                 # else:
                 #     var_ = var
                 var_ = var
-                if (issubclass(seas_class, skde.SeasonalKDE) or
-                        seas_class == "empirical"):
-                    dist = seas_class(var_, self.times, solution,
-                                      fixed_pars=conf.par_known[var_name],
-                                      **kwds)
+                if (
+                    issubclass(seas_class, skde.SeasonalKDE)
+                    or seas_class == "empirical"
+                ):
+                    dist = seas_class(
+                        var_,
+                        self.times,
+                        solution,
+                        fixed_pars=conf.par_known[var_name],
+                        **kwds,
+                    )
                 else:
                     if dist_class is None:
                         dist_class = conf.dists[var_name]
-                    dist = seas_class(dist_class, var_, self.times,
-                                      solution=solution,
-                                      fixed_pars=conf.par_known[var_name],
-                                      supplements=supplements,
-                                      **kwds)
+                    dist = seas_class(
+                        dist_class,
+                        var_,
+                        self.times,
+                        solution=solution,
+                        fixed_pars=conf.par_known[var_name],
+                        supplements=supplements,
+                        **kwds,
+                    )
 
             if self.verbose:
-                print("\tp-value of chi2 goodness-of-fit %.4f" %
-                      dist.chi2_test())
+                print(
+                    "\tp-value of chi2 goodness-of-fit %.4f" % dist.chi2_test()
+                )
             quantiles = dist.cdf(solution, x=var, doys=doys)
             assert np.nanmin(quantiles) >= 0
             assert np.nanmax(quantiles) <= 1
@@ -954,8 +1107,9 @@ class VGBase(object):
 
         if filter_nans:
             # we have outrageous outliers from time to time
-            data_trans_finite = np.where(np.isfinite(data_trans),
-                                         data_trans, 1e300)
+            data_trans_finite = np.where(
+                np.isfinite(data_trans), data_trans, 1e300
+            )
             data_trans[np.abs(data_trans_finite) >= 1e300] = np.nan
             data_trans = my.interp_nan(data_trans, max_interp=3)
         return data_trans, dist_sol
@@ -965,13 +1119,13 @@ class VGBase(object):
             refit = tuple()
         elif refit == "all" or refit is True:
             refit = self.var_names
-        if isinstance(refit, basestring):
-            refit = refit,
+        if isinstance(refit, str):
+            refit = (refit,)
 
         # Fit hourly distributions to the data, if necesarry, and
         # qq-transform it to standard-norm.
         data_hourly_trans = []
-        sh = shelve.open(self.seasonal_cache_file, "c")
+        sh = shelve.open(str(self.seasonal_cache_file), "c")
         # sh.keys() is very slow
         fft_order = 20
         for var_name in self.var_names:
@@ -981,50 +1135,60 @@ class VGBase(object):
             dtimes = self.times_orig
 
             fixed_pars = conf.par_known_hourly[var_name]
-            hour_neighbors = 12 if var_name is "R" else 4
+            hour_neighbors = 12 if var_name == "R" else 4
             seas_class = conf.seasonal_classes_hourly[var_name]
             if solution_key not in sh or var_name in refit:
                 if self.verbose:
                     print("\tFitting an hourly distribution to ", var_name)
                 if seas_class in (skde.SeasonalKDE, skde.SeasonalHourlyKDE):
                     # fit hourly distributions
-                    hourly_dist = \
-                        skde.SeasonalHourlyKDE(values, dtimes,
-                                               fixed_pars=fixed_pars,
-                                               hour_neighbors=hour_neighbors,
-                                               verbose=self.verbose)
+                    hourly_dist = skde.SeasonalHourlyKDE(
+                        values,
+                        dtimes,
+                        fixed_pars=fixed_pars,
+                        hour_neighbors=hour_neighbors,
+                        verbose=self.verbose,
+                    )
                     # for the time being, let's use scotts_rule of
                     # thumb and not the full blown leave_one_out
                     # maximum likelihood bandwidth estimation
                     solution = hourly_dist.fit(thumb=True)
                 else:
-                    hourly_dist = \
-                        sd.SlidingDistHourly(conf.dists_hourly[var_name],
-                                             values, dtimes,
-                                             fixed_pars=fixed_pars,
-                                             verbose=self.verbose,
-                                             fft_order=fft_order)
+                    hourly_dist = sd.SlidingDistHourly(
+                        conf.dists_hourly[var_name],
+                        values,
+                        dtimes,
+                        fixed_pars=fixed_pars,
+                        verbose=self.verbose,
+                        fft_order=fft_order,
+                    )
                     solution = hourly_dist.fit()
                 sh[solution_key] = solution
                 sh.sync()
             else:
                 if self.verbose:
-                    print("\tRecover previous hourly fit from shelve for: " +
-                          var_name)
+                    print(
+                        "\tRecover previous hourly fit from shelve for: "
+                        + var_name
+                    )
                 solution = sh[solution_key]
                 if seas_class in (skde.SeasonalKDE, skde.SeasonalHourlyKDE):
-                    hourly_dist = \
-                        skde.SeasonalHourlyKDE(values, dtimes,
-                                               solution=solution,
-                                               fixed_pars=fixed_pars,
-                                               hour_neighbors=hour_neighbors)
+                    hourly_dist = skde.SeasonalHourlyKDE(
+                        values,
+                        dtimes,
+                        solution=solution,
+                        fixed_pars=fixed_pars,
+                        hour_neighbors=hour_neighbors,
+                    )
                 else:
-                    hourly_dist = \
-                        sd.SlidingDistHourly(conf.dists_hourly[var_name],
-                                             values, dtimes,
-                                             solution=solution,
-                                             fixed_pars=fixed_pars,
-                                             fft_order=fft_order)
+                    hourly_dist = sd.SlidingDistHourly(
+                        conf.dists_hourly[var_name],
+                        values,
+                        dtimes,
+                        solution=solution,
+                        fixed_pars=fixed_pars,
+                        fft_order=fft_order,
+                    )
             qq = hourly_dist.cdf(solution, values, self.data_doys_raw)
             values_trans = distributions.norm.ppf(qq)
             data_hourly_trans += [values_trans]
@@ -1039,20 +1203,20 @@ class VGBase(object):
         df = pd.DataFrame(non_rain_finite.T, index=self.times)
         df[~rain_mask] = np.nan
         n_doys = len(np.unique(df.index.dayofyear))
-        doy_means = (df
-                     .groupby(df.index.dayofyear)
-                     .mean()
-                     .apply(my.interp_nan, axis=0)
-                     .apply(lambda x: my.fourier_approx(x,
-                                                   order=2,
-                                                   size=n_doys),
-                            axis=0)
-                     )
+        doy_means = (
+            df.groupby(df.index.dayofyear)
+            .mean()
+            .apply(my.interp_nan, axis=0)
+            .apply(
+                lambda x: my.fourier_approx(x, order=2, size=n_doys), axis=0
+            )
+        )
         dry_doys = times.datetime2doy(self.times[~rain_mask])
         return doy_means.ix[dry_doys].as_matrix().T
 
-    def _negative_rain(self, data_trans, rain, doys, var_names=None,
-                       method="regression"):
+    def _negative_rain(
+        self, data_trans, rain, doys, var_names=None, method="regression"
+    ):
         """
         Transform rain-gaps to standard-normal by distance to wet conditions.
 
@@ -1069,14 +1233,16 @@ class VGBase(object):
         rain_i = self.var_names.index("R")
         if var_names is None:
             var_names = self.var_names
-        non_rain_i = [self.var_names.index(var_name)
-                      for var_name in var_names
-                      if var_name != "R"]
-        threshold = (conf.dists_kwds["R"]["threshold"] /
-                     self.sum_interval_dict["R"])
+        non_rain_i = [
+            self.var_names.index(var_name)
+            for var_name in var_names
+            if var_name != "R"
+        ]
+        threshold = (
+            conf.dists_kwds["R"]["threshold"] / self.sum_interval_dict["R"]
+        )
         rain_finite = np.where(np.isfinite(rain), rain, 0)
-        rain_mask = ((rain_finite / self.sum_interval_dict["R"])
-                     >= threshold)
+        rain_mask = (rain_finite / self.sum_interval_dict["R"]) >= threshold
 
         def calc_dist_ranks_distance():
             # calculate means of non-rain variables during wet conditions
@@ -1090,18 +1256,21 @@ class VGBase(object):
             # the gaussian
             return my.rel_ranks(-distances)
 
-
         def calc_dist_ranks_regression():
-            X = np.matrix(np.array([my.interp_nan(data_trans[i, rain_mask],
-                                                  max_interp=2)
-                                    for i in non_rain_i]).T)
+            X = np.matrix(
+                np.array(
+                    [
+                        my.interp_nan(data_trans[i, rain_mask], max_interp=2)
+                        for i in non_rain_i
+                    ]
+                ).T
+            )
             X[~np.isfinite(X)] = 0
             assert np.all(np.isfinite(X))
             y = np.matrix(data_trans[rain_i, rain_mask]).T
             beta = (X.T * X).I * X.T * y
-            rain_reg = np.array(data_trans[non_rain_i].T * beta)  #[:, rain_i]
+            rain_reg = np.array(data_trans[non_rain_i].T * beta)  # [:, rain_i]
             return my.rel_ranks(rain_reg[~rain_mask])
-
 
         if method == "distance":
             dist_ranks = calc_dist_ranks_distance()
@@ -1120,22 +1289,28 @@ class VGBase(object):
 
         if self.plot:
             import matplotlib.pyplot as plt
+
             print("Wet means in std-n:")
             # calculate means of non-rain variables during wet conditions
             non_rain = data_trans[non_rain_i]
             non_rain_finite = np.where(np.isfinite(rain), non_rain, np.nan)
-            wet_means = self._wet_means_by_doy(non_rain_finite, rain_mask)
+            wet_means = self._wet_means_by_doy(
+                non_rain_finite, rain_mask, doy_mask, fft_order
+            )
 
-            non_rain_var_names = (var_name for var_name in var_names
-                                  if var_name != "R")
+            non_rain_var_names = (
+                var_name for var_name in var_names if var_name != "R"
+            )
             for var_name, wet_mean in zip(non_rain_var_names, wet_means):
                 print("\t%s: %.3f" % (var_name, wet_mean.mean()))
 
             fig, axs = plt.subplots(nrows=2)
-            axs[0].plot(self.times, data_trans[rain_i], "-x",
-                        label="rain trans")
-            axs[0].plot(self.times[~rain_mask], neg_rain, "-x",
-                        label="neg rain")
+            axs[0].plot(
+                self.times, data_trans[rain_i], "-x", label="rain trans"
+            )
+            axs[0].plot(
+                self.times[~rain_mask], neg_rain, "-x", label="neg rain"
+            )
             axs[0].plot(self.times, distributions.norm.ppf(1 - rain_prob))
             # dists_wet = np.sum(wet_means - non_rain[:, rain_mask], axis=0)
             # dists_ranks_wet = my.rel_ranks(-dists_wet)
@@ -1148,28 +1323,37 @@ class VGBase(object):
 
             # axs[1].scatter(data_trans[rain_i, rain_mask],
             #                neg_rain_wet, marker="x")
-            X = np.matrix(np.array([data_trans[i, rain_mask]
-                                    for i in non_rain_i]).T)
+            X = np.matrix(
+                np.array([data_trans[i, rain_mask] for i in non_rain_i]).T
+            )
             y = np.matrix(data_trans[rain_i, rain_mask]).T
             beta = (X.T * X).I * X.T * y
-            rain_reg = np.array(data_trans[non_rain_i].T * beta)  #[:, rain_i]
-            axs[1].scatter(data_trans[rain_i, rain_mask], rain_reg[rain_mask],
-                           marker="+", facecolor="green")
+            rain_reg = np.array(data_trans[non_rain_i].T * beta)  # [:, rain_i]
+            axs[1].scatter(
+                data_trans[rain_i, rain_mask],
+                rain_reg[rain_mask],
+                marker="+",
+                facecolor="green",
+            )
 
             axs[1].set_aspect("equal")
         return data_trans
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     np.random.seed(0)
     warnings.simplefilter("error", RuntimeWarning)
     import matplotlib.pyplot as plt
     import vg
     import config_konstanz as conf
+
     vg.conf = vg.vg_base.conf = vg.vg_plotting.conf = conf
-    met_vg = vg.VG(("R", "theta", "ILWR", "Qsw", "rh", "u", "v"),
-                   refit="R",
-                   verbose=True, plot=True)
+    met_vg = vg.VG(
+        ("R", "theta", "ILWR", "Qsw", "rh", "u", "v"),
+        refit="R",
+        verbose=True,
+        plot=True,
+    )
     met_vg.fit(p=3)
     simt, sim = met_vg.simulate()
     # met_vg.plot_exceedance_daily()
