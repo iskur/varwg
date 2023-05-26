@@ -68,7 +68,7 @@ def daily_wind(met, sum_interval=24):
 def met_as_array(met, p=0, T=None, var_names=None):
     """Returns the met - dictionary as an array. Rows are sorted
     alpha-numerically according to the variable names."""
-    var_names = sorted(met.keys()) if var_names is None else var_names
+    var_names = list(met.keys()) if var_names is None else var_names
     K = len(var_names)
     if T is None:
         T = len(met[var_names[0]]) - p
