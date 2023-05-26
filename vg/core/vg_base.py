@@ -2,6 +2,7 @@ import copy
 import datetime
 import os
 import shelve
+from pickle import UnpicklingError
 import re
 import shlex
 import sys
@@ -1055,7 +1056,13 @@ class VGBase(object):
             else:
                 if self.verbose:
                     print("\tRecover previous fit from shelve for: ", var_name)
-                seas_class, dist_class, solution = sh[solution_key]
+                try:
+                    seas_class, dist_class, solution = sh[solution_key]
+                except UnpicklingError:
+                    self._fit_distribution(
+                        sh, var, var_name, solution_key, **kwds
+                    )
+                    seas_class, dist_class, solution = sh[solution_key]
                 try:
                     supplements = sh[solution_key + "suppl"]
                 except KeyError:
