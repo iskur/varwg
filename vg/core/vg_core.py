@@ -384,7 +384,7 @@ class VG(vg_plotting.VGPlotting):
             dump_data=dump_data,
             non_rain=non_rain,
             rain_method=rain_method,
-            **met_kwds
+            **met_kwds,
         )
         # simulated residuals
         self.ut = None
@@ -703,11 +703,11 @@ class VG(vg_plotting.VGPlotting):
                 _signal = np.array(
                     [_ for _ in climate_signal if _ is not None]
                 )
-                self.T = _signal.shape[1]
+                self.T_sim = np.atleast_2d(_signal).shape[1]
             else:
-                self.T = self.T_summed
+                self.T_sim = self.T_summed
         else:
-            self.T = T
+            self.T_sim = T
 
         # we depend on order selection if self.fit was not called
         if self.p is None and sim_func is None:
@@ -716,9 +716,9 @@ class VG(vg_plotting.VGPlotting):
         self.sim_times = self._gen_sim_times(
             start_str=start_str, stop_str=stop_str
         )
-        # self.T has to be reset when self._gen_sim_times is called, but not
+        # self.T_sim has to be reset when self._gen_sim_times is called, but not
         # inside self.disaggregate
-        self.T = len(self.sim_times)
+        self.T_sim = len(self.sim_times)
 
         # converts the given parameters so they are understood in the
         # std-normal world
@@ -763,27 +763,27 @@ class VG(vg_plotting.VGPlotting):
                     self.data_trans,
                     self.times,
                     self.p,
-                    n_sim_steps=self.T,
+                    n_sim_steps=self.T_sim,
                     theta_incr=m_resampler,
                     theta_i=self.primary_var_ii,
                     cache_dir=conf.cache_dir,
                     verbose=self.verbose,
                     return_candidates=True,
-                    **(res_kwds - "cy")
+                    **(res_kwds - "cy"),
                 )
             else:
                 sim, self.res_indices, self.candidates = resampler.resample(
                     data=self.data_trans,
                     dtimes=self.times,
                     p=self.p,
-                    n_sim_steps=self.T,
+                    n_sim_steps=self.T_sim,
                     theta_incr=m_resampler,
                     bias=None,
                     theta_i=self.primary_var_ii,
                     cache_dir=conf.cache_dir,
                     verbose=self.verbose,
                     return_candidates=True,
-                    **res_kwds
+                    **res_kwds,
                 )
         elif self.q in (0, None):
             # simulate VAR-time-series
@@ -807,7 +807,7 @@ class VG(vg_plotting.VGPlotting):
                     sim = models.VAR_LS_sim_asy(
                         self.AM,
                         self.sigma_u,
-                        self.T,
+                        self.T_sim,
                         self.data_trans,
                         self.p,
                         skewed_i=asy,
@@ -820,7 +820,7 @@ class VG(vg_plotting.VGPlotting):
                     sim = models.VAR_LS_sim(
                         self.AM,
                         self.sigma_u,
-                        self.T,
+                        self.T_sim,
                         m,
                         ia=m_t,
                         m_trend=m_trend,
@@ -832,7 +832,7 @@ class VG(vg_plotting.VGPlotting):
                     sim, self.ex_out = models.VAREX_LS_sim(
                         self.AM,
                         self.sigma_u,
-                        self.T,
+                        self.T_sim,
                         ex,
                         m,
                         ia=m_t,
@@ -850,7 +850,7 @@ class VG(vg_plotting.VGPlotting):
                 # starting values there is some
                 # confusion here...
                 self.means,
-                self.T,
+                self.T_sim,
                 m,
                 ia=m_t,
                 m_trend=m_trend,
@@ -1029,7 +1029,7 @@ class VG(vg_plotting.VGPlotting):
         # index modifier below
         tpd = len(hours_unique)
         self.dis_times = self._gen_sim_times(
-            self.T * tpd, output_resolution=1.0
+            self.T_sim * tpd, output_resolution=1.0
         )
 
         def trans(data, doys):
@@ -1070,7 +1070,13 @@ class VG(vg_plotting.VGPlotting):
         return self.dis_times, sim_sea_dis
 
     def disaggregate(
-        self, var_names_dis=None, event_dt=None, factors=None, doy_tolerance=15
+        self,
+        var_names_dis=None,
+        event_dt=None,
+        factors=None,
+        doy_tolerance=15,
+        latitude=None,
+        longitude=None,
     ):
         """Disaggregate variables to hourly time steps by drawing from the
         residuals of the measured data
@@ -1114,7 +1120,7 @@ class VG(vg_plotting.VGPlotting):
         tpd = len(hours_unique)
 
         self.dis_times = self._gen_sim_times(
-            (self.T - 1) * tpd, output_resolution=1.0
+            (self.T_sim - 1) * tpd, output_resolution=1.0
         )
 
         if factors is not None:
@@ -1207,7 +1213,7 @@ class VG(vg_plotting.VGPlotting):
         # ax.plot(sim_sea_dis[0], "-o", label="sim_sea_dis")
         # ax.plot(sim_interps[0], "-x", label="sim_interps")
         # daily_rain_out = self.sim_sea[self.var_names.index("R")]
-        # m = self.T * tpd - tpd
+        # m = self.T_sim * tpd - tpd
         # rain_mask_out = (daily_rain_out > 0).repeat(tpd)[:m]
         # for start_i, end_i in my.gaps(rain_mask_out):
         #     ax.axvspan(start_i, end_i, alpha=.5)
@@ -1627,7 +1633,7 @@ class VG(vg_plotting.VGPlotting):
     ):
         theta_incr = self.theta_incr[prim_i]
         if np.isnan(theta_incr):
-            self._m_single += [np.zeros((self.K, self.T))]
+            self._m_single += [np.zeros((self.K, self.T_sim))]
             return self._m_single[-1]
 
         intercept = (
@@ -1650,7 +1656,7 @@ class VG(vg_plotting.VGPlotting):
     def _gen_m_t(
         self, prim_i, prim_index, prim_is_normal, sigma, scale, scale_nn, _T
     ):
-        m_t = np.zeros((self.K, self.T))
+        m_t = np.zeros((self.K, self.T_sim))
         # das war an der Tafel im Seminarraum 2:
         # mean_arrival: mittlere Zeit zwischen Aenderungen (kalte/warme
         # Perioden)
@@ -1664,7 +1670,7 @@ class VG(vg_plotting.VGPlotting):
             else:
                 disturbance_std = np.mean(scale_nn(disturbance_std))
             m_t_primvar = interannual_variability(
-                self.T, mean_arrival, disturbance_std
+                self.T_sim, mean_arrival, disturbance_std
             )
             m_t += m_t_primvar * scale.reshape((self.K, 1))
 
@@ -1714,7 +1720,7 @@ class VG(vg_plotting.VGPlotting):
     def _scenario_parameters(self):
         """Prepares the scenario parameters, m and m_trend for the
         std.-normal world."""
-        m = np.zeros((self.K, self.T))
+        m = np.zeros((self.K, self.T_sim))
         m_t = np.zeros_like(m)
         m_trend = np.zeros(self.K)
         ScenParameters = namedtuple(
@@ -1795,7 +1801,7 @@ class VG(vg_plotting.VGPlotting):
                         scale_nn,
                     )
                 else:
-                    self._m_single += [np.zeros((self.K, self.T))]
+                    self._m_single += [np.zeros((self.K, self.T_sim))]
 
                 m_t += self._gen_m_t(
                     prim_i,
@@ -1820,11 +1826,11 @@ class VG(vg_plotting.VGPlotting):
     def _location_shift_normal(self, sim):
         for prim_i, prim in enumerate(self.primary_var):
             prim_index = self.var_names.index(prim)
-            dummy_time = np.arange(self.T, dtype=float)
+            dummy_time = np.arange(self.T_sim, dtype=float)
             m = self._m_single[prim_i][prim_index]
             m_t = self._m_t_single[prim_i][prim_index]
             m_trend = self._m_trend_single[prim_i][prim_index]
-            sim[prim_index] -= m + m_t + dummy_time / self.T * m_trend
+            sim[prim_index] -= m + m_t + dummy_time / self.T_sim * m_trend
         return sim
 
     def _location_shift_back(self, sim_sea):
@@ -1839,8 +1845,8 @@ class VG(vg_plotting.VGPlotting):
             if self.theta_grad is not None:
                 theta_grad = self.theta_grad[prim_i]
                 if not np.isnan(theta_grad):
-                    dummy_time = np.arange(self.T, dtype=float)
-                    sim_sea[prim_index] += dummy_time / self.T * theta_grad
+                    dummy_time = np.arange(self.T_sim, dtype=float)
+                    sim_sea[prim_index] += dummy_time / self.T_sim * theta_grad
 
             if self.climate_signal is not None:
                 if self.climate_signal[prim_i] is not None:
@@ -1899,9 +1905,9 @@ class VG(vg_plotting.VGPlotting):
             Datetimes of the events. Can be passed to VG.disaggregate later.
         """
         if T is None:
-            self.T = self.T_summed
+            self.T_sim = self.T_summed
         else:
-            self.T = T
+            self.T_sim = T
         self.sim_times = self._gen_sim_times(T, start_str, stop_str)
         if n_events is None:
             n_events = 3 * int(len(self.sim_doys) / 365.0)

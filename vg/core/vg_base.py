@@ -362,7 +362,7 @@ class VGBase(object):
         self.p = self.q = None
 
         # these attributes will be populated in simulate() and disaggregate()
-        self.T = self.mean_arrival = self.disturbance_std = None
+        self.T_sim = self.mean_arrival = self.disturbance_std = None
         self.theta_incr = self.theta_grad = self.fixed_variables = None
         self.primary_var = self.climate_signal = self.start_date = None
         self.m_t = self.sim = self.sim_sea = self.sim_times = None
@@ -597,7 +597,7 @@ class VGBase(object):
         # last day (24 hours)
         # size of pool we can draw from:
         nn = self.T_data // tpd * tpd - tpd
-        m = self.T * tpd - tpd  # no of hourly timesteps (simulated)
+        m = self.T_sim * tpd - tpd  # no of hourly timesteps (simulated)
         sim_sea_dis = self.sim_sea.repeat(tpd).reshape(-1, m + tpd)[:, :-tpd]
         deltas_input = np.zeros((self.K, nn))
         sim_interps = np.copy(sim_sea_dis)
@@ -670,7 +670,7 @@ class VGBase(object):
                 deltas_input[var_i, pos_mask] = upper_perc
 
             # not a real 'time' as above
-            hourly_output_times = np.arange(self.T * tpd)
+            hourly_output_times = np.arange(self.T_sim * tpd)
             # interpolate between daily values (simulation)
             f_interp = interpolate.interp1d(
                 hourly_output_times[::tpd], self.sim_sea[var_i]
@@ -701,7 +701,7 @@ class VGBase(object):
         nan_mask = np.any(np.isnan(deltas_input), axis=0)
         # size of pool we can draw from:
         nn = self.T_data // tpd * tpd - tpd
-        m = self.T * tpd - tpd  # no of hourly timesteps (simulated)
+        m = self.T_sim * tpd - tpd  # no of hourly timesteps (simulated)
         # TODO: Check for fitted Rain instances explicitly!
         if "R" in var_names_dis:
             deltas_drawn = np.empty((len(var_names_dis), m))
@@ -884,7 +884,7 @@ class VGBase(object):
         """Convert the data to standard-normal an put it into (K,T)-array form."""
         if self.fixed_variables:
             sh = shelve.open(self.seasonal_cache_file, "c")
-            fixed_data = np.nan * np.empty((self.K, self.T))
+            fixed_data = np.nan * np.empty((self.K, self.T_sim))
             for var_name, values in list(self.fixed_variables.items()):
                 var_ii = self.var_names.index(var_name)
                 if values is None:
@@ -940,10 +940,8 @@ class VGBase(object):
         array([2000-01-01 00:00:00, 2000-01-03 00:00:00, 2000-01-05 00:00:00,
               2000-01-07 00:00:00], dtype=object)
         """
-        if T is not None and output_resolution is None:
-            self.T = T
-        elif T is None:
-            T = self.T
+        if T is None:
+            T = self.T_sim
         if output_resolution is None:
             output_resolution = self.output_resolution
         # produce sim_doys and times_out:
