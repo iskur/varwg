@@ -334,14 +334,14 @@ class VGBase(object):
                 # py2/3 are incompatible here, so we write different cache
                 # files depending on the python version
                 name_parts = self.seasonal_cache_file.rsplit(".")
-                self.seasonal_cache_file = ".".join(
-                    (
-                        name_parts[0],
-                        "_",
-                        "py2" if PY2 else "py3",
-                        name_parts[1],
-                    )
+                self.seasonal_cache_file = "%s_%s.%s" % (
+                    name_parts[0],
+                    "py2" if PY2 else "py3",
+                    ".".join(name_parts[1:]),
                 )
+        if not os.path.exists(self.cache_dir):
+            os.makedirs(self.cache_dir)
+
         self.dump = dump_data
         # will be used in _load_and_prepare_data
         self.met = self.times_orig = None
