@@ -29,15 +29,6 @@ from vg.core import vg_base, vg_plotting
 
 read_met = vg_base.read_met
 
-# import pyximport
-# pyximport.install(setup_args={'include_dirs': np.get_include(),
-#                               # 'gdb_debug': True
-#                               },
-#                   inplace=True,
-#                   reload_support=True)
-
-from vg.time_series_analysis import cresample
-
 try:
     from vg import config as conf
 except ImportError:
@@ -490,7 +481,7 @@ class VG(vg_plotting.VGPlotting):
 
                     B, self.sigma_u = models.VAR_LS_extro(
                         self.data_trans,
-                        self.data_raw / self.sum_interval,
+                        (self.data_raw / self.sum_interval),
                         transforms,
                         backtransforms,
                         p=self.p,
@@ -664,7 +655,14 @@ class VG(vg_plotting.VGPlotting):
         # we record the random state to later dump it
         pre_sim_random_state = np.random.get_state()
 
-        self.T = T
+        if mean_arrival is None and disturbance_std is not None:
+            raise RuntimeError(
+                "Must specify mean_arrival if disturbance_std is given."
+            )
+        if disturbance_std is None and mean_arrival is not None:
+            raise RuntimeError(
+                "Must specify disturbance_std if mean_arrival is given."
+            )
         (
             self.disturbance_std,
             self.theta_incr,
@@ -692,7 +690,7 @@ class VG(vg_plotting.VGPlotting):
             self.primary_var = primary_var
         for var_name in self.primary_var:
             if var_name not in self.var_names:
-                raise ValueError("primary_var not in var_names")
+                raise ValueError(f"{primary_var=} not in {self.var_names=}")
 
         if T is None:
             if climate_signal is not None:
@@ -716,8 +714,8 @@ class VG(vg_plotting.VGPlotting):
         self.sim_times = self._gen_sim_times(
             start_str=start_str, stop_str=stop_str
         )
-        # self.T_sim has to be reset when self._gen_sim_times is called, but not
-        # inside self.disaggregate
+        # self.T_sim has to be reset when self._gen_sim_times is
+        # called, but not inside self.disaggregate
         self.T_sim = len(self.sim_times)
 
         # converts the given parameters so they are understood in the
@@ -858,7 +856,7 @@ class VG(vg_plotting.VGPlotting):
                 u=residuals,
             )
 
-        if self.plot:
+        if self.plot and self.sigma_u is not None:
             ts.matr_img(
                 self.sigma_u,
                 "Noise Covariance matrix",
@@ -986,7 +984,7 @@ class VG(vg_plotting.VGPlotting):
         data_hourly = vg_base.met_as_array(self.met, var_names=self.var_names)
         # the nans mess up the calculation of the covariance matrix
         data_hourly = data_hourly[:, np.all(np.isfinite(data_hourly), axis=0)]
-        if isinstance(self.sum_interval, collections.Iterable):
+        if isinstance(self.sum_interval, collections.abc.Iterable):
             warnings.warn(
                 "Per-variable sum_interval is not supported " "anymore."
             )
