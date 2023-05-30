@@ -22,7 +22,7 @@ from vg.time_series_analysis import (
     seasonal_distributions as sd,
     models,
 )
-from .. import ctimes
+from vg import ctimes
 
 
 try:
