@@ -367,6 +367,7 @@ class VGBase(object):
         self.m_t = self.sim = self.sim_sea = self.sim_times = None
         self.outfilepath = self.sim_sea_dis = self.dis_times = None
         self.var_names_dis = self.ex_in = self.ex_out = None
+        self.svar_doy_width = self.svar_fft_order = None
 
         # cached attributes
         self._data_doys = self._data_doys_raw = None
