@@ -311,6 +311,8 @@ class VGBase(object):
         dump_data=True,
         non_rain=None,
         rain_method=None,
+        neg_rain_doy_width=30,
+        neg_rain_fft_order=2,
         **met_kwds,
     ):
         # external_var_names=None,
@@ -390,13 +392,17 @@ class VGBase(object):
         if "R" in self.var_names:
             if self.verbose:
                 print("Transforming 'negative rain'")
+            # populated in negative_rain
+            self.rain_mask = np.ones(self.T_summed, dtype=bool)
             rain_i = self.var_names.index("R")
             rain = self.data_raw[rain_i]
             self.data_trans = self._negative_rain(
                 self.data_trans,
                 rain,
                 self.data_doys,
-                non_rain,
+                doy_width=neg_rain_doy_width,
+                fft_order=neg_rain_fft_order,
+                var_names=non_rain,
                 method=rain_method,
             )
 
@@ -1172,23 +1178,75 @@ class VGBase(object):
     def dist_sol_hourly(self, var_name):
         return self.dist_sol["%s_hourly" % var_name]
 
-    def _wet_means_by_doy(self, non_rain_finite, rain_mask):
-        df = pd.DataFrame(non_rain_finite.T, index=self.times)
-        df[~rain_mask] = np.nan
-        n_doys = len(np.unique(df.index.dayofyear))
-        doy_means = (
-            df.groupby(df.index.dayofyear)
-            .mean()
-            .apply(my.interp_nan, axis=0)
-            .apply(
-                lambda x: my.fourier_approx(x, order=2, size=n_doys), axis=0
+    def _wet_means_by_doy(
+        self, non_rain_finite, rain_mask, doy_mask, fft_order
+    ):
+        wet_means_by_doy = np.empty((doy_mask.shape[0], len(non_rain_finite)))
+        for doy_i, doy_mask_ in enumerate(doy_mask):
+            wet_means_by_doy[doy_i] = np.nanmean(
+                non_rain_finite[:, doy_mask_], axis=1
             )
-        )
+        wet_means_by_doy = np.array(
+            [
+                my.fourier_approx(my.interp_nan(x), order=fft_order)
+                for x in wet_means_by_doy.T
+            ]
+        ).T
         dry_doys = times.datetime2doy(self.times[~rain_mask])
-        return doy_means.ix[dry_doys].as_matrix().T
+        wet_means_by_doy = pd.DataFrame(
+            wet_means_by_doy, index=np.arange(1, doy_i + 2)
+        )
+        return wet_means_by_doy.reindex(dry_doys).values.T
+
+    def _wet_stds_by_doy(
+        self, non_rain_finite, rain_mask, doy_mask, fft_order
+    ):
+        wet_stds_by_doy = np.empty((doy_mask.shape[0], len(non_rain_finite)))
+        for doy_i, doy_mask_ in enumerate(doy_mask):
+            wet_stds_by_doy[doy_i] = np.nanstd(
+                non_rain_finite[:, doy_mask_], axis=1
+            )
+        wet_stds_by_doy = np.array(
+            [
+                my.fourier_approx(my.interp_nan(x), order=fft_order)
+                for x in wet_stds_by_doy.T
+            ]
+        ).T
+        dry_doys = times.datetime2doy(self.times[~rain_mask])
+        wet_stds_by_doy = pd.DataFrame(
+            wet_stds_by_doy, index=np.arange(1, doy_i + 2)
+        )
+        return wet_stds_by_doy.reindex(dry_doys).values.T
+
+    def _betas_by_doy(self, X, y, rain_mask, doy_mask, fft_order):
+        betas_by_doy = np.empty((doy_mask.shape[0], X.shape[1]))
+        for doy_i, doy_mask_ in enumerate(doy_mask):
+            X_doy = X[doy_mask_]
+            y_doy = y[doy_mask_]
+            beta = np.linalg.inv(X_doy.T @ X_doy) @ X_doy.T @ y_doy
+            betas_by_doy[doy_i] = beta
+        betas_by_doy = np.array(
+            [
+                my.fourier_approx(my.interp_nan(x), order=fft_order)
+                for x in betas_by_doy.T
+            ]
+        ).T
+        dry_doys = times.datetime2doy(self.times[~rain_mask])
+        betas_by_doy = pd.DataFrame(
+            betas_by_doy, index=np.arange(1, doy_i + 2)
+        )
+        return betas_by_doy.reindex(dry_doys).values.T
 
     def _negative_rain(
-        self, data_trans, rain, doys, var_names=None, method="regression"
+        self,
+        data_trans,
+        rain,
+        doys,
+        *,
+        doy_width,
+        fft_order,
+        var_names=None,
+        method="regression",
     ):
         """
         Transform rain-gaps to standard-normal by distance to wet conditions.
@@ -1203,69 +1261,152 @@ class VGBase(object):
         var_names : None or sequence of str, optional
             Non-rain variables to use.
         """
+        if doys[1] - doys[0] < 1:
+            rain_dist, sol = self.dist_sol_hourly("R")
+        else:
+            rain_dist, sol = self.dist_sol["R"]
+
+        if isinstance(rain_dist, distributions._Rain):
+            rain_prob = rain_dist.all_parameters_dict(sol, doys)["rain_prob"]
+        else:
+            rain_prob = rain_dist.rain_probs(conf.threshold, doys)
+        dry_prob = 1 - rain_prob
+
         rain_i = self.var_names.index("R")
         if var_names is None:
-            var_names = self.var_names
-        non_rain_i = [
-            self.var_names.index(var_name)
-            for var_name in var_names
-            if var_name != "R"
-        ]
-        threshold = (
-            conf.dists_kwds["R"]["threshold"] / self.sum_interval_dict["R"]
-        )
+            var_names = [name for name in self.var_names if name != "R"]
+        if ("abs_hum" in var_names) and ("abs_hum" not in self.var_names):
+            if "rh" not in self.var_names and "theta" not in self.var_names:
+                raise RuntimeError(
+                    "Calculation of abs_hum in _negative_rain "
+                    "requires theta and rh"
+                )
+            abs_hum = meteox2y.rel2abs_hum(
+                data_trans[self.var_names.index("rh")],
+                data_trans[self.var_names.index("theta")],
+            )
+            var_names = tuple(
+                var_name for var_name in var_names if var_name != "abs_hum"
+            )
+            non_rain = data_trans[
+                [
+                    self.var_names.index(var_name)
+                    for var_name in var_names
+                    if var_name != "R"
+                ]
+            ]
+            non_rain = np.vstack((abs_hum[None, :], non_rain))
+        else:
+            non_rain = data_trans[
+                [
+                    self.var_names.index(var_name)
+                    for var_name in var_names
+                    if var_name != "R"
+                ]
+            ]
+        threshold = conf.threshold
         rain_finite = np.where(np.isfinite(rain), rain, 0)
-        rain_mask = (rain_finite / self.sum_interval_dict["R"]) >= threshold
+        rain_mask = rain_finite >= threshold
+        dry_mask = ~rain_mask
+        self.rain_mask = rain_mask
+        doy_mask = sd.seasonal.build_doy_mask(doys, doy_width)
 
         def calc_dist_ranks_distance():
             # calculate means of non-rain variables during wet conditions
-            non_rain = data_trans[non_rain_i]
             non_rain_finite = np.where(np.isfinite(rain), non_rain, np.nan)
-            wet_means = self._wet_means_by_doy(non_rain_finite, rain_mask)
-            # distance between current vector of non-rain variables and mean of
-            # wet conditions
-            distances = np.sum(wet_means - non_rain[:, ~rain_mask], axis=0)
+            wet_means = self._wet_means_by_doy(
+                non_rain_finite, rain_mask, doy_mask, fft_order
+            )
+            # dry seasons are special!
+            dry_means = self._wet_means_by_doy(
+                non_rain_finite, dry_mask, doy_mask, fft_order
+            )
+            wet_means[:, rain_prob[dry_mask] < 0.05] = dry_means.mean(axis=1)[
+                :, None
+            ]
+            wet_stds = self._wet_stds_by_doy(
+                non_rain_finite, rain_mask, doy_mask, fft_order
+            )
+
+            # distance between current vector of non-rain variables
+            # and mean of wet conditions
+            distances = np.sum(
+                (wet_means - non_rain[:, dry_mask]) / wet_stds, axis=0
+            )
             # qq-transform the inverse distances to the lower tail of
             # the gaussian
             return my.rel_ranks(-distances)
 
         def calc_dist_ranks_regression():
-            X = np.matrix(
-                np.array(
-                    [
-                        my.interp_nan(data_trans[i, rain_mask], max_interp=2)
-                        for i in non_rain_i
-                    ]
-                ).T
-            )
+            X = np.array(
+                [
+                    my.interp_nan(non_rain_var, max_interp=2)
+                    for non_rain_var in non_rain
+                ]
+            ).T
             X[~np.isfinite(X)] = 0
-            assert np.all(np.isfinite(X))
-            y = np.matrix(data_trans[rain_i, rain_mask]).T
-            beta = (X.T * X).I * X.T * y
-            rain_reg = np.array(data_trans[non_rain_i].T * beta)  # [:, rain_i]
-            return my.rel_ranks(rain_reg[~rain_mask])
+            y = data_trans[rain_i]
+            betas = self._betas_by_doy(X, y, rain_mask, doy_mask, fft_order)
+            rain_reg = (non_rain[:, dry_mask] * betas).sum(axis=0)
+            return my.rel_ranks(rain_reg)
+
+        def calc_dist_ranks_simulation():
+            rain_trans = np.where(rain_mask, data_trans[rain_i], np.nan)
+            data_for_sim = np.vstack((non_rain, rain_trans))
+            p = 3  # TODO: make this configurable!
+            B, sigma_u = models.VAR_LS(data_for_sim, p)
+
+            def bottom_stack(matrix):
+                return np.moveaxis(np.squeeze(self.T_summed * [matrix]), 0, -1)
+
+            Bs, sigma_us = map(bottom_stack, (B, sigma_u))
+            try:
+                A = np.linalg.cholesky(sigma_u)
+            except np.linalg.LinAlgError:
+                sigma_u.ravel()[:: self.K + 1] += rng.normal(self.K) * 1e-6
+                A = np.linalg.cholesky(sigma_u)
+            data_infilled = models.SVAR_LS_fill(
+                Bs, sigma_us, self.data_doys, data_for_sim, A=A
+            )
+            return my.rel_ranks(data_infilled[-1, dry_mask])
 
         if method == "distance":
             dist_ranks = calc_dist_ranks_distance()
         elif method == "regression":
             dist_ranks = calc_dist_ranks_regression()
+        elif method == "simulation":
+            dist_ranks = calc_dist_ranks_simulation()
+
+        # import matplotlib.pyplot as plt
+        # fig, axs = plt.subplots(nrows=2, ncols=1)
+        # r_dist = calc_dist_ranks_distance()
+        # r_regr = calc_dist_ranks_regression()
+        # axs[0].plot(r_dist, label="dist")
+        # axs[0].plot(r_regr, label="regr")
+        # axs[1].scatter(r_dist, r_regr)
+        # plt.show()
+
+        self.rain_method = method
+        self.neg_rain_doy_width = doy_width
+        self.neg_rain_fft_order = fft_order
 
         # dryness probability in the standard-normal domain
-        if doys[1] - doys[0] < 1:
-            rain_dist, sol = self.dist_sol_hourly("R")
-        else:
-            rain_dist, sol = self.dist_sol["R"]
-        rain_prob = rain_dist.all_parameters_dict(sol, doys)["rain_prob"]
-        dry_prob = 1 - rain_prob
-        neg_rain = distributions.norm.ppf(dist_ranks * dry_prob[~rain_mask])
-        data_trans[rain_i, ~rain_mask] = neg_rain
+        neg_rain = distributions.norm.ppf(dist_ranks * dry_prob[dry_mask])
+        # normalize variance during dry spells
+        # neg_rain *= (np.nanstd(data_trans[rain_i, rain_mask])
+        #              / neg_rain.std())
+        data_trans[rain_i, dry_mask] = neg_rain
+        # data_trans[rain_i] /= np.nanstd(data_trans[rain_i])
+
+        # assert np.all(data_old[rain_i, rain_mask] ==
+        #               data_trans[rain_i, rain_mask])
 
         if self.plot:
             import matplotlib.pyplot as plt
 
             print("Wet means in std-n:")
             # calculate means of non-rain variables during wet conditions
-            non_rain = data_trans[non_rain_i]
+            # non_rain = data_trans[non_rain_i]
             non_rain_finite = np.where(np.isfinite(rain), non_rain, np.nan)
             wet_means = self._wet_means_by_doy(
                 non_rain_finite, rain_mask, doy_mask, fft_order
@@ -1277,14 +1418,38 @@ class VGBase(object):
             for var_name, wet_mean in zip(non_rain_var_names, wet_means):
                 print("\t%s: %.3f" % (var_name, wet_mean.mean()))
 
-            fig, axs = plt.subplots(nrows=2)
+            print(f"{self.var_names=}")
+            print(f"{np.nanstd(data_trans[:, rain_mask], axis=1).round(3)=}")
+            print(f"{np.nanstd(data_trans[:, dry_mask], axis=1).round(3)=}")
+            print(f"{np.nanstd(data_trans, axis=1).round(3)=}")
+
+            # fig, axs = plt.subplots(nrows=2)
+            fig, ax = plt.subplots(nrows=1, ncols=1)
+            axs = (ax,)
             axs[0].plot(
                 self.times, data_trans[rain_i], "-x", label="rain trans"
             )
+            axs[0].plot(self.times[dry_mask], neg_rain, "-x", label="neg rain")
             axs[0].plot(
-                self.times[~rain_mask], neg_rain, "-x", label="neg rain"
+                self.times,
+                distributions.norm.ppf(1 - rain_prob),
+                label="rain thresh",
             )
-            axs[0].plot(self.times, distributions.norm.ppf(1 - rain_prob))
+            # for var_i, var_name in enumerate(var_names):
+            #     axs[0].plot(self.times[dry_mask],
+            #                 wet_means[var_i], "-+",
+            #                 label=f"wet_mean {var_name}")
+            axs[0].plot(self.times, rain_prob, label="rain_prob")
+            from vg.time_series_analysis import phase_randomization as pr
+
+            rain_sim = pr.randomize2d(
+                data_trans,
+                # taboo_period_min=150,
+                # taboo_period_max=400
+            )[rain_i]
+            axs[0].plot(
+                self.times, rain_sim, label="pr", linewidth=0.5, alpha=0.25
+            )
             # dists_wet = np.sum(wet_means - non_rain[:, rain_mask], axis=0)
             # dists_ranks_wet = my.rel_ranks(-dists_wet)
             # neg_rain_wet = distributions.norm.ppf(dry_prob[rain_mask] +
@@ -1293,23 +1458,32 @@ class VGBase(object):
             # axs[0].plot(self.times[rain_mask], neg_rain_wet, "-x")
             # axs[0].plot(self.times, rain_reg)
             axs[0].legend(loc="best")
+            axs[0].grid(True)
 
-            # axs[1].scatter(data_trans[rain_i, rain_mask],
-            #                neg_rain_wet, marker="x")
-            X = np.matrix(
-                np.array([data_trans[i, rain_mask] for i in non_rain_i]).T
-            )
-            y = np.matrix(data_trans[rain_i, rain_mask]).T
-            beta = (X.T * X).I * X.T * y
-            rain_reg = np.array(data_trans[non_rain_i].T * beta)  # [:, rain_i]
-            axs[1].scatter(
-                data_trans[rain_i, rain_mask],
-                rain_reg[rain_mask],
-                marker="+",
-                facecolor="green",
-            )
+            # # axs[1].scatter(data_trans[rain_i, rain_mask],
+            # #                neg_rain_wet, marker="x")
+            # X = np.array([data_trans[i, rain_mask] for i in non_rain_i]).T
+            # y = data_trans[rain_i, rain_mask].T
+            # beta = np.linalg.inv(X.T @ X) @ X.T @ y
+            # rain_reg = np.array(data_trans[non_rain_i].T * beta)
+            # __import__('pdb').set_trace()
+            # axs[1].scatter(
+            #     data_trans[rain_i, rain_mask],
+            #     rain_reg[rain_mask, rain_i],
+            #     marker="+",
+            #     facecolor="green",
+            # )
+            # axs[1].set_aspect("equal")
 
-            axs[1].set_aspect("equal")
+            # from vg.time_series_analysis import time_series as ts
+            # __import__('pdb').set_trace()
+            # ts.plot_auto_corr(np.array((data_trans[rain_i], rain_sim)),
+            #                   var_names=("obs", "sim"))
+            # fig, ax = plt.subplots(nrows=1, ncols=1)
+            # ax.acorr(data_trans[rain_i], usevlines=False, label="obs")
+            # ax.acorr(rain_sim, usevlines=False, label="sim")
+            # ax.legend(loc="best")
+
         return data_trans
 
 
@@ -1325,6 +1499,8 @@ if __name__ == "__main__":
         ("R", "theta", "ILWR", "Qsw", "rh", "u", "v"),
         # refit="R",
         verbose=True,
+        neg_rain_doy_width=35,
+        neg_rain_fft_order=3,
         plot=True,
     )
     met_vg.fit(p=3)
