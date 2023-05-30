@@ -300,6 +300,7 @@ class VGBase(object):
         var_names,
         met_file=None,
         sum_interval=24,
+        max_nans=12,
         plot=False,
         separator="\t",
         refit=None,
@@ -372,8 +373,8 @@ class VGBase(object):
 
         if self.verbose:
             print("Loading input data.")
-        self.times, self.data_raw = self._load_and_prepare_data(
-            separator, **met_kwds
+        (self.times, self.data_raw) = self._load_and_prepare_data(
+            separator, max_nans=max_nans, **met_kwds
         )
 
         if detrend_vars:
@@ -773,7 +774,7 @@ class VGBase(object):
             sim_sea_dis = sim_interps + deltas_drawn
         return deltas_drawn, sim_sea_dis
 
-    def _load_and_prepare_data(self, delimiter="\t", **met_kwds):
+    def _load_and_prepare_data(self, delimiter="\t", max_nans=12, **met_kwds):
         """Loading the data from the met_file and aggregate it according to
         sum_interval (both defined in __init__). Plus plotting if requested."""
         if not os.path.exists(self.cache_dir):
@@ -811,7 +812,7 @@ class VGBase(object):
         # convert the dictionary into an array.
         # mind the order: alpha-numeric according to var_names
         # will be shorter once summed up
-        T_raw_data = len(self.met[self.var_names[0]])
+        # T_raw_data = len(self.met[self.var_names[0]])
         # self.K corresponds to all variables. the wtemp variables are
         # unfortunately stored someplace else and should be ignored here
         # so for the shape of data, we do not count to K, but something lower
@@ -821,59 +822,36 @@ class VGBase(object):
             for var_name in self.var_names
             if (not var_name.startswith("wtemp") and var_name != "nao")
         ]
-        data = np.empty(
-            (len(var_names_part), old_div(T_raw_data, self.sum_interval[0, 0]))
-        )
-        data[:] = np.nan
+        # data = np.empty((len(var_names_part),
+        #                  old_div(T_raw_data, self.sum_interval[0, 0])))
+        # data[:] = np.nan
+        sum_interval = self.sum_interval[0, 0]
+        # mets = OrderedDict((name, self.met[name])
+        #                    for name in var_names_part)
 
-        for key in var_names_part:
-            var_i = var_names_part.index(key)
-            if self.sum_interval[var_i] > 1:
-                data[var_i], times_ = my.sumup(
-                    self.met[key],
-                    self.sum_interval[var_i],
-                    self.times_orig,
-                    middle_time=False,
-                    sum_to_nan=False,
-                    acceptable_nans=12,
-                )
-            else:
-                data[var_i] = self.met[key]
-                times_ = self.times_orig
+        def sum_to_nan(values):
+            n_nans = np.isnan(values.astype(float)).sum()
+            if n_nans > max_nans:
+                return np.nan
+            # return np.nanmean(values) * sum_interval
+            return np.nansum(values)
+
+        data_df = (
+            pd.DataFrame(
+                data=self.met, index=self.times_orig, columns=var_names_part
+            )
+            .resample("%dH" % sum_interval)
+            .agg(sum_to_nan)
+        )
+
+        data = data_df.values.T
+        times_ = data_df.index.to_pydatetime()
 
         if "U" in self.var_names and "U" not in self.met:
             # the wind has to be aggregated taking the direction into account
             data[self.var_names.index("U")] = daily_wind(
                 self.met, self.sum_interval_dict["U"]
             )[1]
-
-        # if "nao" in self.var_names:
-        #     import nao
-        #     nao_dates, naoi = nao.read_nao()
-        #     self.met["nao"] = naoi[np.where(nao_dates == times_[0])[0]:
-        #                            np.where(nao_dates == times_[-1])[0] + 1]
-        #     var_row = self.var_names.index("nao")
-        #     summed_nao = my.sumup(self.met["nao"], self.sum_interval[var_row])
-        #     if summed_nao.shape[1] < data.shape[1]:
-        #         shape_diff = data.shape[1] - summed_nao.shape[1]
-        #         summed_nao = np.concatenate((np.zeros((1, shape_diff)),
-        #                                      summed_nao), axis=1)
-        #         data = np.insert(data, var_row, summed_nao, axis=0)
-
-        # # check if we are supposed to simulate water temperatures - they are
-        # # stored someplace else
-        # if "wtemp" in "".join(self.var_names):
-        #     met_rivers = read_met(conf.hyd_file)[1]
-        #     self.met.update(met_rivers)
-        #     for var_name in met_rivers.keys():
-        #         if var_name in self.var_names:
-        #             var_row = self.var_names.index(var_name)
-        #             new_data = my.sumup(self.met[var_name],
-        #                                self.sum_interval[var_row])
-        #             # the last measurement of data was dropped in
-        #             # sumup! so loose it also here
-        #             new_data = new_data[:, :data.shape[1]]
-        #             data = np.insert(data, var_row, new_data, axis=0)
 
         return times_, data
 
