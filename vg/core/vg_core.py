@@ -295,7 +295,8 @@ class VG(vg_plotting.VGPlotting):
         rain_method="regression",
         conf_update=None,
         station_name=None,
-        **met_kwds
+        infill=False,
+        **met_kwds,
     ):
         """A vector autoregressive moving average (VARMA) weather generator.
         Initializing a VG-object does the following:
@@ -354,6 +355,8 @@ class VG(vg_plotting.VGPlotting):
         station_name : str or None, optional
             Name of the station. Usefull in combination with
             weathercop multisite generation.
+        infill : boolean, optional
+            VAR-based infilling of missing values.
         """
         # external_var_names=None,
         # "fix" unicode problems
@@ -377,6 +380,7 @@ class VG(vg_plotting.VGPlotting):
             non_rain=non_rain,
             rain_method=rain_method,
             max_nans=max_nans,
+            infill=infill,
             **met_kwds,
         )
         # simulated residuals
@@ -1476,6 +1480,51 @@ class VG(vg_plotting.VGPlotting):
             ).T
             df_kwds = dict(index=self.dis_times, data=data, columns=var_names)
         return pd.DataFrame(**df_kwds)
+
+    def infill_trans_nans(self):
+        if self.p is None:
+            if self.verbose:
+                print("Fitting seasonal VAR for infilling.")
+            self.fit(seasonal=True)
+        data_infilled = models.SVAR_LS_fill(
+            self.Bs, self.sigma_us, self.data_doys, self.data_trans
+        )
+        if self.verbose:
+            n_nan_timesteps = (np.isnan(self.data_trans).sum(axis=0) > 0).sum()
+            nan_perc = n_nan_timesteps / self.T_summed * 100
+            print(f"Filled in {n_nan_timesteps} time steps ({nan_perc:.1f}%)")
+            for var_i, values in enumerate(self.data_trans):
+                n_nan_timesteps = np.isnan(values).sum()
+                if n_nan_timesteps:
+                    nan_perc = n_nan_timesteps / self.T_summed * 100
+                    var_name = self.var_names[var_i]
+                    print(f"\t{var_name}: {n_nan_timesteps} ({nan_perc:.1f}%)")
+
+        # fig, axs = plt.subplots(nrows=self.K, ncols=1, sharex=True)
+        # for var_i, var_name in enumerate(self.var_names):
+        #     ax = axs[var_i]
+        #     ax.plot(self.times, self.data_trans[var_i], color="k")
+        #     ax.plot(self.times, data_infilled[var_i], "--", color="b")
+        #     ax.set_title(var_name)
+        # fig.suptitle(self.station_name)
+
+        # fig, axs = self.plot_meteogram_hourly()
+        # fig, axs = self.plot_meteogram_trans()
+
+        self.data_trans = data_infilled
+
+        # fig, axs = self.plot_meteogram_trans(figs=fig, axss=axs)
+        # fig, axs = self.plot_meteogram_daily()
+
+        self.data_raw = seasonal_back(
+            self.dist_sol, self.data_trans, self.var_names, self.data_doys
+        )
+
+        self.fit(seasonal=True)
+        # fig, axs = self.plot_meteogram_daily(figs=fig, axss=axs)
+        # plt.show()
+
+        return data_infilled
 
     def predict(self, dtimes=None, data_past=None, T=1, n_realizations=1):
         """Predict the next T steps given the past data.
