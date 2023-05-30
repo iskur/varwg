@@ -407,6 +407,10 @@ class VG(vg_plotting.VGPlotting):
         ex=None,
         ex_kwds=None,
         extro=False,
+        doy_width=60,
+        fft_order=2,
+        *args,
+        **kwds,
     ):
         """p is the order of autoregressive process.
         q the order of the moving average process
@@ -459,12 +463,18 @@ class VG(vg_plotting.VGPlotting):
             if self.seasonal:
                 if self.verbose:
                     print("Fitting the seasonal VAR model.")
+                self.svar_doy_width = doy_width
+                self.svar_fft_order = fft_order
                 self.Bs, self.sigma_us = models.SVAR_LS(
                     self.data_trans,
                     self.data_doys,
                     self.p,
                     var_names=self.var_names,
                     verbose=self.verbose,
+                    doy_width=doy_width,
+                    fft_order=fft_order,
+                    *args,
+                    **kwds,
                 )
                 self.residuals = models.SVAR_residuals(
                     self.data_trans, self.data_doys, self.Bs, self.p
