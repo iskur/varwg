@@ -1549,28 +1549,60 @@ class VG(vg_plotting.VGPlotting):
         with open(rain_outfilepath, "w") as gotm_file:
             gotm_file.writelines(lines)
 
-    def to_df(self, kind="hourly input", var_names=None):
-        import pandas as pd
-
+    def to_df(
+        self, kind="hourly input", var_names=None, *, with_conversions=True
+    ):
         if var_names is None:
             var_names = self.var_names
 
+        data = None
         if kind == "hourly input":
             if "e" in var_names and "e" not in self.met:
                 self.met["e"] = meteox2y.rel2vap_p(
                     self.met["rh"], self.met["theta"]
                 )
-            data = np.array([self.met[var_name] for var_name in var_names]).T
-            df_kwds = dict(index=self.times_orig, data=data, columns=var_names)
+            data = np.array([self.met[var_name] for var_name in var_names])
+            index = self.times_orig
+        elif kind == "daily input":
+            data = self.data_raw / self.sum_interval
+            index = self.times
+        elif kind == "daily input trans":
+            data = self.data_trans
+            index = self.times
+        elif kind == "daily output trans":
+            data = self.sim
+            index = self.sim_times
+        elif kind == "daily output":
+            data = self.sim_sea
+            index = self.sim_times
         elif kind == "hourly output":
+            data = self.sim_sea_dis
+            index = self.dis_times
+        else:
+            raise RuntimeError(f"kind={kind} not understood")
+            return
+        if data is None and "output" in kind:
+            raise RuntimeError("Call simulate, before requesting output")
+        if data.shape[0] != len(var_names):
             data = np.array(
-                [
-                    self.sim_sea_dis[self.var_names.index(name)]
-                    for name in var_names
-                ]
-            ).T
-            df_kwds = dict(index=self.dis_times, data=data, columns=var_names)
-        return pd.DataFrame(**df_kwds)
+                [data[self.var_names.index(name)] for name in var_names]
+            )
+        # do not trust that the conversions have any side-effects on
+        # its parameters!
+        index, data = map(np.copy, (index, data))
+        var_names = [name for name in var_names]
+        if with_conversions:
+            if (
+                "trans" not in kind
+                and "input" not in kind
+                and conf.conversions
+            ):
+                for conversion in conf.conversions:
+                    index, data, var_names = conversion(index, data, var_names)
+        df = pd.DataFrame(data=data.T, columns=var_names, index=index)
+        df.name = kind
+        df.index.name = "time"
+        return df
 
     def infill_trans_nans(self):
         if self.p is None:
@@ -1864,15 +1896,6 @@ class VG(vg_plotting.VGPlotting):
         return self._cov_trans
 
     def _scale_nn(self, x, seas_dist, trig_params):
-        # if self._x_cache is None:
-        #     self._x_cache = {}
-        # key = str(round(float(x.squeeze()), 6))
-        # if key not in self._x_cache:
-        #     self._x_cache[key] = seas_dist.qq_shift(x, trig_params)
-        # return self._x_cache[key]
-
-        # return seas_dist.qq_shift(x, trig_params)
-
         return my.pickle_cache(
             str(
                 Path(self.seasonal_cache_file).parent
