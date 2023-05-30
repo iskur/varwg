@@ -313,6 +313,7 @@ class VGBase(object):
         rain_method=None,
         neg_rain_doy_width=30,
         neg_rain_fft_order=2,
+        infill=False,
         **met_kwds,
     ):
         # external_var_names=None,
@@ -405,6 +406,8 @@ class VGBase(object):
                 var_names=non_rain,
                 method=rain_method,
             )
+        if infill:
+            self.data_trans = self.infill_trans_nans()
 
     @property
     def sum_interval_dict(self):
