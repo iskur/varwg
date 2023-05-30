@@ -282,6 +282,7 @@ class VG(vg_plotting.VGPlotting):
         var_names,
         met_file=None,
         sum_interval=24,
+        max_nans=12,
         plot=False,
         separator="\t",
         refit=None,
@@ -375,6 +376,7 @@ class VG(vg_plotting.VGPlotting):
             dump_data=dump_data,
             non_rain=non_rain,
             rain_method=rain_method,
+            max_nans=max_nans,
             **met_kwds,
         )
         # simulated residuals
