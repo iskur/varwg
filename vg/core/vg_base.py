@@ -1045,7 +1045,7 @@ class VGBase(object):
     def _fit_seasonal(
         self, refit=None, values=None, doys=None, filter_nans=True
     ):
-        if refit is None:
+        if refit is None or refit is False:
             refit = tuple()
         elif refit == "all" or refit is True:
             refit = self.var_names
