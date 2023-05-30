@@ -1000,6 +1000,48 @@ class VGBase(object):
         )
         return times_out
 
+    def _fit_distribution(self, sh, var, var_name, solution_key, **kwds):
+        seas_class = conf.seasonal_classes[var_name]
+        if (
+            issubclass(seas_class, skde.SeasonalKDE)
+            or conf.dists[var_name] == "empirical"
+        ):
+            dist = seas_class(
+                var,
+                self.times,
+                fixed_pars=conf.par_known[var_name],
+                verbose=self.verbose,
+                **kwds,
+            )
+            solution = dist.fit(
+                # silverman=(var_name == "sun")
+                silverman=(var_name in ("sun", "R"))
+            )
+            sh[solution_key] = [seas_class, None, solution]
+        else:
+            dist = seas_class(
+                conf.dists[var_name],
+                var,
+                self.times,
+                fixed_pars=conf.par_known[var_name],
+                verbose=self.verbose,
+                **kwds,
+            )
+            solution = dist.fit()
+            try:
+                sh[solution_key] = [seas_class, conf.dists[var_name], solution]
+            except TypeError:
+                # we will rely on the distribution that is set
+                # in the config file later
+                sh[solution_key] = [seas_class, None, solution]
+            if hasattr(dist, "supplements"):
+                sh[solution_key + "suppl"] = dist.supplements
+            if kwds.get("tabulate_cdf", False):
+                cdf_table_key = solution_key + f"cdf_table_{dist.dist.name}"
+                sh[cdf_table_key] = dist.cdf_table
+
+        return dist, solution
+
     def _fit_seasonal(
         self, refit=None, values=None, doys=None, filter_nans=True
     ):
@@ -1044,43 +1086,9 @@ class VGBase(object):
             if solution_key not in keys or plain_solution_key in refit:
                 if self.verbose:
                     print("\tFitting a distribution to ", var_name)
-                seas_class = conf.seasonal_classes[var_name]
-                if (
-                    issubclass(seas_class, skde.SeasonalKDE)
-                    or conf.dists[var_name] == "empirical"
-                ):
-                    dist = seas_class(
-                        var,
-                        self.times,
-                        fixed_pars=conf.par_known[var_name],
-                        verbose=self.verbose,
-                        **kwds,
-                    )
-                    solution = dist.fit(silverman=(var_name == "sun"))
-                    sh[solution_key] = [seas_class, None, solution]
-                else:
-                    dist = seas_class(
-                        conf.dists[var_name],
-                        var,
-                        self.times,
-                        fixed_pars=conf.par_known[var_name],
-                        verbose=self.verbose,
-                        **kwds,
-                    )
-                    solution = dist.fit()
-                    try:
-                        sh[solution_key] = [
-                            seas_class,
-                            conf.dists[var_name],
-                            solution,
-                        ]
-                    except TypeError:
-                        # we will rely on the distribution that is set
-                        # in the config file later
-                        sh[solution_key] = [seas_class, None, solution]
-                    if hasattr(dist, "supplements"):
-                        sh[solution_key + "suppl"] = dist.supplements
-
+                dist, solution = self._fit_distribution(
+                    sh, var, var_name, solution_key, **kwds
+                )
             else:
                 if self.verbose:
                     print("\tRecover previous fit from shelve for: ", var_name)
