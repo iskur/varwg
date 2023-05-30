@@ -2166,7 +2166,7 @@ class VG(vg_plotting.VGPlotting):
             duration = durations[event_i]
             rh_signal[i : i + duration] = event_dryness
 
-        event_mask = np.where(rh_signal <= 0.4)[0]
+        event_mask = np.where(rh_signal <= event_dryness)[0]
         event_dt = self.sim_times[event_mask]
 
         return rh_signal, event_dt
