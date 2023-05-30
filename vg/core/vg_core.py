@@ -1941,19 +1941,33 @@ if __name__ == "__main__":
     met_vg = VG(
         ("R", "theta", "ILWR", "Qsw", "rh", "u", "v"),
         # non_rain=("theta", "Qsw", "rh"),
-        refit=True,
+        rain_method="regression",
+        # rain_method="distance",
+        neg_rain_doy_width=30,
+        neg_rain_fft_order=2,
+        # refit=True,
+        # refit="R",
         verbose=True,
-        dump_data=True,
+        dump_data=False,
+        # plot=True
     )
-    simt, sim = met_vg.simulate()
-    met_vg.disaggregate()
-    # simt, sim = met_vg.simulate(start_str="01.01.2000 00:00:00",
-    #                             stop_str="31.12.3000 00:00:00",
-    #                             resample=False)
-    # simt_dis, sim_dis = met_vg.disaggregate()
-    # met_vg.plot_all()
-    met_vg.plot_exceedance_daily()
-    met_vg.plot_qq()
-    met_vg.plot_transformed_daily()
-    met_vg.plot_monthly_hists("R")
-    plt.show()
+
+    # met_vg.fit(seasonal=True)
+    # # met_vg.fit(seasonal=False)
+    # simt, sim = met_vg.simulate(T=100*365, phase_randomize=True)
+    # # met_vg.disaggregate()
+    # # simt, sim = met_vg.simulate(start_str="01.01.2000 00:00:00",
+    # #                             stop_str="31.12.3000 00:00:00",
+    # #                             resample=False)
+    # # simt_dis, sim_dis = met_vg.disaggregate()
+    # # met_vg.plot_all()
+    # met_vg.plot_meteogramm_trans()
+    # met_vg.plot_exceedance_daily()
+    # # met_vg.plot_qq()
+    # met_vg.plot_daily_fit("R")
+    # met_vg.plot_monthly_hists("R")
+    # fig, ax = plt.subplots(nrows=1, ncols=1)
+    # rr, sol = met_vg.dist_sol["R"]
+    # params = rr.all_parameters_dict(sol, doys=np.arange(365))
+    # ax.plot(params["q_thresh"])
+    # plt.show()
