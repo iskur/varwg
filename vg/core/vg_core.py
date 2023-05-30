@@ -806,6 +806,10 @@ class VG(vg_plotting.VGPlotting):
             if sim_func_kwds is None:
                 sim_func_kwds = {}
             sim = sim_func(self, sc_pars, **sim_func_kwds)
+            # this is weathercop-specific
+            if (stop_at := sim_func_kwds.get("stop_at", None)) is not None:
+                vine = sim_func_kwds["wcop"].vine
+                var_names_back = vine.varnames[: stop_at + 1]
             if return_rphases := sim_func_kwds.get("return_rphases", False):
                 sim, rphases = sim
 
