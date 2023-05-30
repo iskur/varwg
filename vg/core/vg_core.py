@@ -3,6 +3,7 @@ import collections
 import copy
 import datetime
 import os
+from pathlib import Path
 import warnings
 import shutil
 import pickle
@@ -583,6 +584,7 @@ class VG(vg_plotting.VGPlotting):
         theta_grad=None,
         fixed_variables=None,
         primary_var="theta",
+        scale_prim=True,
         climate_signal=None,
         start_str=None,
         stop_str=None,
@@ -597,6 +599,13 @@ class VG(vg_plotting.VGPlotting):
         residuals=None,
         sim_func=None,
         sim_func_kwds=None,
+        phase_randomize=False,
+        phase_randomize_vary_mean=True,
+        return_rphases=False,
+        rphases=None,
+        p_kwds=None,
+        taboo_period_min=None,
+        taboo_period_max=None,
     ):
         """Simulate based on data from __init__ and the fit from calling
         self.fit().
@@ -723,6 +732,8 @@ class VG(vg_plotting.VGPlotting):
         for var_name in self.primary_var:
             if var_name not in self.var_names:
                 raise ValueError(f"{primary_var=} not in {self.var_names=}")
+        self.phase_randomize = phase_randomize
+        self.phase_randomize_vary_mean = phase_randomize_vary_mean
 
         if T is None:
             if climate_signal is not None:
@@ -743,6 +754,9 @@ class VG(vg_plotting.VGPlotting):
         if self.p is None and sim_func is None:
             self.fit()
 
+        # if this is True, we still call self._gen_sim_times because
+        # of expected side-effects
+        self.sim_times_is_times = start_str is None and stop_str is None
         self.sim_times = self._gen_sim_times(
             start_str=start_str, stop_str=stop_str
         )
@@ -750,11 +764,25 @@ class VG(vg_plotting.VGPlotting):
         # called, but not inside self.disaggregate
         self.T_sim = len(self.sim_times)
 
+        if self.phase_randomize:
+            if self.theta_incr is None:
+                self.theta_incr = np.zeros(len(self.primary_var))
+            if residuals is None:
+                residuals = self.residuals
+
         # converts the given parameters so they are understood in the
         # std-normal world
         # to store effect of scenario parameters by primary variable
         self._m_single, self._m_t_single, self._m_trend_single = [], [], []
-        m, m_t, m_trend = sc_pars = self._scenario_parameters()
+        m, m_t, m_trend = sc_pars = self._scenario_parameters(
+            theta_incr,
+            theta_grad,
+            disturbance_std,
+            climate_signal,
+            phase_randomize,
+            scale_prim,
+            primary_var_sim=sim_func_kwds.get("primary_var_sim", None),
+        )
         # store to be able to play outside with it later
         self.m, self.m_t, self.m_trend = m, m_t, m_trend
 
@@ -778,6 +806,9 @@ class VG(vg_plotting.VGPlotting):
             if sim_func_kwds is None:
                 sim_func_kwds = {}
             sim = sim_func(self, sc_pars, **sim_func_kwds)
+            if return_rphases := sim_func_kwds.get("return_rphases", False):
+                sim, rphases = sim
+
         elif resample or res_kwds is not None:
             # in contrast to the parametric models, we do not
             # transform anything
@@ -818,6 +849,10 @@ class VG(vg_plotting.VGPlotting):
         elif self.q in (0, None):
             # simulate VAR-time-series
             if self.seasonal:
+                # scale u to not get too much variance
+                # n_unique_doys = len(np.unique(self.data_doys))
+                # uu = self.svar_doy_width / n_unique_doys * residuals
+                uu = residuals
                 sim = models.SVAR_LS_sim(
                     self.Bs,
                     self.sigma_us,
@@ -826,8 +861,17 @@ class VG(vg_plotting.VGPlotting):
                     ia=m_t,
                     m_trend=m_trend,
                     fixed_data=fixed_data,
-                    u=residuals,
+                    u=uu,
+                    phase_randomize=phase_randomize,
+                    return_rphases=return_rphases,
+                    rphases=rphases,
+                    p_kwds=p_kwds,
+                    taboo_period_min=taboo_period_min,
+                    taboo_period_max=taboo_period_max,
                 )
+                if return_rphases:
+                    sim, rphases = sim
+                self.ut = models.SVAR_LS_sim.ut
             else:
                 if asy:
                     if isinstance(asy, str):
@@ -857,6 +901,7 @@ class VG(vg_plotting.VGPlotting):
                         fixed_data=fixed_data,
                         transform=transform,
                         u=residuals,
+                        phase_randomize=phase_randomize,
                     )
                 else:
                     sim, self.ex_out = models.VAREX_LS_sim(
@@ -975,6 +1020,8 @@ class VG(vg_plotting.VGPlotting):
                 conversions=conf.conversions,
             )
 
+        if return_rphases:
+            return self.sim_times, sim_sea, rphases
         return self.sim_times, sim_sea
 
     def print_means(self):
@@ -1733,14 +1780,21 @@ class VG(vg_plotting.VGPlotting):
             m_primvar = delta_primvar / sigma
         else:
             m_primvar = scale_nn(delta_primvar)
+        if self.phase_randomize and self.phase_randomize_vary_mean:
+            m_primvar += 0.25 * np.random.randn()
         self._m_single += [m_primvar * scale.reshape((self.K, 1)) + intercept]
-        # if self.verbose:
-        #     # coefficent of determination
-        #     cod = np.corrcoef()
         return self._m_single[-1]
 
     def _gen_m_t(
-        self, prim_i, prim_index, prim_is_normal, sigma, scale, scale_nn, _T
+        self,
+        prim_i,
+        prim_index,
+        prim_is_normal,
+        sigma,
+        scale,
+        scale_nn,
+        scale_nn_simple,
+        _T,
     ):
         m_t = np.zeros((self.K, self.T_sim))
         # das war an der Tafel im Seminarraum 2:
@@ -1762,14 +1816,13 @@ class VG(vg_plotting.VGPlotting):
 
         if (
             self.climate_signal is not None
-            and np.array(self.climate_signal).ndim > 1
             and self.climate_signal[prim_i] is not None
         ):
             climate_diff = self._get_climate_diff(_T, prim_i)
             if prim_is_normal:
                 climate_diff /= sigma
             else:
-                climate_diff = scale_nn(climate_diff)
+                climate_diff = scale_nn_simple(climate_diff)
             m_t += climate_diff * scale.reshape((self.K, 1))
         self._m_t_single += [m_t]
         return m_t
@@ -1803,9 +1856,65 @@ class VG(vg_plotting.VGPlotting):
                 self._cov_trans = np.cov(self.data_trans)
         return self._cov_trans
 
-    def _scenario_parameters(self):
+    def _scale_nn(self, x, seas_dist, trig_params):
+        # if self._x_cache is None:
+        #     self._x_cache = {}
+        # key = str(round(float(x.squeeze()), 6))
+        # if key not in self._x_cache:
+        #     self._x_cache[key] = seas_dist.qq_shift(x, trig_params)
+        # return self._x_cache[key]
+
+        # return seas_dist.qq_shift(x, trig_params)
+
+        return my.pickle_cache(
+            str(
+                Path(self.seasonal_cache_file).parent
+                / f"qq_shift_{self.station_name}_{x}_%s.pkl"
+            ),
+            warn=False,
+            # clear_cache=True,
+        )(seas_dist.qq_shift)(
+            x,
+            trig_params,
+            # doys=self.sim_doys
+        )
+
+    def _scenario_parameters(
+        self,
+        theta_incr=None,
+        theta_grad=None,
+        disturbance_std=None,
+        climate_signal=None,
+        phase_randomize=False,
+        scale_prim=True,
+        primary_var_sim=None,
+    ):
         """Prepares the scenario parameters, m and m_trend for the
-        std.-normal world."""
+        std.-normal world.
+
+        Parameters
+        ----------
+        phase_randomize : boolean, optional
+            Use phase randomization for VAR-residuals
+        scale_prim : boolean, optional
+            Allow primary variables to influence each other.
+            Only effective when using multiple primary variables!
+        """
+
+        def str2tuple(thing):
+            if isinstance(thing, str):
+                return (thing,)
+            return thing
+
+        if primary_var_sim is None:
+            prim_vars = str2tuple(self.primary_var)
+            primary_var_ii = self.primary_var_ii
+        else:
+            prim_vars = str2tuple(primary_var_sim)
+            primary_var_ii = [
+                self.var_names.index(prim_var) for prim_var in prim_vars
+            ]
+
         m = np.zeros((self.K, self.T_sim))
         m_t = np.zeros_like(m)
         m_trend = np.zeros(self.K)
@@ -1813,25 +1922,23 @@ class VG(vg_plotting.VGPlotting):
             "scenario_parameters", ("m", "m_t", "m_trend")
         )
 
-        # oddly enough, we allow more than one primary variable
-        if isinstance(self.primary_var, str):
-            prim_vars = (self.primary_var,)
-        else:
-            prim_vars = self.primary_var
-
         for prim_i, prim in enumerate(prim_vars):
             # prim_i is index inside sequence of primary variables.
             # prim_index is index inside sequence of all variables.
-            prim_index = self.primary_var_ii[prim_i]
+            # prim_index = self.primary_var_ii[prim_i]
+            prim_index = primary_var_ii[prim_i]
             # scale other variables according to linear regression
-            scale = np.cov(self.data_trans)[prim_index] / np.var(
-                self.data_trans[prim_index]
+            finite_row_mask = np.all(np.isfinite(self.data_trans), axis=0)
+            data_trans = self.data_trans[:, finite_row_mask]
+            scale = np.cov(data_trans)[prim_index] / np.var(
+                data_trans[prim_index]
             )
 
             # do not change the primary variable by itself
-            # scale[prim_index] = 1
-            for index in self.primary_var_ii:
-                scale[index] = 1
+            scale[prim_index] = 1
+            if not scale_prim:
+                # do not change the other primary variables
+                scale[self.primary_var_ii] = 1
             if prim in self.var_names:
                 seas_dist, trig_params = self.dist_sol[prim]
                 if hasattr(seas_dist, "dist"):
@@ -1842,21 +1949,37 @@ class VG(vg_plotting.VGPlotting):
                     prim_is_normal = False
 
                 if not prim_is_normal:
-                    medians = seas_dist.ppf(
-                        trig_params,
-                        0.5 * np.ones(len(self.sim_doys)),
-                        self.sim_doys,
+                    scale_nn = functools.partial(
+                        self._scale_nn,
+                        seas_dist=seas_dist,
+                        trig_params=trig_params,
                     )
 
-                    def scale_nn(x):
+                    # means = seas_dist.mean(trig_params, self.sim_doys)
+
+                    # we might exist in a loop and want to avoid
+                    # calculating the medians all the time
+                    if not hasattr(seas_dist, "medians"):
+                        seas_dist.medians = seas_dist.median(
+                            trig_params, self.sim_doys
+                        )
+
+                    def scale_nn_simple(x):
+                        if seas_dist.medians.shape != x.shape:
+                            seas_dist.medians = seas_dist.median(
+                                trig_params, self.sim_doys
+                            )
                         return distributions.norm.ppf(
                             seas_dist.cdf(
-                                trig_params, medians + x, self.sim_doys
+                                trig_params,
+                                seas_dist.medians + x,
+                                self.sim_doys,
                             )
                         )
 
                 else:
                     scale_nn = None
+                    scale_nn_simple = None
 
                 # get the doy-specific distribution parameters
                 _T = (2 * np.pi / 365 * self.sim_doys)[np.newaxis, :]
@@ -1865,7 +1988,7 @@ class VG(vg_plotting.VGPlotting):
                 else:
                     sigma = None
 
-                if self.theta_grad is not None:
+                if theta_grad is not None:
                     m_trend += self._gen_m_trend(
                         prim_i,
                         prim_index,
@@ -1877,7 +2000,7 @@ class VG(vg_plotting.VGPlotting):
                 else:
                     self._m_trend_single += [np.zeros(self.K)]
 
-                if self.theta_incr is not None:
+                if theta_incr is not None:
                     m += self._gen_m(
                         prim_i,
                         prim_index,
@@ -1889,15 +2012,17 @@ class VG(vg_plotting.VGPlotting):
                 else:
                     self._m_single += [np.zeros((self.K, self.T_sim))]
 
-                m_t += self._gen_m_t(
-                    prim_i,
-                    prim_index,
-                    prim_is_normal,
-                    sigma,
-                    scale,
-                    scale_nn,
-                    _T,
-                )
+                if disturbance_std is not None or climate_signal is not None:
+                    m_t += self._gen_m_t(
+                        prim_i,
+                        prim_index,
+                        prim_is_normal,
+                        sigma,
+                        scale,
+                        scale_nn,
+                        scale_nn_simple,
+                        _T,
+                    )
 
         return ScenParameters(m, m_t, m_trend)
 
