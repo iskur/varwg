@@ -16,18 +16,13 @@ from scipy import interpolate, stats
 
 import vg.time_series_analysis.seasonal_kde as skde
 from vg import helpers as my, times
-from vg.meteo import avrwind, meteox2y
-from vg.time_series_analysis import distributions, seasonal_distributions as sd
-
-# import pyximport
-# pyximport.install(setup_args={'include_dirs': np.get_include(),
-#                               # 'gdb_debug': True
-#                               },
-#                   inplace=True,
-#                   # reload_support=True
-#                   )
-
-from vg import ctimes
+from vg.meteo import avrwind, meteox2y, meteox2y_cy
+from vg.time_series_analysis import (
+    distributions,
+    seasonal_distributions as sd,
+    models,
+)
+from .. import ctimes
 
 
 try:
@@ -415,13 +410,16 @@ class VGBase(object):
     @property
     def primary_var_ii(self):
         """The row index of the primary variable."""
+        if self.primary_var is None:
+            raise RuntimeError(
+                "primary_var is not set. Have you called simulate yet?"
+            )
         try:
             return [
                 self.var_names.index(prim_var) for prim_var in self.primary_var
             ]
         except ValueError:
             warnings.warn("No %s in input." % self.primary_var)
-            return None
 
     @property
     def output_resolution(self):
@@ -441,12 +439,12 @@ class VGBase(object):
 
     @property
     def T_data(self):
-        """Length of the input data time series."""
+        """Length of the input data time series ('hourly')."""
         return len(self.times_orig)
 
     @property
     def T_summed(self):
-        """Length of aggregated input data."""
+        """Length of aggregated input data ('daily')."""
         return len(self.times)
 
     @property
@@ -711,7 +709,6 @@ class VGBase(object):
             hourly_rain_in = my.interp_nan(
                 self.met["R"][: nn + tpd], max_interp=3
             )
-
             daily_rain_in = hourly_rain_in.reshape(-1, tpd).mean(axis=1)
             rain_mask_in = (daily_rain_in > thresh).repeat(tpd)[:nn]
             daily_rain_out = self.sim_sea[rain_i]
@@ -1067,13 +1064,6 @@ class VGBase(object):
                     supplements = None
                     sh[solution_key + "suppl"] = None
 
-                # if len(self.times) > len(var):
-                #     # we assume we were called from predict in which case
-                #     # we have to pass the past data in here and not the
-                #     # passed data, hehe
-                #     var_ = self.data_raw[var_ii]
-                # else:
-                #     var_ = var
                 var_ = var
                 if (
                     issubclass(seas_class, skde.SeasonalKDE)
@@ -1355,7 +1345,7 @@ if __name__ == "__main__":
     vg.conf = vg.vg_base.conf = vg.vg_plotting.conf = conf
     met_vg = vg.VG(
         ("R", "theta", "ILWR", "Qsw", "rh", "u", "v"),
-        refit="R",
+        # refit="R",
         verbose=True,
         plot=True,
     )
