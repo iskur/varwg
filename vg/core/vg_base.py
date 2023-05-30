@@ -487,6 +487,10 @@ class VGBase(object):
             self._dis_doys_len = len(self._dis_doys)
         return self._dis_doys
 
+    @property
+    def start_hour_of_src(self):
+        return self.times_orig[0].hour
+
     def fitted_medians(self, var_name, doys=None):
         """Medians of the fitted seasonal distribution.
 
@@ -559,6 +563,9 @@ class VGBase(object):
 
         def choose_chunk(dst_point):
             nan_in_output = True
+            # dst_point -= self.start_hour_of_src
+            # dst_point += self.start_hour_of_src
+            # dst_point -= 1
             while nan_in_output:
                 if seasonal:
                     # pool = (pool0 + dst_point) % nn
@@ -588,23 +595,32 @@ class VGBase(object):
                     nan_in_output = False
             return chunk_ii
 
+        progress = tqdm if self.verbose else lambda x: x
         indices = np.array(
             [
                 choose_chunk(dst_point)
-                for dst_point in tqdm(range(0, m + autocorr_len, autocorr_len))
+                for dst_point in progress(
+                    range(0, m + autocorr_len, autocorr_len)
+                )
             ]
         )
+        # indices -= self.start_hour_of_src
         return indices.ravel()[:m]
 
-    def _gen_deltas_input(self, var_names_dis, tpd):
+    def _gen_deltas_input(
+        self, var_names_dis, tpd, longitude=None, latitude=None
+    ):
         """Generate the pool of deltas_input for vg.disaggregate."""
-        # these are in "hourly" discretization
-        doys_in = self.data_doys_raw[:-tpd]
-
+        if longitude is None:
+            longitude = conf.longitude
+        if latitude is None:
+            latitude = conf.latitude
         # due to the interpolation with interp1d, we often have to skip the
         # last day (24 hours)
         # size of pool we can draw from:
         nn = self.T_data // tpd * tpd - tpd
+        # these are in "hourly" discretization
+        doys_in = self.data_doys_raw[:nn]
         m = self.T_sim * tpd - tpd  # no of hourly timesteps (simulated)
         sim_sea_dis = self.sim_sea.repeat(tpd).reshape(-1, m + tpd)[:, :-tpd]
         deltas_input = np.zeros((self.K, nn))
@@ -613,8 +629,14 @@ class VGBase(object):
             var_i = self.var_names.index(var_name)
             # hourly measured values
             var_h = my.interp_nan(self.met[var_name][: nn + tpd], max_interp=3)
+            # if self.start_hour_of_src:
+            #     print(f"prepending var_h by {self.start_hour_of_src=} steps")
+            #     var_h = np.concatenate((np.zeros(self.start_hour_of_src),
+            #                             var_h))[:nn + tpd]
             # daily averages of measured values:
-            var_d = np.nanmean(var_h.reshape(-1, tpd), axis=1)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                var_d = np.nanmean(var_h.reshape(-1, tpd), axis=1)
             # 'time' array for interp1d
             hourly_input_times = np.arange(var_h.shape[0])
             # interpolate between daily values (measurements)
@@ -629,12 +651,30 @@ class VGBase(object):
             if var_name.startswith("Qsw"):
 
                 def pot_s(doys):
+                    # hourly = meteox2y_cy.pot_s_rad(
                     hourly = meteox2y.pot_s_rad(
-                        doys, lat=conf.latitude, longt=conf.longitude
+                        doys,
+                        lat=latitude,
+                        longt=longitude,
+                        tz_mer=None,
                     )
                     return hourly * self.sum_interval[var_i]
 
                 limits["u"] = pot_s
+
+                # import matplotlib.pyplot as plt
+                # fig, axs = plt.subplots(nrows=2, ncols=1, sharex=True)
+                # axs[0].plot(self.times_orig[:nn],
+                #             var_h[:-tpd], label="var_h")
+                # axs[0].plot(self.times_orig[:nn],
+                #             var_interp, label="var_interp")
+                # axs[0].plot(self.times_orig[:nn],
+                #             pot_s(doys_in) / self.sum_interval[var_i],
+                #             label="pot_s")
+                # axs[0].legend(loc="best")
+                # axs[1].plot(self.times_orig[:nn], deltas_input[var_i])
+                # plt.show()
+                # __import__('pdb').set_trace()
 
             pos_mask = deltas_input[var_i] > 0
             neg_mask = ~pos_mask
@@ -672,8 +712,12 @@ class VGBase(object):
                 )
                 deltas = deltas_input[var_i, pos_mask]
                 interps = var_interp[pos_mask]
-                upper_perc = old_div(deltas, (upper - interps))
-                upper_perc[interps > upper] = 1
+                div_mask = ~np.isclose(interps, upper)
+                upper_perc = np.full_like(interps, 1 - 1e-12)
+                upper_perc[div_mask] = deltas[div_mask] / (
+                    upper[div_mask] - interps[div_mask]
+                )
+                upper_perc[interps > upper] = 0
                 upper_perc[upper_perc > 1.0] = 1.0
                 deltas_input[var_i, pos_mask] = upper_perc
 
@@ -714,8 +758,7 @@ class VGBase(object):
         if "R" in var_names_dis:
             deltas_drawn = np.empty((len(var_names_dis), m))
             rain_i = var_names_dis.index("R")
-            thresh = conf.dists_kwds["R"]["threshold"]
-
+            thresh = conf.threshold
             hourly_rain_in = my.interp_nan(
                 self.met["R"][: nn + tpd], max_interp=3
             )
@@ -931,7 +974,10 @@ class VGBase(object):
         # produce sim_doys and times_out:
         if start_str is None:
             if self.sim_times is None:
-                self.start_date = self.times_orig[0]
+                time_first = self.times_orig[0]
+                self.start_date = datetime.datetime(
+                    time_first.year, time_first.month, time_first.day
+                )
             else:
                 self.start_date = self.sim_times[0]
         else:

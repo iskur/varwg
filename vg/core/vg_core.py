@@ -1116,6 +1116,11 @@ class VG(vg_plotting.VGPlotting):
                 print("Disaggregating selected variables.")
             var_names_dis = (var_names_dis,)
 
+        if latitude is None:
+            latitude = conf.latitude
+        if longitude is None:
+            longitude = conf.longitude
+
         # how many timesteps are there per day in the input data?
         # we assume that the data is not finer than hours
         hours_unique = np.unique([dtime.hour for dtime in self.times_orig])
@@ -1126,11 +1131,18 @@ class VG(vg_plotting.VGPlotting):
         self.dis_times = self._gen_sim_times(
             (self.T_sim - 1) * tpd, output_resolution=1.0
         )
+        # reset cache
+        self._dis_doys = None
 
         if factors is not None:
             factors = np.asarray(factors)[:, None]
 
-        deltas_input, sim_interps = self._gen_deltas_input(var_names_dis, tpd)
+        deltas_input, sim_interps = self._gen_deltas_input(
+            var_names_dis,
+            tpd,
+            longitude=longitude,
+            latitude=latitude,
+        )
         deltas_drawn, sim_sea_dis = self._add_deltas(
             deltas_input,
             sim_interps,
@@ -1145,21 +1157,26 @@ class VG(vg_plotting.VGPlotting):
         for var_name in var_names_dis:
             var_i = self.var_names.index(var_name)
             limits = copy.copy(conf.par_known[var_name])
+            u_kwds = dict()
             if var_name.startswith("Qsw"):
 
-                def pot_s(doys):
+                def pot_s(doys, longitude, latitude):
                     hourly = pot_s_rad(
-                        doys, lat=conf.latitude, longt=conf.longitude
+                        doys,
+                        lat=latitude,
+                        longt=longitude,
+                        tz_mer=None,
                     )
                     return hourly * self.sum_interval[var_i]
 
+                u_kwds = dict(longitude=longitude, latitude=latitude)
                 limits["u"] = pot_s
             elif var_name.startswith("sun"):
 
                 def sun_hours(doys):
                     dtimes = times.doy2datetime(doys)
                     sunrise, sunset = sunshine_riseset(
-                        dtimes, conf.longitude, conf.latitude, tz_offset=None
+                        dtimes, longitude, latitude, tz_offset=None
                     )
                     doy_hours = (doys - doys.astype(int)) * 24
                     max_hours = np.full_like(doys, 60)
@@ -1187,13 +1204,14 @@ class VG(vg_plotting.VGPlotting):
                 if limits is None:
                     limits = {}
                 # limits["l"] = conf.array_gen(seas_dist.dist.thresh)
-                limits["l"] = conf.array_gen(0.0)
+                limits["l"] = conf.array_gen(conf.threshold)
+                # limits["l"] = conf.array_gen(0.)
                 # limits["u"] = conf.array_gen(1.e12)
 
             if limits is not None and ("u" in limits or "uc" in limits):
                 upper_func = limits["u"] if "u" in limits else limits["uc"]
                 upper = (
-                    upper_func(self.dis_doys[pos_mask])
+                    upper_func(self.dis_doys[pos_mask], **u_kwds)
                     / self.sum_interval[var_i]
                 )
                 upper_perc = deltas_drawn[var_i, pos_mask]
@@ -1212,6 +1230,8 @@ class VG(vg_plotting.VGPlotting):
                 lower_dis = interps + lower_perc * (interps - lower)
                 lower_dis = np.where(lower_dis < lower, lower, lower_dis)
                 sim_sea_dis[var_i, neg_mask] = lower_dis
+
+        # sim_sea_dis = np.roll(sim_sea_dis, -1, axis=1)
 
         # fig, ax = plt.subplots()
         # ax.plot(sim_sea_dis[0], "-o", label="sim_sea_dis")
