@@ -17,7 +17,10 @@ import pandas as pd
 from vg.time_series_analysis import seasonal_distributions as sd
 from vg import helpers as my, times
 from vg.meteo import avrwind, meteox2y
-from vg.meteo.meteox2y import pot_s_rad, sunshine_riseset
+from vg.meteo.meteox2y import sunshine_riseset
+
+# from vg.meteo.meteox2y_cy import pot_s_rad
+from vg.meteo.meteox2y import pot_s_rad
 from vg.time_series_analysis import (
     conditional_sim as csim,
     distributions,
@@ -26,7 +29,7 @@ from vg.time_series_analysis import (
     time_series as ts,
 )
 from vg.core import vg_base, vg_plotting
-
+from vg.time_series_analysis import cresample
 
 read_met = vg_base.read_met
 
