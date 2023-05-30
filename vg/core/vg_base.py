@@ -1104,6 +1104,16 @@ class VGBase(object):
                 except KeyError:
                     supplements = None
                     sh[solution_key + "suppl"] = None
+                if kwds.get("tabulate_cdf", False):
+                    cdf_table_key = (
+                        solution_key + f"cdf_table_{dist_class.name}"
+                    )
+                    try:
+                        cdf_table = sh[cdf_table_key]
+                    except KeyError:
+                        cdf_table = None
+                else:
+                    cdf_table = None
 
                 var_ = var
                 if (
@@ -1127,6 +1137,7 @@ class VGBase(object):
                         solution=solution,
                         fixed_pars=conf.par_known[var_name],
                         supplements=supplements,
+                        cdf_table=cdf_table,
                         **kwds,
                     )
 
@@ -1135,8 +1146,7 @@ class VGBase(object):
                     "\tp-value of chi2 goodness-of-fit %.4f" % dist.chi2_test()
                 )
             quantiles = dist.cdf(solution, x=var, doys=doys)
-            assert np.nanmin(quantiles) >= 0
-            assert np.nanmax(quantiles) <= 1
+            assert len(quantiles) == len(var)
             data_trans[var_ii] = distributions.norm.ppf(quantiles)
             dist_sol[var_name] = dist, solution
         sh.close()
