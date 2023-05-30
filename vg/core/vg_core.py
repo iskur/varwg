@@ -159,7 +159,12 @@ def seasonal_back(
     data = np.empty_like(norm_data)
     if mean_shifts is None:
         mean_shifts = defaultdict(lambda: None)
-    for var_ii, (var_name, var) in enumerate(zip(var_names, norm_data)):
+    if var_names_back is None:
+        var_names_back = var_names
+    for var_name in var_names_back:
+        var_i = var_names.index(var_name)
+        var = norm_data[var_i]
+        # for var_i, (var_name, var) in enumerate(zip(var_names, norm_data)):
         distribution, solution = dist_sol[solution_template % var_name]
         if hasattr(distribution, "dist") and isinstance(
             distribution.dist, distributions.Normal
@@ -169,8 +174,10 @@ def seasonal_back(
             # for "extreme" values in the standard-normal world!
             if doys is not None:
                 _T = (2 * np.pi / 365 * doys)[np.newaxis, :]
+            else:
+                _T = None
             mus, sigmas = distribution.trig2pars(solution, _T)
-            data[var_ii] = var * sigmas + mus
+            data[var_i] = var * sigmas + mus
         else:
             quantiles = distributions.norm.cdf(var)
             doys_ = doys if pass_doys else None
@@ -501,15 +508,21 @@ class VG(vg_plotting.VGPlotting):
                         transforms,
                         backtransforms,
                         p=self.p,
+                        *args,
+                        **kwds,
                     )
                     self.residuals = models.VAR_LS_extro.residuals
                 elif ex is None:
-                    B, self.sigma_u = models.VAR_LS(self.data_trans, self.p)
+                    B, self.sigma_u = models.VAR_LS(
+                        self.data_trans, self.p, *args, **kwds
+                    )
                     self.residuals = models.VAR_residuals(
                         self.data_trans, B, self.p
                     )
                 else:
-                    B, self.sigma_u = models.VAREX_LS(self.data_trans, p, ex)
+                    B, self.sigma_u = models.VAREX_LS(
+                        self.data_trans, p, ex, *args, **kwds
+                    )
                 # we call it AM to have one place for VARMA parameters
                 self.AM = B
             self.p = p
@@ -519,7 +532,7 @@ class VG(vg_plotting.VGPlotting):
                 if self.verbose:
                     print("Perfoming VARMA order selection: ", end=" ")
                 self.p, self.q = p, q = models.VARMA_order_selection(
-                    self.data_trans, p_max, plot_table=self.plot
+                    self.data_trans, p_max, plot_table=self.plot, *args, **kwds
                 )
                 if self.verbose:
                     print("p=%d and q=%d seems parsimonious to me" % (p, q))
@@ -536,7 +549,7 @@ class VG(vg_plotting.VGPlotting):
             self.data_trans -= self.means
 
             AM, sigma_u, residuals = models.VARMA_LS_prelim(
-                self.data_trans, p, q
+                self.data_trans, p, q, *args, **kwds
             )
 
             self.data_trans += self.means
@@ -663,7 +676,7 @@ class VG(vg_plotting.VGPlotting):
         sim_sea : (K, T) float ndarray
 
         """
-        if isinstance(random_state, basestring):
+        if isinstance(random_state, str):
             with open(random_state, "rb") as pi_file:
                 random_state = pickle.load(pi_file)
         if random_state is not None:
@@ -696,14 +709,17 @@ class VG(vg_plotting.VGPlotting):
             )
         ]
         self.fixed_variables = fixed_variables
-        self.climate_signal = np.atleast_2d(climate_signal)
-        if self.climate_signal.dtype == object:
-            # we have to back up, this has not worked
-            self.climate_signal = tuple(self.climate_signal[0])
         if isinstance(primary_var, str):
             self.primary_var = (primary_var,)
+            self.climate_signal = np.atleast_1d(climate_signal)
+            # self.climate_signal = np.atleast_2d(climate_signal)
         else:
             self.primary_var = primary_var
+            if climate_signal is None:
+                self.climate_signal = np.array([None] * len(primary_var))
+        # if self.climate_signal.dtype == object:
+        #     # we have to back up, this has not worked
+        #     self.climate_signal = tuple(self.climate_signal[0])
         for var_name in self.primary_var:
             if var_name not in self.var_names:
                 raise ValueError(f"{primary_var=} not in {self.var_names=}")
@@ -713,9 +729,9 @@ class VG(vg_plotting.VGPlotting):
                 # if we have multiple primary variables, elements of climate
                 # signal can be None. we also have to be careful, because the
                 # number of primary variables could be interpreted as T
-                climate_signal = np.atleast_2d(climate_signal)
+                # climate_signal = np.atleast_2d(climate_signal)
                 _signal = np.array(
-                    [_ for _ in climate_signal if _ is not None]
+                    [_ for _ in self.climate_signal if _ is not None]
                 )
                 self.T_sim = np.atleast_2d(_signal).shape[1]
             else:
@@ -939,35 +955,11 @@ class VG(vg_plotting.VGPlotting):
         if loc_shift:
             sim_sea = self._location_shift_back(sim_sea)
 
-        if self.verbose:
-            # checking the change of moments
-            # try:
-            # mean_before = my.nanavg(self.data_raw[self.primary_var_ii] /
-            #                         self.sum_interval[self.primary_var_ii])
-            mean_before = [
-                np.nanmean(self.data_raw[var_i] / self.sum_interval[var_i])
-                for var_i in self.primary_var_ii
-            ]
-            mean_after = np.nanmean(sim_sea[self.primary_var_ii], axis=1)
-            print(
-                (
-                    "\t%s mean (data): %s, %s mean (sim): %s, " "diff: %s"
-                )  # , mean(m): %.4f")
-                % (
-                    ", ".join(self.primary_var),
-                    ", ".join("%.3f" % mean for mean in mean_before),
-                    ", ".join(self.primary_var),
-                    ", ".join("%.3f" % mean for mean in mean_after),
-                    ", ".join(
-                        "%.3f" % diff for diff in mean_after - mean_before
-                    ),
-                )
-            )  # m[self.primary_var_ii].mean()))
-            # except (UnboundLocalError, NameError, ValueError, TypeError):
-            #     pass
-
         # lets store this so we can play with it from the outside
         self.sim, self.sim_sea = sim, sim_sea
+
+        if self.verbose:
+            self.print_means()
 
         if self.dump:
             extra = "" if self.station_name is None else self.station_name
@@ -984,6 +976,21 @@ class VG(vg_plotting.VGPlotting):
             )
 
         return self.sim_times, sim_sea
+
+    def print_means(self):
+        obs = self.to_df("daily input").mean(axis=0)
+        obs.name = "obs"
+        sim = self.to_df("daily output", with_conversions=False).mean(axis=0)
+        sim.name = "sim"
+        diff = pd.DataFrame(
+            sim.values - obs.values, index=obs.index, columns=["diff"]
+        )
+        diff_perc = pd.DataFrame(
+            100 * (sim.values - obs.values) / obs.values,
+            index=obs.index,
+            columns=["diff [%]"],
+        )
+        print(pd.concat([obs, sim, diff, diff_perc], axis=1).round(3))
 
     def disaggregate_rm(self, refit=None):
         """Random Mixing variant of disaggregation."""
@@ -1121,7 +1128,7 @@ class VG(vg_plotting.VGPlotting):
             if self.verbose:
                 print("Disaggregating all variables")
             var_names_dis = self.var_names
-        elif isinstance(var_names_dis, basestring):
+        elif isinstance(var_names_dis, str):
             if self.verbose:
                 print("Disaggregating selected variables.")
             var_names_dis = (var_names_dis,)
@@ -1899,7 +1906,8 @@ class VG(vg_plotting.VGPlotting):
         variable and the given climate signal."""
         var_name = self.primary_var[prim_i]
         return (
-            self.climate_signal[prim_i] - self.fitted_medians(var_name)
+            np.atleast_2d(self.climate_signal)[prim_i]
+            - self.fitted_medians(var_name)
         ) * self.sum_interval_dict[var_name]
 
     def _location_shift_normal(self, sim):
