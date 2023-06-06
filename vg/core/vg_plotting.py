@@ -144,8 +144,10 @@ class VGPlotting(vg_base.VGBase):
                                               axs=axs, *args, **kwds)
         title_str = "Precipitation exceedance"
         fig.suptitle(title_str)
-        fig.canvas.set_window_title("%s (%d)" %
-                                    (title_str, fig.canvas.manager.num))
+        try:
+            fig.canvas.set_window_title(f"{title_str} ({fig.canvas.manager.num})")
+        except AttributeError:
+            pass
         return fig, axs
 
     def plot_exeedance_hourly(self, thresh=None, fig=None, axs=None,
@@ -203,8 +205,7 @@ class VGPlotting(vg_base.VGBase):
             title_str = "Hydrological year sums (cdf)"
             ax.set_title(title_str)
             try:
-                fig.canvas.set_window_title("%s (%d)" %
-                                            (title_str, fig.canvas.manager.num))
+                fig.canvas.set_window_title(f"{title_str} ({fig.canvas.manager.num})")
             except AttributeError:
                 pass
         return fig, ax
@@ -317,8 +318,10 @@ class VGPlotting(vg_base.VGBase):
             ax.set_title(conf.long_var_names[var_name])
         title_str = "Seasonal scatter"
         fig.suptitle(title_str)
-        fig.canvas.set_window_title("%s (%d)" %
-                                    (title_str, fig.canvas.manager.num))
+        try:
+            fig.canvas.set_window_title(f"{title_str} ({fig.canvas.manager.num})")
+        except AttributeError:
+            pass
         return fig, ax
 
     def _meteogram(self, time, data, suptitle, var_names, fig=None, axs=None,
@@ -560,8 +563,10 @@ class VGPlotting(vg_base.VGBase):
             title_str = ("Seasonal scatter of residuals %s" %
                          conf.long_var_names[var_name])
             ax.set_title(title_str)
-            fig.canvas.set_window_title("%s (%d)" %
-                                        (title_str, fig.canvas.manager.num))
+            try:
+                fig.canvas.set_window_title(f"{title_str} ({fig.canvas.manager.num})")
+            except AttributeError:
+                pass
         return figs, axs
 
     def plot_spaces(self, var_names=None, opacity=.4):
@@ -594,9 +599,10 @@ class VGPlotting(vg_base.VGBase):
                              (conf.long_var_names[var_name2],
                               conf.long_var_names[var_name1]))
                 ax.set_title(title_str)
-                fig.canvas.set_window_title("%s (%d)" %
-                                            (title_str,
-                                             fig.canvas.manager.num))
+                try:
+                    fig.canvas.set_window_title(f"{title_str} ({fig.canvas.manager.num})")
+                except AttributeError:
+                    pass
         return figs, axs
 
     def plot_diff_spaces(self, var_names=None, diff=1, opacity=.4):
@@ -627,9 +633,10 @@ class VGPlotting(vg_base.VGBase):
             title_str = ("Spaces %d-lagged %s" %
                          (diff, conf.long_var_names[var_name]))
             ax.set_title(title_str)
-            fig.canvas.set_window_title("%s (%d)" %
-                                        (title_str,
-                                         fig.canvas.manager.num))
+            try:
+                fig.canvas.set_window_title(f"{title_str} ({fig.canvas.manager.num})")
+            except AttributeError:
+                pass
         return figs, axs
 
     def plot_hourly_fit(self, var_names=None, *args, **kwds):
@@ -771,7 +778,10 @@ class VGPlotting(vg_base.VGBase):
                             fig.canvas.manager.num,
                             discr_str))
             ax.set_title(title_str)
-            fig.canvas.set_window_title(title_str)
+            try:
+                fig.canvas.set_window_title(title_str)
+            except AttributeError:
+                pass
             figs += [fig]
             axss += [ax]
 
@@ -786,7 +796,10 @@ class VGPlotting(vg_base.VGBase):
                                 fig.canvas.manager.num,
                                 discr_str))
                 plt.title(title_str)
-                fig.canvas.set_window_title(title_str)
+                try:
+                    fig.canvas.set_window_title(title_str)
+                except AttributeError:
+                    pass
                 fig.name = ("scatter_pdf_quantiles_%s_%s" %
                             (var_name, discr_str))
                 figs += [fig]
@@ -796,7 +809,10 @@ class VGPlotting(vg_base.VGBase):
                 if isinstance(dist, sd.SeasonalDist):
                     fig, _ = dist.plot_fourier_fit()
                     fig.suptitle(suptitle)
-                    fig.canvas.set_window_title(suptitle)
+                    try:
+                        fig.canvas.set_window_title(suptitle)
+                    except AttributeError:
+                        pass
                     fig.name = "scatter_pdf_fft_%s_%s" % (var_name, discr_str)
                     figs += [fig]
             if plot_monthly:
@@ -805,10 +821,16 @@ class VGPlotting(vg_base.VGBase):
                     try:
                         for f in fig:
                             f.suptitle(suptitle)
-                            fig.canvas.set_window_title(suptitle)
+                            try:
+                                fig.canvas.set_window_title(suptitle)
+                            except AttributeError:
+                                pass
                     except TypeError:
                         fig.suptitle(suptitle)
-                        fig.canvas.set_window_title(suptitle)
+                        try:
+                            fig.canvas.set_window_title(suptitle)
+                        except AttributeError:
+                            pass
                     if isinstance(fig, mpl.figure.Figure):
                         fig = [fig]
                     if isinstance(axs, np.ndarray):
@@ -821,10 +843,17 @@ class VGPlotting(vg_base.VGBase):
                     try:
                         for f in fig:
                             f.suptitle(suptitle)
-                            fig.canvas.set_window_title(suptitle)
+                            try:
+                                fig.canvas.set_window_title(suptitle)
+                            except AttributeError:
+                                pass
+                            
                     except TypeError:
                         fig.suptitle(suptitle)
-                        fig.canvas.set_window_title(suptitle)
+                        try:
+                            fig.canvas.set_window_title(suptitle)
+                        except AttributeError:
+                            pass
                     if isinstance(fig, mpl.figure.Figure):
                         fig = [fig]
                     if isinstance(axs, np.ndarray):
@@ -912,7 +941,11 @@ class VGPlotting(vg_base.VGBase):
             plt.draw()
         title_str = "QQ-plots"
         fig.suptitle(title_str)
-        fig.canvas.set_window_title(title_str)
+
+        try:
+            fig.canvas.set_window_title(title_str)
+        except AttributeError:
+            pass
         fig.name = "qq"
         return fig, axs
 
@@ -1361,7 +1394,10 @@ class VGPlotting(vg_base.VGBase):
 
             suptitle = "Episode statistics %s" % var_name
             fig.suptitle(suptitle)
-            fig.canvas.set_window_title(suptitle)
+            try:
+                fig.canvas.set_window_title(suptitle)
+            except AttributeError:
+                pass
             figs += [fig]
             axs += [axs_]
         return figs, axs
@@ -1484,7 +1520,10 @@ class VGPlotting(vg_base.VGBase):
             title = "Seasonal daily cycles for %s" % conf.ygreek[var_name]
             fig.suptitle(title)
             fig.name = "daily_cycles_%s" % var_name
-            fig.canvas.set_window_title(title)
+            try:
+                fig.canvas.set_window_title(title)
+            except AttributeError:
+                pass
             if "constrained_layout" not in fig_kw.keys():
                 fig.tight_layout(rect=(0, 0, 1, .925))
             fig.subplots_adjust(right=0.8)
