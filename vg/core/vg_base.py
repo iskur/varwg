@@ -1095,7 +1095,9 @@ class VGBase(object):
                     print("\tRecover previous fit from shelve for: ", var_name)
                 try:
                     seas_class, dist_class, solution = sh[solution_key]
-                except UnpicklingError:
+                except UnpicklingError as exc:
+                    if self.verbose:
+                        print(exc)
                     self._fit_distribution(
                         sh, var, var_name, solution_key, **kwds
                     )
