@@ -2,6 +2,7 @@
 import time
 import numpy as np
 import numpy.testing as npt
+import vg
 import vg.time_series_analysis.conditional_sim as csim
 from vg.time_series_analysis import models, time_series, distributions
 from .test_spectral import cov, autocovs, K
@@ -10,7 +11,7 @@ from . import test_models
 
 class Test(npt.TestCase):
     def setUp(self):
-        np.random.seed(0)
+        vg.reseed(0)
         self.verbose = False
         self.rho = 0.9
         self.cov_model_ar1 = lambda lag: self.rho**lag / (1 - self.rho**2)
@@ -157,7 +158,7 @@ class Test(npt.TestCase):
     #     npt.assert_almost_equal(means2, data)
 
     def test_disaggregate_2d(self):
-        # np.random.seed(0)
+        # vg.reseed(0)
         disagg_len = 5
         nan_mask = np.isnan(self.data_obs)
 
@@ -215,8 +216,8 @@ class Test(npt.TestCase):
 
     def test_disaggregate_2d_nonlin(self):
         """Disaggregate with a back-transformation."""
-        np.random.seed(0)
-        dist = distributions.expon(1, old_div(1.0, 15.0))
+        vg.reseed(0)
+        dist = distributions.expon(1, 1 / 15)
 
         def trans(values, *args):
             return np.array(

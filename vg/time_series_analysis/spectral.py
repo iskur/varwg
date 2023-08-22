@@ -18,7 +18,7 @@ except ImportError:
     warnings.warn("Could not import pyfftw. Using the slower numpy functions.")
     FFTW = False
 from vg.time_series_analysis import time_series
-
+import vg
 
 if FFTW:
     pyfftw.interfaces.cache.enable()
@@ -138,8 +138,8 @@ class Spectral(object):
 
     @property
     def sim(self):
-        real = np.random.normal(size=np.ravel(self.size))
-        imag = np.random.normal(size=np.ravel(self.size))
+        real = vg.rng.normal(size=np.ravel(self.size))
+        imag = vg.rng.normal(size=np.ravel(self.size))
         epsilon = real + 1j * imag
         rand = epsilon * self.sqrt_fft_covs
         return (np.real(self.ifft_func(rand)) * self.npoints)[
@@ -180,7 +180,7 @@ class Spectral(object):
                     (self.pool, gen_n(n - self.pool_size))
                 )
                 self.pool_size = n
-            return self.pool[np.random.randint(self.pool_size, size=n)]
+            return self.pool[vg.rng.integers(self.pool_size, size=n)]
 
 
 class SpectralND(Spectral):

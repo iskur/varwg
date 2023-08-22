@@ -43,7 +43,6 @@ PY2 = sys.version_info.major == 2
 cache_filename = "seasonal_solutions_{version}.sh".format(
     version="py2" if PY2 else "py3"
 )
-rng = default_rng()
 
 
 def detrend(values):

@@ -1,6 +1,7 @@
 import warnings
 import numpy as np
 from vg import helpers as my
+import vg
 
 
 @my.cache(mask=None)
@@ -13,7 +14,7 @@ def _random_phases(phases, T_sim, T_data, verbose=False, mask_fun=None):
         # phase randomization with same random phases in all
         # variables and stations
         phases_len = T_data // 2 - 1 + T_data % 2
-        phases_pos = np.random.uniform(0, 2 * np.pi, phases_len)
+        phases_pos = vg.rng.uniform(0, 2 * np.pi, phases_len)
 
         if mask_fun is not None:
             # e.g.: do not touch phases that are close to the annual
@@ -135,7 +136,7 @@ def randomize2d_old(
     randomized = []
     zero_phases = np.zeros(K)[:, None]
     while T_total < T:
-        phases_lh = np.random.uniform(
+        phases_lh = vg.rng.uniform(
             0, 2 * np.pi, T_data // 2 if T_data % 2 == 1 else T_data // 2 - 1
         )
         phases_lh = np.array(K * [phases_lh])

@@ -6,6 +6,7 @@ import warnings
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+import vg
 from vg import helpers as my
 
 
@@ -208,7 +209,7 @@ def richardson_model_occ(T, trans_pp):
     pp = trans_pp
     T = int(round(T))
     occs = np.full(T, False, dtype=bool)
-    rr = np.random.rand(T)
+    rr = vg.rng.random(T)
     # decide on the first occurrence with unconditional probability
     occs[0] = rr[0] < pp[0].sum()
     for t in range(1, T):
@@ -224,7 +225,7 @@ def richardson_model(T, rain, thresh=0.0001):
     trans_pp = trans_prob(rain)
     occs = richardson_model_occ(T, trans_pp)
     rain_sim = np.zeros(int(round(T)))
-    rain_sim[occs] = np.random.choice(rain[rain > thresh], np.sum(occs))
+    rain_sim[occs] = vg.rng.choice(rain[rain > thresh], np.sum(occs))
     return rain_sim
 
 

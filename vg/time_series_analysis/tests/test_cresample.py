@@ -14,7 +14,7 @@ from vg.time_series_analysis import cresample
 
 class Test(npt.TestCase):
     def setUp(self):
-        np.random.seed(0)
+        vg.reseed(0)
         self.tempdir = tempfile.mkdtemp()
         self.met_vg = vg.VG(
             ("theta", "Qsw", "ILWR", "rh", "u", "v"), verbose=False  # "R",
@@ -32,7 +32,7 @@ class Test(npt.TestCase):
         )
 
     def test_resample_mean(self):
-        np.random.seed(0)
+        vg.reseed(0)
         res = cresample.resample(self.data, self.times, p=3, theta_incr=0)[0]
         npt.assert_almost_equal(
             np.mean(res, axis=1), np.mean(self.data, axis=1), decimal=1

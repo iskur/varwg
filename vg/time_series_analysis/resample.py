@@ -11,6 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import optimize
 
+import vg
 from vg import helpers as my
 from vg import times
 
@@ -260,7 +261,7 @@ def resample(
     doy_neighbors = np.where(
         times.doy_distance(doys[0], doys[:-p]) <= doy_tolerance
     )[0]
-    start_i = np.random.choice(doy_neighbors)
+    start_i = vg.rng.choice(doy_neighbors)
     sim[:, :p] = data[:, start_i : start_i + p]
     candidate_series[:, :p] = sim[:, :p, None]
     chosen_indices[:p] = list(range(start_i, start_i + p))
@@ -304,7 +305,7 @@ def resample(
         if return_candidates:
             neighbors = doy_neighbors[candidates_i]
             candidate_series[:, t, :] = data[:, neighbors + p]
-        doy_neighbor_i = np.random.choice(candidates_i, p=k_ji)
+        doy_neighbor_i = vg.rng.choice(candidates_i, p=k_ji)
         neighbor_i = doy_neighbors[doy_neighbor_i]
         # save the origin for outside analysis
         chosen_indices[t] = neighbor_i
