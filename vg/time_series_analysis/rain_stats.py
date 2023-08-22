@@ -9,7 +9,7 @@ import pandas as pd
 from vg import helpers as my
 
 
-def trans_prob(rain, thresh=.0001):
+def trans_prob(rain, thresh=0.0001):
     """Estimates transition probabilities.
 
     Parameter
@@ -33,11 +33,10 @@ def trans_prob(rain, thresh=.0001):
     p00 = np.sum(~rain_mask[:-1] & no_change_mask)
     p10 = np.sum(diffs == -1)
     p01 = np.sum(diffs == 1)
-    return (np.array([[p00, p01],
-                      [p10, p11]]) / n)
+    return np.array([[p00, p01], [p10, p11]]) / n
 
 
-def spell_lengths(rain, thresh=.001):
+def spell_lengths(rain, thresh=0.001):
     """Calculate dry and wet spell lenghts.
 
     Parameter
@@ -54,16 +53,28 @@ def spell_lengths(rain, thresh=.001):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
         rain_mask = rain >= thresh
-    dry = np.array([stop_i - start_i + 1
-                    for start_i, stop_i in my.gaps(~rain_mask)])
-    wet = np.array([stop_i - start_i + 1
-                    for start_i, stop_i in my.gaps(rain_mask)])
+    dry = np.array(
+        [stop_i - start_i + 1 for start_i, stop_i in my.gaps(~rain_mask)]
+    )
+    wet = np.array(
+        [stop_i - start_i + 1 for start_i, stop_i in my.gaps(rain_mask)]
+    )
     return dry, wet
 
 
-def plot_exceedance(obs, sim=None, kind="depth", thresh=.001, fig=None,
-                  axs=None, figsize=None, lkwds=None, draw_scatter=None,
-                  *pargs, **pkwds):
+def plot_exceedance(
+    obs,
+    sim=None,
+    kind="depth",
+    thresh=0.001,
+    fig=None,
+    axs=None,
+    figsize=None,
+    lkwds=None,
+    draw_scatter=None,
+    *pargs,
+    **pkwds,
+):
     """Plot exceedance probability.
 
     Parameter
@@ -87,24 +98,23 @@ def plot_exceedance(obs, sim=None, kind="depth", thresh=.001, fig=None,
         draw_scatter = not bool(fig)
     if kind == "all":
         if fig is None:
-            fig, axs = plt.subplots(ncols=3,
-                                    sharey=True,
-                                    figsize=figsize,
-                                    constrained_layout=True)
+            fig, axs = plt.subplots(
+                ncols=3, sharey=True, figsize=figsize, constrained_layout=True
+            )
         kinds = "depth", "dry", "wet"
     elif isinstance(kind, basestring):
-        kinds = kind,
+        kinds = (kind,)
     elif fig is None or axs is None:
-        fig, axs = plt.subplots(figsize=figsize,
-                                sharey=True,
-                                constrained_layout=True)
-        axs = axs,
-        kinds = kind,
+        fig, axs = plt.subplots(
+            figsize=figsize, sharey=True, constrained_layout=True
+        )
+        axs = (axs,)
+        kinds = (kind,)
     if lkwds is None:
         lkwds = {}
 
     def rel_ranks(n):
-        return (np.arange(float(n)) + .5) / n
+        return (np.arange(float(n)) + 0.5) / n
 
     def plot_sim_single(ax, sim):
         sim_conv = conv(sim)
@@ -117,17 +127,20 @@ def plot_exceedance(obs, sim=None, kind="depth", thresh=.001, fig=None,
         ax = axs[ax_i]
 
         if kind == "depth":
+
             def conv(x):
                 valid_x = x[np.isfinite(x)]
                 return valid_x[valid_x >= thresh]
 
             ax.set_xlabel("depth [mm]")
         elif kind == "dry":
+
             def conv(x):
                 return spell_lengths(x, thresh)[0]
 
             ax.set_xlabel("dry spell length")
         elif kind == "wet":
+
             def conv(x):
                 return spell_lengths(x, thresh)[1]
 
@@ -145,10 +158,15 @@ def plot_exceedance(obs, sim=None, kind="depth", thresh=.001, fig=None,
             obs_conv = conv(obs)
             ranks = rel_ranks(len(obs_conv))
             obs_sorted = np.sort(obs_conv)[::-1]
-            ax.scatter(obs_sorted, ranks, marker="o",
-                       edgecolor=edgecolor,
-                       # edgecolor=(1, 0, 0, .5),
-                       facecolor=(0, 0, 0, 0), **lkwds)
+            ax.scatter(
+                obs_sorted,
+                ranks,
+                marker="o",
+                edgecolor=edgecolor,
+                # edgecolor=(1, 0, 0, .5),
+                facecolor=(0, 0, 0, 0),
+                **lkwds,
+            )
             ax.set_xscale("log")
             ax.set_yscale("log")
             ax.set_ylim(max(5e-4, ranks[0]), ranks[-1])
@@ -194,19 +212,19 @@ def richardson_model_occ(T, trans_pp):
     # decide on the first occurrence with unconditional probability
     occs[0] = rr[0] < pp[0].sum()
     for t in range(1, T):
-        occs[t] = rr[t] < (pp[int(occs[t - 1]), 1] /
-                           pp[:, int(occs[t - 1])].sum())
+        occs[t] = rr[t] < (
+            pp[int(occs[t - 1]), 1] / pp[:, int(occs[t - 1])].sum()
+        )
     return occs
 
 
-def richardson_model(T, rain, thresh=.0001):
+def richardson_model(T, rain, thresh=0.0001):
     if T is None:
         T = len(rain)
     trans_pp = trans_prob(rain)
     occs = richardson_model_occ(T, trans_pp)
     rain_sim = np.zeros(int(round(T)))
-    rain_sim[occs] = np.random.choice(rain[rain > thresh],
-                                      np.sum(occs))
+    rain_sim[occs] = np.random.choice(rain[rain > thresh], np.sum(occs))
     return rain_sim
 
 
@@ -244,8 +262,8 @@ def hyd_year_sums(data_xar, fun_name="sum", full_years=True):
 
 
 if __name__ == "__main__":
-
     import vg
+
     vg.conf = vg.config_konstanz
     met_vg = vg.VG(("R", "theta"))
     rain = old_div(met_vg.data_raw[0], 24)

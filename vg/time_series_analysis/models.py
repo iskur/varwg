@@ -32,8 +32,7 @@ import scipy
 from past.utils import old_div
 from scipy import linalg, optimize
 from scipy.linalg import kron
-from scipy.stats import (skew, rankdata,
-                         distributions as sp_distributions)
+from scipy.stats import skew, rankdata, distributions as sp_distributions
 from tqdm import tqdm
 
 from vg import helpers as my
@@ -42,8 +41,9 @@ from vg.time_series_analysis.distributions import MDFt, norm
 from vg.time_series_analysis import phase_randomization
 
 
-mgarch_param_factory = namedtuple("mgarch_params",
-                                  ("gamma0", "Gammas", "Gs", "cov_residuals"))
+mgarch_param_factory = namedtuple(
+    "mgarch_params", ("gamma0", "Gammas", "Gs", "cov_residuals")
+)
 rng = np.random.default_rng()
 
 
@@ -53,19 +53,21 @@ def MGARCH_ML(residuals, q, m):
 
     """
     K, T = residuals.shape
-    dim0 = int(.5 * K * (K + 1))
+    dim0 = int(0.5 * K * (K + 1))
     gamma0 = np.full(dim0, 1e-6)
-    Gammas = q * [np.diagflat(np.full(dim0, .1))]
-    Gs = m * [np.diagflat(np.full(dim0, .1))]
-    delta_vec = vec(np.hstack((gamma0[:, None],
-                               np.hstack(Gammas),
-                               np.hstack(Gs))))
+    Gammas = q * [np.diagflat(np.full(dim0, 0.1))]
+    Gs = m * [np.diagflat(np.full(dim0, 0.1))]
+    delta_vec = vec(
+        np.hstack((gamma0[:, None], np.hstack(Gammas), np.hstack(Gs)))
+    )
     sigma0 = np.cov(residuals)
-    result = optimize.minimize(_MGARCH_likelihood,
-                               x0=delta_vec,
-                               bounds=len(delta_vec) * [(0, None)],
-                               args=(residuals, q, m, sigma0),
-                               options=dict(disp=True))
+    result = optimize.minimize(
+        _MGARCH_likelihood,
+        x0=delta_vec,
+        bounds=len(delta_vec) * [(0, None)],
+        args=(residuals, q, m, sigma0),
+        options=dict(disp=True),
+    )
     gamma0, Gammas, Gs = _MGARCH_unpack(result.x, K, q, m)
     _check_stationarity(Gammas, Gs)
     mgarch_residuals = MGARCH_residuals(residuals, gamma0, Gammas, Gs)
@@ -113,15 +115,15 @@ def _MGARCH_likelihood(params, ut, q, m, sigma0):
         if variance_min <= 0:
             raise OverflowError
             # import ipdb; ipdb.set_trace()
-            llh += variance_min ** 2
+            llh += variance_min**2
         elif sigma_det <= 0:
-            llh += sigma_det ** 2
+            llh += sigma_det**2
         elif not np.isfinite(sigma_det):
             llh += 1e9
         else:
-            llh += (-np.log(sigma_det)
-                    - np.dot(np.dot(ut[:, t].T, linalg.inv(sigma)),
-                             ut[:, t]))
+            llh += -np.log(sigma_det) - np.dot(
+                np.dot(ut[:, t].T, linalg.inv(sigma)), ut[:, t]
+            )
         return llh
 
     for t in range(max(q, m), T):
@@ -181,11 +183,12 @@ def MGARCH_sim(params, T, sigma0, epsilon=None, n_presim_steps=100):
     if epsilon is None:
         # epsilon = np.random.multivariate_normal(K * [0], cov_residuals,
         #                                         n_sim_steps - max(q, m))
-        epsilon = rng.multivariate_normal(K * [0], cov_residuals,
-                                    n_sim_steps - max(q, m))
+        epsilon = rng.multivariate_normal(
+            K * [0], cov_residuals, n_sim_steps - max(q, m)
+        )
         epsilon = epsilon.T
     ut = np.zeros((K, n_sim_steps))
-    ut[:, :max(q, m)] = epsilon[:, :max(q, m)]
+    ut[:, : max(q, m)] = epsilon[:, : max(q, m)]
     sigmas = q * [sigma0]
     for t in range(max(q, m), n_sim_steps):
         sigma_vech = gamma0
@@ -201,13 +204,14 @@ def MGARCH_sim(params, T, sigma0, epsilon=None, n_presim_steps=100):
 
 
 def _MGARCH_unpack(params, K, q, m):
-    dim0 = int(.5 * K * (K + 1))
+    dim0 = int(0.5 * K * (K + 1))
     delta = unvec(params, dim0)
     gamma0 = delta[:, 0]
-    Gammas = [delta[:, i:i + dim0]
-              for i in range(1, 1 + q * dim0, dim0)]
-    Gs = [delta[:, i:i + dim0]
-          for i in range(1 + q * dim0, 1 + (q + m) * dim0, dim0)]
+    Gammas = [delta[:, i : i + dim0] for i in range(1, 1 + q * dim0, dim0)]
+    Gs = [
+        delta[:, i : i + dim0]
+        for i in range(1 + q * dim0, 1 + (q + m) * dim0, dim0)
+    ]
     return gamma0, Gammas, Gs
 
 
@@ -281,7 +285,7 @@ def VAR_LS(data, p=2):
 
     # covariance matrix of the noise
     sigma_u = Y @ Y.T - B @ Z @ Y.T
-    sigma_u /= (Y.shape[1] - K * p - 1)
+    sigma_u /= Y.shape[1] - K * p - 1
 
     return B, sigma_u
 
@@ -358,8 +362,9 @@ def VAREX_LS(data, p, ex):
     return B, sigma_u
 
 
-def SVAR_LS(data, doys, p=2, doy_width=60, fft_order=2, var_names=None,
-          verbose=True):
+def SVAR_LS(
+    data, doys, p=2, doy_width=60, fft_order=2, var_names=None, verbose=True
+):
     """Seasonal version of the least squares estimator."""
     K, T = data.shape
     Bs, sigma_us = [], []
@@ -367,9 +372,9 @@ def SVAR_LS(data, doys, p=2, doy_width=60, fft_order=2, var_names=None,
     for doy in tqdm(unique_doys, disable=(not verbose)):
         mask = (doys > doy - doy_width) & (doys <= doy + doy_width)
         if (doy - doy_width) < 0:
-            mask |= doys > (365. - doy_width + doy)
+            mask |= doys > (365.0 - doy_width + doy)
         if (doy + doy_width) > 365:
-            mask |= doys < (doy + doy_width - 365.)
+            mask |= doys < (doy + doy_width - 365.0)
         B, sigma_u = VAR_LS(np.where(mask, data, np.nan), p=p)
         Bs += [B]
         sigma_us += [sigma_u]
@@ -407,9 +412,14 @@ def SVAR_LS(data, doys, p=2, doy_width=60, fft_order=2, var_names=None,
 
     def matr_fft(M, fft_order):
         return np.asarray(
-            [[my.fourier_approx(M[:, k, j], fft_order)
-              for j in range(M.shape[2])]
-             for k in range(K)])
+            [
+                [
+                    my.fourier_approx(M[:, k, j], fft_order)
+                    for j in range(M.shape[2])
+                ]
+                for k in range(K)
+            ]
+        )
 
     # import matplotlib.pyplot as plt
     # plt.rcParams["font.size"] = 7
@@ -437,8 +447,7 @@ def SVAR_LS(data, doys, p=2, doy_width=60, fft_order=2, var_names=None,
 def VAR_mean(B):
     K = B.shape[0]
     p = (B.shape[1] - 1) // K
-    Ai = [np.asarray(B[:, 1 + i * K: 1 + (i + 1) * K])
-          for i in range(p)]
+    Ai = [np.asarray(B[:, 1 + i * K : 1 + (i + 1) * K]) for i in range(p)]
     nu = B[:, 0]
     mu = np.identity(K)
     for i in range(p):
@@ -447,8 +456,7 @@ def VAR_mean(B):
 
 
 def VAR_cov(B, sigma_u):
-    """see p. 27-28
-    """
+    """see p. 27-28"""
     K = B.shape[0]
     p = (B.shape[1] - 1) // K
     A = B2A(B)
@@ -466,19 +474,31 @@ def B2A(B):
     A[:K] = B[:, 1:]
     Ik = np.identity(K)
     for i in range(p - 1):
-        A[(i + 1) * K: (i + 2) * K,
-          i * K: (i + 1) * K] = Ik
+        A[(i + 1) * K : (i + 2) * K, i * K : (i + 1) * K] = Ik
     return A
 
 
 @my.cache("ut")
-def SVAR_LS_sim(Bs, sigma_us, doys, m=None, ia=None, m_trend=None, u=None,
-              n_presim_steps=100, fixed_data=None, phase_randomize=False,
-              rphases=None, return_rphases=False, p_kwds=None,
-              taboo_period_min=None, taboo_period_max=None):
+def SVAR_LS_sim(
+    Bs,
+    sigma_us,
+    doys,
+    m=None,
+    ia=None,
+    m_trend=None,
+    u=None,
+    n_presim_steps=100,
+    fixed_data=None,
+    phase_randomize=False,
+    rphases=None,
+    return_rphases=False,
+    p_kwds=None,
+    taboo_period_min=None,
+    taboo_period_max=None,
+):
     if p_kwds is None:
         p_kwds = dict()
-    doys_ii = (doys % 365) / 365. * len(np.unique(doys))
+    doys_ii = (doys % 365) / 365.0 * len(np.unique(doys))
     # doys_ii = doys % len(np.unique(doys))
     doys_ii = doys_ii.astype(int)
     K = Bs.shape[0]
@@ -496,33 +516,35 @@ def SVAR_LS_sim(Bs, sigma_us, doys, m=None, ia=None, m_trend=None, u=None,
             taboo_period_max=taboo_period_max,
             return_rphases=return_rphases,
             rphases=rphases,
-            **p_kwds)
+            **p_kwds
+        )
         if return_rphases:
             u, rphases = u
     if u is None:
         u = np.array(
-            [rng.multivariate_normal(K * [0],
-                                     sigma_us[..., doy_i])
-             for doy_i in doys_ii])
+            [
+                rng.multivariate_normal(K * [0], sigma_us[..., doy_i])
+                for doy_i in doys_ii
+            ]
+        )
         u = u.T
     SVAR_LS_sim.ut = u
     for t, doy_i in enumerate(doys_ii):
-        Y[:, t + p] = \
-            VAR_LS_sim(
-                Bs[..., doy_i],
-                # ignored when using phase_randomization!
-                sigma_us[..., doy_i],
-                1,
-                None if m is None else m[:, t, None],
-                None if ia is None else ia[:, t, None],
-                m_trend,
-                n_presim_steps=0,
-                # u=None if u is None else u[:, t, None],
-                u=u[:, t, None],
-                prev_data=Y[:, t:t + p],
-                # u is already phase randomized above if requested
-                phase_randomize=False,
-            ).ravel()
+        Y[:, t + p] = VAR_LS_sim(
+            Bs[..., doy_i],
+            # ignored when using phase_randomization!
+            sigma_us[..., doy_i],
+            1,
+            None if m is None else m[:, t, None],
+            None if ia is None else ia[:, t, None],
+            m_trend,
+            n_presim_steps=0,
+            # u=None if u is None else u[:, t, None],
+            u=u[:, t, None],
+            prev_data=Y[:, t : t + p],
+            # u is already phase randomized above if requested
+            phase_randomize=False,
+        ).ravel()
     Y = Y[:, p:]
     Y_new = Y
 
@@ -564,11 +586,22 @@ def SVAR_LS_sim(Bs, sigma_us, doys, m=None, ia=None, m_trend=None, u=None,
 
 
 @my.cache("ut")
-def SVAR_LS_fill(Bs, sigma_us, doys, Y, A=None, m=None, ia=None, m_trend=None,
-               n_presim_steps=100, fixed_data=None, p_kwds=None):
+def SVAR_LS_fill(
+    Bs,
+    sigma_us,
+    doys,
+    Y,
+    A=None,
+    m=None,
+    ia=None,
+    m_trend=None,
+    n_presim_steps=100,
+    fixed_data=None,
+    p_kwds=None,
+):
     if p_kwds is None:
         p_kwds = dict()
-    doys_ii = (doys % 365) / 365. * len(np.unique(doys))
+    doys_ii = (doys % 365) / 365.0 * len(np.unique(doys))
     doys_ii = doys_ii.astype(int)
     K = Bs.shape[0]
     p = (Bs.shape[1] - 1) // K
@@ -576,21 +609,20 @@ def SVAR_LS_fill(Bs, sigma_us, doys, Y, A=None, m=None, ia=None, m_trend=None,
     Y[:, :p] = VAR_mean(Bs[..., doys_ii[-1]])
     for t, doy_i in enumerate(doys_ii):
         if np.any(np.isnan(Y[:, t + p])):
-            Y_p = \
-                VAR_LS_sim(
-                    Bs[..., doy_i],
-                    # ignored when using phase_randomization!
-                    sigma_us[..., doy_i],
-                    1,
-                    None if m is None else m[:, t, None],
-                    None if ia is None else ia[:, t, None],
-                    m_trend,
-                    n_presim_steps=0,
-                    u=np.zeros(K)[:, None],
-                    prev_data=Y[:, t:t + p],
-                    # u is already phase randomized above if requested
-                    phase_randomize=False,
-                ).ravel()
+            Y_p = VAR_LS_sim(
+                Bs[..., doy_i],
+                # ignored when using phase_randomization!
+                sigma_us[..., doy_i],
+                1,
+                None if m is None else m[:, t, None],
+                None if ia is None else ia[:, t, None],
+                m_trend,
+                n_presim_steps=0,
+                u=np.zeros(K)[:, None],
+                prev_data=Y[:, t : t + p],
+                # u is already phase randomized above if requested
+                phase_randomize=False,
+            ).ravel()
             u_t = Y[:, t + p] - Y_p
             u_t = _cholesky_partial(u_t, sigma_us[..., doy_i], A=A)
             Y[:, t + p] = Y_p + u_t
@@ -634,9 +666,19 @@ def VAR_LS_asy(data, skewed_i, p=None):
 
 
 @my.cache("ut")
-def VAR_LS_sim_asy(B, sigma_u, T, data, p, skewed_i,
-                   n_presim_steps=100, verbose=False, var_names=None,
-                   *args, **kwds):
+def VAR_LS_sim_asy(
+    B,
+    sigma_u,
+    T,
+    data,
+    p,
+    skewed_i,
+    n_presim_steps=100,
+    verbose=False,
+    var_names=None,
+    *args,
+    **kwds
+):
     residuals = VAR_residuals(data, B, p)
     data_skew = VAR_LS_asy(data, skewed_i, p)
     data_skew = np.squeeze(data_skew)
@@ -699,8 +741,8 @@ def VAR_LS_sim_asy(B, sigma_u, T, data, p, skewed_i,
     #     data[:, [swap.j, swap.i]] = data[:, [swap.i, swap.j]]
     #     return data
 
-    temp = 2.
-    k = .95
+    temp = 2.0
+    k = 0.95
     m, M = 0, 200
     error_old = skew_error(u)
     u = swap(u)
@@ -740,13 +782,16 @@ def VAR_LS_sim_asy(B, sigma_u, T, data, p, skewed_i,
         if m == M:
             m = 0
             temp *= k
-            print ("sim: %.3f, data: %.3f, temp: %.5f" %
-                   (asy(u), data_skew, temp))
-            if (old_div((error_last_best - error_best), error_last_best) < 1e-6
-                    or (np.all(~accept) and iteration > 5000)):
+            print(
+                "sim: %.3f, data: %.3f, temp: %.5f" % (asy(u), data_skew, temp)
+            )
+            if old_div(
+                (error_last_best - error_best), error_last_best
+            ) < 1e-6 or (np.all(~accept) and iteration > 5000):
                 break
 
     import matplotlib.pyplot as plt
+
     fig, axs = plt.subplots(3, sharex=True, sharey=True)
     axs[0].plot(residuals[0], label="residuals")
     axs[0].plot(u_best[0], label="u")
@@ -769,26 +814,45 @@ def VAR_LS_sim_asy(B, sigma_u, T, data, p, skewed_i,
         both = [
             residuals[var_i],
             # scipy.stats.trimboth(residuals[var_i], .05),
-            np.squeeze(u_best[var_i])]
+            np.squeeze(u_best[var_i]),
+        ]
         labels = "measured", "simulated"
         for ax, vals, label in zip(axs, both, labels):
-            my.hist(vals, 20, kde=True,
-                    dist=(scipy.stats.distributions.norm,
-                          scipy.stats.distributions.t),
-                    ax=ax)
+            my.hist(
+                vals,
+                20,
+                kde=True,
+                dist=(
+                    scipy.stats.distributions.norm,
+                    scipy.stats.distributions.t,
+                ),
+                ax=ax,
+            )
             skew_ = scipy.stats.skew(vals)
             kurt = scipy.stats.kurtosis(vals)
-            ax.set_title(r"%s residuals $\gamma$=%.3f kurt=%.3f" %
-                         (label, skew_, kurt))
+            ax.set_title(
+                r"%s residuals $\gamma$=%.3f kurt=%.3f" % (label, skew_, kurt)
+            )
         fig.suptitle(var_names[var_i])
 
     VAR_LS_sim_asy.ut = u_best
     return VAR_LS_sim(B, sigma_u, T, u=u_best, *args, **kwds)
 
 
-def VAR_LS_sim(B, sigma_u, T, m=None, ia=None, m_trend=None, u=None,
-               n_presim_steps=100, fixed_data=None, prev_data=None,
-               transform=None, phase_randomize=False):
+def VAR_LS_sim(
+    B,
+    sigma_u,
+    T,
+    m=None,
+    ia=None,
+    m_trend=None,
+    u=None,
+    n_presim_steps=100,
+    fixed_data=None,
+    prev_data=None,
+    transform=None,
+    phase_randomize=False,
+):
     """Based on a least squares estimator, simulate a time-series of the form
     ..math::y(t) = nu + A1*y(t-1) + ... + Ap*y(t-p) + ut
     B contains (nu, A1, ..., Ap).
@@ -856,7 +920,7 @@ def VAR_LS_sim(B, sigma_u, T, m=None, ia=None, m_trend=None, u=None,
         Y[:, :p] = prev_data[:, -p:]
         n_sim_steps -= n_presim_steps
 
-    Ai = [np.asarray(B[:, 1 + i * K: 1 + (i + 1) * K]) for i in range(p)]
+    Ai = [np.asarray(B[:, 1 + i * K : 1 + (i + 1) * K]) for i in range(p)]
 
     if m is None and prev_data is None:
         # setting starting values to the process mean
@@ -866,22 +930,22 @@ def VAR_LS_sim(B, sigma_u, T, m=None, ia=None, m_trend=None, u=None,
     if phase_randomize:
         if u is None:
             raise RuntimeError("u must be passed for phase randomization!")
-        u = phase_randomization.randomize2d(u, T=T,
-                                            taboo_period_min=None,
-                                            taboo_period_max=None)
+        u = phase_randomization.randomize2d(
+            u, T=T, taboo_period_min=None, taboo_period_max=None
+        )
     elif u is None:
         u = rng.multivariate_normal(K * [0], sigma_u, n_sim_steps - p)
         u = u.T
 
-    Y[:, -u.shape[1]:] += u
+    Y[:, -u.shape[1] :] += u
     if m is None:
         nu = B[:, 0]
         Y[:, p:] += nu[:, None]
     elif m is not None:
-        Y[:, -m.shape[1]:] += m
+        Y[:, -m.shape[1] :] += m
 
     if ia is not None:
-        Y[:, -ia.shape[1]:] += ia
+        Y[:, -ia.shape[1] :] += ia
 
     if m_trend is not None:
         # apply changes as a trend
@@ -900,13 +964,27 @@ def VAR_LS_sim(B, sigma_u, T, m=None, ia=None, m_trend=None, u=None,
 
         if (fixed_data is not None) and (t >= start_t):
             # fixing what's asked to be held constant
-            Y[:, t] = np.where(np.isnan(fixed_data[:, t - start_t]),
-                               Y[:, t], fixed_data[:, t - start_t])
+            Y[:, t] = np.where(
+                np.isnan(fixed_data[:, t - start_t]),
+                Y[:, t],
+                fixed_data[:, t - start_t],
+            )
     return Y[:, -T:]
 
 
-def VAREX_LS_sim(B, sigma_u, T, ex, m=None, ia=None, m_trend=None, u=None,
-                 n_presim_steps=100, prev_data=None, ex_kwds=None):
+def VAREX_LS_sim(
+    B,
+    sigma_u,
+    T,
+    ex,
+    m=None,
+    ia=None,
+    m_trend=None,
+    u=None,
+    n_presim_steps=100,
+    prev_data=None,
+    ex_kwds=None,
+):
     """Based on a least squares estimator, simulate a time-series of the form
     ..math::y(t) = A1*y(t-1) + ... + Ap*y(t-p) + C*x(t-1) + ut
     B contains (A1, ..., Ap, C).
@@ -986,19 +1064,19 @@ def VAREX_LS_sim(B, sigma_u, T, ex, m=None, ia=None, m_trend=None, u=None,
         Y[:, :p] = prev_data[:, -p:]
         n_sim_steps -= n_presim_steps
 
-    Ai = [B[:, i * K: (i + 1) * K] for i in range(p)]
+    Ai = [B[:, i * K : (i + 1) * K] for i in range(p)]
     C = B[:, -1]
 
     if u is None:
         u = rng.multivariate_normal(K * [0], sigma_u, n_sim_steps - p)
         u = u.T
 
-    Y[:, -u.shape[1]:] += u
+    Y[:, -u.shape[1] :] += u
     if m is not None:
-        Y[:, -m.shape[1]:] += m
+        Y[:, -m.shape[1] :] += m
 
     if ia is not None:
-        Y[:, -ia.shape[1]:] += ia
+        Y[:, -ia.shape[1] :] += ia
 
     # apply changes as a trend
     Y[:, -T:] += np.arange(T, dtype=float) / T * m_trend
@@ -1043,7 +1121,7 @@ def VAR_residuals(data, B, p=2):
 
     for t in range(p, T + p):
         for i in range(p):
-            Ai = B[:, i_shift + i * K: i_shift + (i + 1) * K]
+            Ai = B[:, i_shift + i * K : i_shift + (i + 1) * K]
             resi[:, t] -= Ai @ data[:, t - i - 1]
         if not mean_adjusted:
             resi[:, t] -= nu
@@ -1065,15 +1143,18 @@ def VAR_LS_extro(data, data_trans, transforms, backtransforms, p=2):
     def error_sum(*Bs):
         return np.sum(errors(*Bs) ** 2)
 
-    B_part = optimize.minimize(error_sum, x0=np.ravel(B0[:, 1:]),
-                               options=dict(disp=True),
-                               # method="Nelder-Mead",
-                               method="Powell",
-                               ).x
+    B_part = optimize.minimize(
+        error_sum,
+        x0=np.ravel(B0[:, 1:]),
+        options=dict(disp=True),
+        # method="Nelder-Mead",
+        method="Powell",
+    ).x
     B[:, 1:] = B_part.reshape((K, M - 1))
     residuals = VAR_LS_extro.residuals = errors(B[:, 1:])
 
     import matplotlib.pyplot as plt
+
     fig, axs = plt.subplots(nrows=K, sharex=True)
     pred = VAR_onestep_predictions(data, B, p=p)
     pred_trans = transforms(pred)
@@ -1112,13 +1193,11 @@ def VAR_onestep_predictions(data, B, p=2):
 
     for t in range(p, T):
         for i in range(p):
-            Ai = B[:, i_shift + i * K: i_shift + (i + 1) * K]
+            Ai = B[:, i_shift + i * K : i_shift + (i + 1) * K]
             predictions[:, t] += Ai @ data[:, t - i - 1]
         if not mean_adjusted:
             predictions[:, t] -= nu
-    return (np.asarray(predictions + mu)
-            if mean_adjusted
-            else predictions)
+    return np.asarray(predictions + mu) if mean_adjusted else predictions
 
 
 def VAREX_residuals(data, ex, B, p=2, ex_kwds=None):
@@ -1138,7 +1217,7 @@ def VAREX_residuals(data, ex, B, p=2, ex_kwds=None):
     C = np.asarray(B[:, -1])
     for t in range(p, T + p):
         for i in range(p):
-            Ai = np.asarray(B[:, i * K: (i + 1) * K])
+            Ai = np.asarray(B[:, i * K : (i + 1) * K])
             resi[:, t] -= Ai @ data[:, t - i - 1]
 
         if ex_isfunc:
@@ -1152,7 +1231,7 @@ def VAREX_residuals(data, ex, B, p=2, ex_kwds=None):
 
 def SVAR_residuals(data, doys, B, p=2):
     K, T = data.shape
-    doys_ii = (doys % 365) / 365. * len(np.unique(doys))
+    doys_ii = (doys % 365) / 365.0 * len(np.unique(doys))
     doys_ii = doys_ii.astype(int)
 
     # were we given a B with the nus (in the first column)?
@@ -1172,7 +1251,7 @@ def SVAR_residuals(data, doys, B, p=2):
 
     for t in range(p, T + p):
         for i in range(p):
-            Ai = B[:, i_shift + i * K: i_shift + (i + 1) * K, doys_ii[t - p]]
+            Ai = B[:, i_shift + i * K : i_shift + (i + 1) * K, doys_ii[t - p]]
             resi[:, t] -= Ai @ data[:, t - i - 1]
     return resi[:, p:] + mu if mean_adjusted else resi[:, p:]
 
@@ -1183,7 +1262,7 @@ def VARMA_LS_prelim(data, p, q):
     process. See p.474ff"""
     K, T = data.shape[0], data.shape[1] - p
     # number of parameters
-    N = K ** 2 * (p + q)
+    N = K**2 * (p + q)
 
     # first estimate ut by calculating the residuals from a long VAR-process
     B = VAR_LS(data, max(10, int(1.5 * (p + q))))[0]
@@ -1206,13 +1285,16 @@ def VARMA_LS_prelim(data, p, q):
     # R might not be necessary since we do not limit any parameters here
     R = np.identity(N)
     IK = np.identity(K)
-    gamma = ((R.T @ np.linalg.inv(kron(X @ X.T, IK) @ R))
-             @ R.T @ kron(X, IK) @ vec(Y))
+    gamma = (
+        (R.T @ np.linalg.inv(kron(X @ X.T, IK) @ R))
+        @ R.T
+        @ kron(X, IK)
+        @ vec(Y)
+    )
     residuals_arma_vec = vec(Y) - kron(X.T, IK) @ R @ gamma
     residuals_arma = residuals_arma_vec.reshape((K, T), order="F")
     # make the residuals have the same length as the data
-    residuals_arma = np.concatenate((np.zeros((K, p)), residuals_arma),
-                                    axis=1)
+    residuals_arma = np.concatenate((np.zeros((K, p)), residuals_arma), axis=1)
     sigma_u_arma = residuals_arma @ residuals_arma.T / T
     AM = gamma.reshape((K, -1), order="F")
     # the following expression leads to the same result...
@@ -1220,8 +1302,20 @@ def VARMA_LS_prelim(data, p, q):
     return AM, sigma_u_arma, residuals_arma
 
 
-def VARMA_LS_sim(AM, p, q, sigma_u, means, T, S=None, m=None, ia=None,
-                 m_trend=None, n_sim_multiple=2, fixed_data=None):
+def VARMA_LS_sim(
+    AM,
+    p,
+    q,
+    sigma_u,
+    means,
+    T,
+    S=None,
+    m=None,
+    ia=None,
+    m_trend=None,
+    n_sim_multiple=2,
+    fixed_data=None,
+):
     """Generates a time series based on the VARMA-parameters AM.
     S and m should be sequences of length K. S is a variable-discerning
     multiplier and m a adder, respectively.
@@ -1289,10 +1383,11 @@ def VARMA_LS_sim(AM, p, q, sigma_u, means, T, S=None, m=None, ia=None,
     Y = np.zeros((K, n_sim_steps))
     Y[:, :p] = means.reshape((K, -1))
 
-    Y[:, -m.shape[1]:] += m
+    Y[:, -m.shape[1] :] += m
     start_t = Y.shape[1] - T
-    ut = np.array([rng.multivariate_normal(K * [0], sigma_u)
-                   for i in range(q)]).reshape((K, q))
+    ut = np.array(
+        [rng.multivariate_normal(K * [0], sigma_u) for i in range(q)]
+    ).reshape((K, q))
     for t in range(p, n_sim_steps):
         # shift the old values back and draw a new random vector
         ut[:, :-1] = ut[:, 1:]
@@ -1309,18 +1404,19 @@ def VARMA_LS_sim(AM, p, q, sigma_u, means, T, S=None, m=None, ia=None,
 
         # conventional VARMA things
         for i in range(p):
-            Ai = AM[:, i * K: (i + 1) * K]
+            Ai = AM[:, i * K : (i + 1) * K]
             Y[:, t] += Ai @ Y[:, t - i - 1]
         for i in range(p, p + q):
-            Mi = AM[:, i * K: (i + 1) * K]
+            Mi = AM[:, i * K : (i + 1) * K]
             Y[:, t] += Mi @ ut[:, -1 - i + p]
 
         if (fixed_data is not None) and (t >= start_t):
             # fixing what's asked to be held constant
-            Y[:, t] = \
-                np.where(np.isnan(fixed_data[:, t - start_t]),
-                         Y[:, t],
-                         fixed_data[:, t - start_t])
+            Y[:, t] = np.where(
+                np.isnan(fixed_data[:, t - start_t]),
+                Y[:, t],
+                fixed_data[:, t - start_t],
+            )
 
         if fixed_data is None:
             Y[:, t] += means
@@ -1359,7 +1455,7 @@ def unvec(sequence, K):
     >>> A = np.array([[0, 3, 1, 4, 2, 5]]).T
     >>> unvec(A, K=2)
     array([[0, 1, 2],
-           [3, 4, 5]])    
+           [3, 4, 5]])
     """
     return np.array(sequence).reshape(K, -1, order="F")
 
@@ -1378,7 +1474,7 @@ def vech(A):
            [2],
            [3]])
     """
-    rows, columns = np.mgrid[0:A.shape[0], 0:A.shape[1]]
+    rows, columns = np.mgrid[0 : A.shape[0], 0 : A.shape[1]]
     return A.T[rows.T >= columns.T][:, None]
 
 
@@ -1397,35 +1493,34 @@ def unvech(sequence, K):
 
 
 def SC(sigma_u, p, T):
-    """Schwarz criterion for VAR_LS order selection (p.150). To be minimized.
-    """
+    """Schwarz criterion for VAR_LS order selection (p.150). To be minimized."""
     K = sigma_u.shape[0]
-    return np.log(np.linalg.det(sigma_u)) + np.log(T) / T * p * K ** 2
+    return np.log(np.linalg.det(sigma_u)) + np.log(T) / T * p * K**2
 
 
 def HQ(sigma_u, p, T):
-    """Hannan-Quinn for VAR_LS order selection (p.150). To be minimized.
-    """
+    """Hannan-Quinn for VAR_LS order selection (p.150). To be minimized."""
     K = sigma_u.shape[0]
-    return np.log(np.linalg.det(sigma_u)) + np.log(np.log(T)) / T * p * K ** 2
+    return np.log(np.linalg.det(sigma_u)) + np.log(np.log(T)) / T * p * K**2
 
 
 def AIC(sigma_u, p, T):
     """Akaike Information Criterion for order selection of a VAR process.
     See p.147"""
     K = sigma_u.shape[0]
-    return np.log(np.linalg.det(sigma_u)) + old_div((2 * p * K ** 2), T)
+    return np.log(np.linalg.det(sigma_u)) + old_div((2 * p * K**2), T)
 
 
 def FPE(sigma_u, p, T):
     """Final prediction error.
     See p.147"""
     K = sigma_u.shape[0]
-    return (((T + p * K + 1) / (T - p * K - 1)) ** K * np.linalg.det(sigma_u))
+    return ((T + p * K + 1) / (T - p * K - 1)) ** K * np.linalg.det(sigma_u)
 
 
-def VAR_order_selection(data, p_max=10, criterion=SC, estimator=VAR_LS,
-                        est_kwds=None):
+def VAR_order_selection(
+    data, p_max=10, criterion=SC, estimator=VAR_LS, est_kwds=None
+):
     """Order selection for VAR processes to allow parsimonious
     parameterization.
 
@@ -1460,12 +1555,17 @@ def VAR_order_selection(data, p_max=10, criterion=SC, estimator=VAR_LS,
     T = data.shape[1]
     if est_kwds is None:
         est_kwds = {}
-    return np.argmin([criterion(estimator(data, p, **est_kwds)[1], p, T)
-                      for p in range(p_max + 1)])
+    return np.argmin(
+        [
+            criterion(estimator(data, p, **est_kwds)[1], p, T)
+            for p in range(p_max + 1)
+        ]
+    )
 
 
-def VARMA_order_selection(data, p_max=5, q_max=5, criterion=SC,
-                          plot_table=False, *args, **kwds):
+def VARMA_order_selection(
+    data, p_max=5, q_max=5, criterion=SC, plot_table=False, *args, **kwds
+):
     """Returns p and q, the orders of a VARMA process that allows for
     parsimonious parameterization.
     Naive extension of VAR_order_selection without a theoretical basis!"""
@@ -1488,14 +1588,24 @@ def VARMA_order_selection(data, p_max=5, q_max=5, criterion=SC,
 
     if plot_table:
         for crit_i, crit in enumerate(crits):
-            ts.matr_img(criterion_table[crit_i],
-                        "Information criterion table. %s" % repr(crit))
+            ts.matr_img(
+                criterion_table[crit_i],
+                "Information criterion table. %s" % repr(crit),
+            )
             ts.plt.xlabel("q")
             ts.plt.ylabel("p")
 
-    p_mins, q_mins = list(zip(*[np.unravel_index(np.nanargmin(criterion_table[ii]),
-                                            criterion_table[ii].shape)
-                           for ii in range(len(crits))]))
+    p_mins, q_mins = list(
+        zip(
+            *[
+                np.unravel_index(
+                    np.nanargmin(criterion_table[ii]),
+                    criterion_table[ii].shape,
+                )
+                for ii in range(len(crits))
+            ]
+        )
+    )
     return p_mins, q_mins, criterion_table
 
 
@@ -1533,13 +1643,14 @@ def _scale_additive(additive, A, p=None):
 
     scale_matrix = np.identity(K)
     for i in range(p):
-        scale_matrix -= A[:, i * K: (i + 1) * K]
+        scale_matrix -= A[:, i * K : (i + 1) * K]
     return scale_matrix @ additive
 
 
 ###############################################################################
 ## WARNING! The following functions were NOT tested thoroughly!!!!!!!!!!!!!!!!!
 ###############################################################################
+
 
 def VAR_LS_predict(data_past, B, sigma_u, T=1, n_realizations=1):
     """Based on a least squares estimator, predict a time-series of the form
@@ -1584,7 +1695,7 @@ def VAR_LS_predict(data_past, B, sigma_u, T=1, n_realizations=1):
                 Y[:, t, r] += rng.multivariate_normal(K * [0], sigma_u)
 
             for i in range(p):
-                Ai = B[:, 1 + i * K: 1 + (i + 1) * K]
+                Ai = B[:, 1 + i * K : 1 + (i + 1) * K]
                 Y[:, t, r] += np.squeeze(Ai @ Y[:, t - i - 1, r])
 
     return np.squeeze(Y[:, -T:])
@@ -1607,7 +1718,9 @@ def VAR_YW(data, p=2):
     for t in range(p, T + p):
         for subt in range(p):
             # HACK! check the p
-            Xt[subt * K:(subt + 1) * K] = data[:, t - subt - 1].reshape((K, 1))
+            Xt[subt * K : (subt + 1) * K] = data[:, t - subt - 1].reshape(
+                (K, 1)
+            )
         X[:, t - p] = Xt
 
     # A contains all the parameters (A1, ..., Ap)
@@ -1635,10 +1748,10 @@ def VAR_YW(data, p=2):
     sigma_u = Y @ Y.T - Y @ X.T @ np.linalg.inv(X @ X.T) @ X @ Y.T
     sigma_u /= T - K * p - 1
 
-#    A_dash = Y * X.T * (X * X.T).I
-#    matr_img(np.asarray(A), "A")
-#    matr_img(np.asarray(A_dash), "A_dash")
-#    plt.show()
+    #    A_dash = Y * X.T * (X * X.T).I
+    #    matr_img(np.asarray(A), "A")
+    #    matr_img(np.asarray(A_dash), "A_dash")
+    #    plt.show()
     return A, sigma_u
 
 
@@ -1659,7 +1772,7 @@ def VAR_YW_sim(A, sigma_u, T):
         ut = rng.multivariate_normal(K * [0], sigma_u).reshape(K, 1)
         Y[:, t] = ut
         for i in range(p):
-            Ai = A[:, i * K: (i + 1) * K]
+            Ai = A[:, i * K : (i + 1) * K]
             Y[:, t] += Ai @ Y[:, t - i]
 
     return Y[:, p:]
@@ -1680,41 +1793,42 @@ def _ut_gamma_part(data, p, q, AM, ut):
     """Recursive calculation of the partial derivatives del ut /del gamma.
     See Lemma 12.1 p.468"""
     K, T = data.shape
-    N = K ** 2 * (p + q)
+    N = K**2 * (p + q)
 
     Y = data[:, p:]
     R = np.identity(N)
     A_0 = np.identity(K)
-    IK_zeros = np.zeros((K ** 2, N))
-    IK_zeros[:K ** 2, :K ** 2] = np.identity(K ** 2)
+    IK_zeros = np.zeros((K**2, N))
+    IK_zeros[: K**2, : K**2] = np.identity(K**2)
     zero_IK = np.identity(N)
     ut_gamma_part = np.zeros((K, N, T + p))
 
     for t in range(p, T - p):
         varma = np.zeros((K, 1))
         for i in range(p):
-            Ai = AM[:, i * K: (i + 1) * K]
+            Ai = AM[:, i * K : (i + 1) * K]
             varma += Ai @ Y[:, t - i]
         for i in range(p, p + q):
-            Mi = AM[:, i * K: (i + 1) * K]
+            Mi = AM[:, i * K : (i + 1) * K]
             varma += Mi @ ut[:, -1 - i + p, np.newaxis]
 
         prev_yu = np.empty(K * (p + q))
         for i in range(p):
-            prev_yu[i * K:(i + 1) * K] = Y[:, t - i].T
+            prev_yu[i * K : (i + 1) * K] = Y[:, t - i].T
         for i in range(p, p + q):
-            prev_yu[i * K:(i + 1) * K] = ut[:, t - i].T
+            prev_yu[i * K : (i + 1) * K] = ut[:, t - i].T
         M_gamma_part = np.zeros((K, N))
         for i in range(p, p + q):
-            Mi = AM[:, i * K: (i + 1) * K]
+            Mi = AM[:, i * K : (i + 1) * K]
             M_gamma_part += Mi @ ut_gamma_part[..., t - i + p]
-        ut_gamma_part[..., t] = \
-            ((A_0 @ kron(varma.T, A_0.T)) @ IK_zeros @ R -
-             kron(prev_yu, A_0.I) @ zero_IK @ R -
-             A_0 @ M_gamma_part)
-            # ((A_0.I * kron(varma.T, A_0.T)) * IK_zeros * R -
-            #  kron(prev_yu, A_0.I) * zero_IK * R -
-            #  A_0.I * M_gamma_part)
+        ut_gamma_part[..., t] = (
+            (A_0 @ kron(varma.T, A_0.T)) @ IK_zeros @ R
+            - kron(prev_yu, A_0.I) @ zero_IK @ R
+            - A_0 @ M_gamma_part
+        )
+        # ((A_0.I * kron(varma.T, A_0.T)) * IK_zeros * R -
+        #  kron(prev_yu, A_0.I) * zero_IK * R -
+        #  A_0.I * M_gamma_part)
     return ut_gamma_part
 
 
@@ -1724,35 +1838,49 @@ def VARMA_LS(data, p, q, rel_change=1e-3):
     # do not trust the estimator of the residuals
     ut = VARMA_residuals(data, AM_pre, p, q)
     K, T = data.shape
-    N = K ** 2 * (p + q)
+    N = K**2 * (p + q)
 
     det_new = np.linalg.det(sigma_u_pre)
     # set det_old to something that will cause the while loop to execute at
     # least one time
-    det_old = rel_change ** -1 * det_new
-    print("Determinant of preliminary residual covariance matrix: %f" %
-          det_old)
+    det_old = rel_change**-1 * det_new
+    print(
+        "Determinant of preliminary residual covariance matrix: %f" % det_old
+    )
 
     AM = AM_pre
     gamma = vec(AM)
 
     ts.matr_img(AM, "AM p=%d q=%d Preliminary" % (p, q))
     ii = 0
-    while (det_new > 1e-60) and (old_div(np.abs(det_old - det_new), det_old)
-                                 > rel_change):
+    while (det_new > 1e-60) and (
+        old_div(np.abs(det_old - det_new), det_old) > rel_change
+    ):
         ut_gamma_part = _ut_gamma_part(data, p, q, AM, ut)
-        sigma_u_gamma = T ** -1 * np.sum([ut[:, t] * ut[:, t].T  # np.newaxis]
-                                          for t in range(ut.shape[1])],
-                                         axis=0)
+        sigma_u_gamma = T**-1 * np.sum(
+            [ut[:, t] * ut[:, t].T for t in range(ut.shape[1])],  # np.newaxis]
+            axis=0,
+        )
         sigma_u_gamma_inv = np.linalg.inv(sigma_u_gamma)
         # information matrix
-        IM = np.sum([ut_gamma_part[..., t].T @ sigma_u_gamma_inv @
-                     ut_gamma_part[..., t]
-                     for t in range(T)], axis=0)
-        likeli_gamma_part = np.sum([ut[:, t, np.newaxis].T @
-                                    sigma_u_gamma_inv @ ut_gamma_part[..., t]
-                                    for t in range(ut.shape[1])],
-                                   axis=0)
+        IM = np.sum(
+            [
+                ut_gamma_part[..., t].T
+                @ sigma_u_gamma_inv
+                @ ut_gamma_part[..., t]
+                for t in range(T)
+            ],
+            axis=0,
+        )
+        likeli_gamma_part = np.sum(
+            [
+                ut[:, t, np.newaxis].T
+                @ sigma_u_gamma_inv
+                @ ut_gamma_part[..., t]
+                for t in range(ut.shape[1])
+            ],
+            axis=0,
+        )
         gamma -= np.linalg.inv(IM) @ likeli_gamma_part.T
 
         AM = gamma.reshape((K, K * (p + q)), order="F")
@@ -1772,8 +1900,12 @@ def VARMA_LS(data, p, q, rel_change=1e-3):
             X[:, t - p] = Xt
         IK = np.identity(K)
         R = np.identity(N)
-        gamma2 = (np.linalg.inv(R.T @ kron(X @ X.T, IK) @ R)
-                  @ R.T @ kron(X, IK) @ vec(Y))
+        gamma2 = (
+            np.linalg.inv(R.T @ kron(X @ X.T, IK) @ R)
+            @ R.T
+            @ kron(X, IK)
+            @ vec(Y)
+        )
         residuals_arma_vec = vec(Y) - kron(X.T, IK) @ R @ gamma2
         residuals_arma = residuals_arma_vec.reshape((K, T), order="F")
         # make the residuals have the same length as the data
@@ -1784,9 +1916,10 @@ def VARMA_LS(data, p, q, rel_change=1e-3):
         print("Determinant of residual covariance matrix: %f" % det_new)
         ii += 1
         if ii > 1:
-            ts.matr_img(np.asarray(gamma2.reshape((K, K * (p + q)),
-                                                  order="F")),
-                        "AM p=%d q=%d Iteration: %d" % (p, q, ii))
+            ts.matr_img(
+                np.asarray(gamma2.reshape((K, K * (p + q)), order="F")),
+                "AM p=%d q=%d Iteration: %d" % (p, q, ii),
+            )
 
     AM = gamma2.reshape((K, K * (p + q)), order="F")
     return AM, sigma_u, ut
@@ -1797,21 +1930,23 @@ def VARMA_residuals(data, AM, p, q):
     resi = np.copy(data)
     for t in range(p, T + p):
         for i in range(p):
-            Ai = AM[:, i * K: (i + 1) * K]
+            Ai = AM[:, i * K : (i + 1) * K]
             resi[:, t] -= Ai @ data[:, t - i - 1].reshape(K, -1)
         for i in range(p, p + q):
-            Mi = AM[:, i * K: (i + 1) * K]
+            Mi = AM[:, i * K : (i + 1) * K]
             resi[:, t] -= Mi @ resi[:, t - i + p - 1].reshape(K, -1)
     return resi
 
 
 if __name__ == "__main__":
     import doctest
+
     doctest.testmod()
 
     import tempfile
     import os
     import vg
+
     vg.conf = vg.vg_base.conf = vg.config_template
     p = 2
     T = 2 * 365
@@ -1819,9 +1954,11 @@ if __name__ == "__main__":
         # we do not use precipitation here as long as we cannot
         # disaggregate it properly
         # "R",
-        "theta", "Qsw", "ILWR", "rh",
+        "theta",
+        "Qsw",
+        "ILWR",
+        "rh",
         # "u", "v"
-        )
+    )
     met_vg = vg.VG(var_names)
     met_vg.fit(p, extro=True)
-

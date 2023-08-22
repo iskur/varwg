@@ -16,12 +16,13 @@ from vg import times
 
 
 PY2 = sys.version_info.major == 2
-shelve_filename = ("resampler_cache_{version}.sh"
-                   .format(version="p2" if PY2 else "py3"))
+shelve_filename = "resampler_cache_{version}.sh".format(
+    version="p2" if PY2 else "py3"
+)
 
 
 def bias2mean(bias, a, b, c, d):
-    return a * (1 - np.exp(-bias ** b / c)) + d
+    return a * (1 - np.exp(-(bias**b) / c)) + d
 
 
 def mean2bias(mean, a, b, c, d):
@@ -32,8 +33,7 @@ def mean2bias(mean, a, b, c, d):
     too_small_mask = mean < d
     bias[too_small_mask] = 0
     valid_mask = ~too_big_mask & ~too_small_mask
-    bias[valid_mask] = ((-c * np.log(1 - (mean[valid_mask] - d) / a))
-                        ** (1 / b))
+    bias[valid_mask] = (-c * np.log(1 - (mean[valid_mask] - d) / a)) ** (1 / b)
     return bias
 
 
@@ -57,8 +57,9 @@ def _calibrate(**res_kwds):
     # theta_min = theta_incr.min()
     # biases = theta_incr - theta_min + np.linspace(0, 5, 15)[:, None]
 
-    theta_incrs = np.concatenate((np.linspace(0, 1, 10),
-                                  np.linspace(1.1, 8, 5)))
+    theta_incrs = np.concatenate(
+        (np.linspace(0, 1, 10), np.linspace(1.1, 8, 5))
+    )
     biases = theta_incrs
     # theta_incrs = np.linspace(0, 4, 15)
 
@@ -78,11 +79,11 @@ def _calibrate(**res_kwds):
         mean_diffs_est = bias2mean(biases, a, b, c, d)
         return np.sum((mean_diffs - mean_diffs_est) ** 2)
 
-    result = optimize.minimize(error,
-                               (max(mean_diffs) + min(mean_diffs),
-                                .5, 1., min(mean_diffs)),
-                               # options=dict(disp=True)
-                               )
+    result = optimize.minimize(
+        error,
+        (max(mean_diffs) + min(mean_diffs), 0.5, 1.0, min(mean_diffs)),
+        # options=dict(disp=True)
+    )
 
     # import matplotlib.pyplot as plt
     # fig, ax = plt.subplots()
@@ -97,8 +98,9 @@ def _calibrate(**res_kwds):
     return result.x
 
 
-def _transform_theta_incr(theta_incr, cache_dir=None, verbose=False,
-                          recalibrate=False, **res_kwds):
+def _transform_theta_incr(
+    theta_incr, cache_dir=None, verbose=False, recalibrate=False, **res_kwds
+):
     """Calibrate theta_incr in order to get a specific mean increase in
     temperature.
 
@@ -130,8 +132,11 @@ def _transform_theta_incr(theta_incr, cache_dir=None, verbose=False,
             # calibration for negative mean changes
             res_kwds["theta_incr"] = theta_incr
             a_neg, b_neg, c_neg, d_neg = _calibrate(
-                **{key: -val if key == "data" else val
-                   for key, val in list(res_kwds.items())})
+                **{
+                    key: -val if key == "data" else val
+                    for key, val in list(res_kwds.items())
+                }
+            )
             sh[par_key_neg] = a_neg, b_neg, c_neg, d_neg
 
     bias_pos = mean2bias(theta_incr, a_pos, b_pos, c_pos, d_pos)
@@ -164,10 +169,22 @@ def _transform_theta_incr(theta_incr, cache_dir=None, verbose=False,
     return bias
 
 
-def resample(data, dtimes, p=3, n_sim_steps=None, theta_incr=0.0,
-             theta_i=0, n_candidates=None, doy_tolerance=10,
-             cache_dir=None, bias=None, verbose=False,
-             return_candidates=False, recalibrate=False, **kwds):
+def resample(
+    data,
+    dtimes,
+    p=3,
+    n_sim_steps=None,
+    theta_incr=0.0,
+    theta_i=0,
+    n_candidates=None,
+    doy_tolerance=10,
+    cache_dir=None,
+    bias=None,
+    verbose=False,
+    return_candidates=False,
+    recalibrate=False,
+    **kwds,
+):
     """A simple multivariate resampler.
     Assumes that all variables are in the same dimension as similarity is
     evaluated in terms of summed absolute differences.
@@ -211,8 +228,10 @@ def resample(data, dtimes, p=3, n_sim_steps=None, theta_incr=0.0,
         cal_kwds = dict(my.ADict(locals()) - "return_candidates")
         bias = _transform_theta_incr(**cal_kwds)
         if verbose:
-            print("Transformed theta_incr=%.3f to bias=%.5f"
-                  % (np.mean(theta_incr), np.mean(bias)))
+            print(
+                "Transformed theta_incr=%.3f to bias=%.5f"
+                % (np.mean(theta_incr), np.mean(bias))
+            )
     if n_sim_steps is None:
         n_sim_steps = data.shape[1]
     K, T = data.shape
@@ -238,10 +257,11 @@ def resample(data, dtimes, p=3, n_sim_steps=None, theta_incr=0.0,
 
     sim = np.empty((data.shape[0], n_sim_steps))
     # start with something present in the data
-    doy_neighbors = np.where(times.doy_distance(doys[0], doys[:-p]) <=
-                             doy_tolerance)[0]
+    doy_neighbors = np.where(
+        times.doy_distance(doys[0], doys[:-p]) <= doy_tolerance
+    )[0]
     start_i = np.random.choice(doy_neighbors)
-    sim[:, :p] = data[:, start_i:start_i + p]
+    sim[:, :p] = data[:, start_i : start_i + p]
     candidate_series[:, :p] = sim[:, :p, None]
     chosen_indices[:p] = list(range(start_i, start_i + p))
 
@@ -251,18 +271,21 @@ def resample(data, dtimes, p=3, n_sim_steps=None, theta_incr=0.0,
     # Lall, U., & Sharma, A. (1996). A Nearest Neighbor Bootstrap For
     # Resampling Hydrologic Time Series. Water Resources Research,
     # 32(3), 679–693. http://doi.org/10.1029/95WR02966
-    k_ji = 1. / np.arange(1, n_candidates + 1)
+    k_ji = 1.0 / np.arange(1, n_candidates + 1)
     k_ji /= np.sum(k_ji)
 
     if verbose:
+
         def progress(iterable):
             return tqdm(iterable, total=(n_sim_steps - p))
+
     else:
+
         def progress(x):
             return x
 
     for t in progress(range(p, n_sim_steps)):
-        now = sim[:, t - p:t, None]
+        now = sim[:, t - p : t, None]
         # find time steps not far in terms of doy
         doy_distance = times.doy_distance(doys[t % len(doys)], doys[:-p])
         doy_neighbors = np.where(doy_distance <= doy_tolerance)[0]
@@ -272,9 +295,10 @@ def resample(data, dtimes, p=3, n_sim_steps=None, theta_incr=0.0,
         else:
             bias_cur = 0
         # what looks most like now?
-        diffs = np.sum((data_chunked[..., doy_neighbors] -
-                        now - bias_cur) ** 2,
-                       axis=(0, 1))
+        diffs = np.sum(
+            (data_chunked[..., doy_neighbors] - now - bias_cur) ** 2,
+            axis=(0, 1),
+        )
         candidates_i = np.argpartition(diffs, n_candidates)[:n_candidates]
         candidates_i = candidates_i[np.argsort(diffs[candidates_i])]
         if return_candidates:
@@ -296,35 +320,44 @@ def resample(data, dtimes, p=3, n_sim_steps=None, theta_incr=0.0,
 if __name__ == "__main__":
     import vg
     import config_konstanz
+
     vg.set_conf(config_konstanz)
     # vg.conf = vg.vg_base.conf = vg.config_konstanz
-    met_vg = vg.VG((
-        # "R",
-        "theta", "Qsw",
-        "ILWR", "rh", "u", "v"
+    met_vg = vg.VG(
+        (
+            # "R",
+            "theta",
+            "Qsw",
+            "ILWR",
+            "rh",
+            "u",
+            "v",
         ),
-                   # refit=True,
-                   verbose=True)
+        # refit=True,
+        verbose=True,
+    )
     met_vg.fit(p=3)
     theta_i = met_vg.var_names.index("theta")
-    simt, sim = met_vg.simulate(res_kwds=dict(recalibrate=True,
-                                              cy=True,
-                                              n_candidates=20),
-                                theta_incr=0.)
+    simt, sim = met_vg.simulate(
+        res_kwds=dict(recalibrate=True, cy=True, n_candidates=20),
+        theta_incr=0.0,
+    )
 
-    theta_incrs = np.linspace(.5, 4, 15)
-    data_mean = np.mean(met_vg.data_raw[theta_i]) / 24.
+    theta_incrs = np.linspace(0.5, 4, 15)
+    data_mean = np.mean(met_vg.data_raw[theta_i]) / 24.0
     delta_means = []
     for theta_incr in theta_incrs:
-        simt, sim = met_vg.simulate(res_kwds=dict(cy=True,
-                                                  n_candidates=20,
-                                                  doy_tolerance=15),
-                                    theta_incr=theta_incr)
+        simt, sim = met_vg.simulate(
+            res_kwds=dict(cy=True, n_candidates=20, doy_tolerance=15),
+            theta_incr=theta_incr,
+        )
         delta_means += [np.mean(sim[theta_i]) - data_mean]
-        print(theta_incr,
-              "%.3f" % np.mean(met_vg.m[theta_i]),
-              "%.3f" % met_vg.sim[theta_i].mean(),
-              "%.3f" % delta_means[-1])
+        print(
+            theta_incr,
+            "%.3f" % np.mean(met_vg.m[theta_i]),
+            "%.3f" % met_vg.sim[theta_i].mean(),
+            "%.3f" % delta_means[-1],
+        )
         # fig, ax = plt.subplots(nrows=1, ncols=1)
         # ax.plot(met_vg.times, met_vg.m[theta_i], label="m")
         # ax.plot(met_vg.times, met_vg.sim[theta_i], label="sim")

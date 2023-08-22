@@ -22,17 +22,16 @@ def distance_array(x_vec, y_vec, mask=None):
         # return x_vec[None, :] - y_vec[:, None]
         return x_vec[x_slice] - y_vec[y_slice]
     else:
-        return np.where(mask,
-                        x_vec[None, :] - y_vec[:, None],
-                        np.nan)
+        return np.where(mask, x_vec[None, :] - y_vec[:, None], np.nan)
 
 
 def distance_array_sparse(x_vec, y_vec, mask):
     """Creates a sparse residual matrix."""
     rows, cols = np.where(mask)
-    dist_sparse = sparse.coo_matrix(((x_vec[rows] - y_vec[cols]),
-                                     (rows, cols)),
-                                    shape=(len(x_vec), len(y_vec)))
+    dist_sparse = sparse.coo_matrix(
+        ((x_vec[rows] - y_vec[cols]), (rows, cols)),
+        shape=(len(x_vec), len(y_vec)),
+    )
     return dist_sparse.T.tocsr()
 
 
@@ -51,17 +50,18 @@ def apply_kernel_ne(kernel_width, data, eval_points=None, recalc=False):
         _distances = apply_kernel_ne.distances
     _pi = np.pi
     if _distances.ndim > 2:
-        k_slice = ([Ellipsis] +
-                   (_distances.ndim - kernel_width.ndim) * [None])
+        k_slice = [Ellipsis] + (_distances.ndim - kernel_width.ndim) * [None]
         kernel_width = kernel_width[tuple(k_slice)]
     densities = ne.evaluate(
         "1.0 / (sqrt(2 * _pi) * kernel_width) * "
-        "exp(-_distances ** 2 / (2 * kernel_width ** 2))")
+        "exp(-_distances ** 2 / (2 * kernel_width ** 2))"
+    )
     return densities
 
 
-def apply_kernel_np(kernel_width, data, eval_points=None, mask=None,
-                    recalc=False):
+def apply_kernel_np(
+    kernel_width, data, eval_points=None, mask=None, recalc=False
+):
     has_distance_cache = hasattr(apply_kernel_ne, "distances")
     if eval_points is not None and has_distance_cache:
         if len(eval_points) != apply_kernel_ne.distances.shape[0]:
@@ -75,16 +75,19 @@ def apply_kernel_np(kernel_width, data, eval_points=None, mask=None,
     else:
         _distances = apply_kernel_ne.distances
     if _distances.ndim > 2:
-        k_slice = ([Ellipsis] +
-                   (_distances.ndim - kernel_width.ndim) * [None])
+        k_slice = [Ellipsis] + (_distances.ndim - kernel_width.ndim) * [None]
         kernel_width = kernel_width[k_slice]
-    return (1.0 /
-            (np.sqrt(2 * np.pi) * kernel_width) *
-            np.exp(-_distances ** 2 / (2 * kernel_width ** 2)))
+    return (
+        1.0
+        / (np.sqrt(2 * np.pi) * kernel_width)
+        * np.exp(-(_distances**2) / (2 * kernel_width**2))
+    )
+
 
 try:
     from multiprocessing import cpu_count
     import numexpr as ne
+
     ne.set_num_threads(min(64, cpu_count()))
     apply_kernel = apply_kernel_ne
     NE = True
@@ -95,8 +98,9 @@ except ImportError:
 
 
 def kernel_density(kernel_width, data, eval_points=None, *args, **kwds):
-    kernel_table = apply_kernel(kernel_width, data,
-                                eval_points=eval_points, *args, **kwds)
+    kernel_table = apply_kernel(
+        kernel_width, data, eval_points=eval_points, *args, **kwds
+    )
     density = np.sum(kernel_table, axis=1) / len(data)
     if density.ndim > 1:
         density = np.sum(density, axis=1) / len(data)
@@ -105,7 +109,7 @@ def kernel_density(kernel_width, data, eval_points=None, *args, **kwds):
 
 def sum_log_density(kernel_width, data):
     density = apply_kernel(kernel_width, data)
-    density.ravel()[::len(data) + 1] = 0
+    density.ravel()[:: len(data) + 1] = 0
     density = np.sum(density, axis=1) / float(len(density) - 1)
     nonzero_mask = np.nonzero(density)
     if np.any(nonzero_mask):
@@ -116,7 +120,7 @@ def sum_log_density(kernel_width, data):
 
 def scotts_rule(n_data, n_dim=3):
     """Scott's rule of thumb for kernel bandwidth."""
-    return n_data ** (-1. / (n_dim + 4))
+    return n_data ** (-1.0 / (n_dim + 4))
 
 
 def silvermans_rule(x):
@@ -124,7 +128,7 @@ def silvermans_rule(x):
     std = np.std(x)
     if len(x) <= 1 or std == 0:
         return np.nan
-    return (1.06 * std * len(x) ** (-1. / 5))
+    return 1.06 * std * len(x) ** (-1.0 / 5)
 
 
 def optimal_kernel_width(x, x0=None, bounds=None):
@@ -134,35 +138,46 @@ def optimal_kernel_width(x, x0=None, bounds=None):
     if x0 is None:
         # x0 = silvermans_rule(x)
         x0 = silver
-    res = optimize.minimize(sum_log_density, x0, args=(x,),
-                            bounds=(bounds,),
-                            # bounds=([1e-5, None],),
-                            # bounds=([silver / 100, silver * 10],),
-                            method="L-BFGS-B",
-                            # method="TNC",
-                            # method="SLSQP",
-                            )
+    res = optimize.minimize(
+        sum_log_density,
+        x0,
+        args=(x,),
+        bounds=(bounds,),
+        # bounds=([1e-5, None],),
+        # bounds=([silver / 100, silver * 10],),
+        method="L-BFGS-B",
+        # method="TNC",
+        # method="SLSQP",
+    )
     if res.success and not np.isclose(res.x, 1e-7):
         return np.squeeze(res.x)
-    warnings.warn("Kernel-width optimization unsuccesful. "
-                  "Using rule of thumb.")
+    warnings.warn(
+        "Kernel-width optimization unsuccesful. " "Using rule of thumb."
+    )
     return x0
 
-def apply_2d_kernel_(kernel_width, data, doys, circ, doy_width,
-                     eval_points=None, eval_doys=None):
+
+def apply_2d_kernel_(
+    kernel_width, data, doys, circ, doy_width, eval_points=None, eval_doys=None
+):
     if eval_points is None:
         eval_points = data
     if eval_doys is None:
         eval_doys = doys
     if NE:
+
         def kernel(dist, width):
             _pi = np.pi
-            return ne.evaluate("(sqrt(2 * _pi) * width) ** -1 *"
-                               "exp(-dist ** 2 / (2 * width ** 2))")
+            return ne.evaluate(
+                "(sqrt(2 * _pi) * width) ** -1 *"
+                "exp(-dist ** 2 / (2 * width ** 2))"
+            )
+
     else:
-        kernel = lambda dist, width: \
-            ((np.sqrt(2 * np.pi) * width) ** -1 *
-             np.exp(old_div(-dist ** 2, (2 * width ** 2))))
+        kernel = lambda dist, width: (
+            (np.sqrt(2 * np.pi) * width) ** -1
+            * np.exp(old_div(-(dist**2), (2 * width**2)))
+        )
     distances = distance_array(data, eval_points)
     densities = kernel(distances, abs(kernel_width))
     temp_distances = doyhour_distance(doys, eval_doys, circ=circ)
@@ -174,32 +189,41 @@ def apply_2d_kernel_(kernel_width, data, doys, circ, doy_width,
     return densities  # / (kernel_width * circ)
 
 
-def apply_2d_kernel(kernels_width, data, hour_width, eval_points=None,
-                    eval_doys=None):
+def apply_2d_kernel(
+    kernels_width, data, hour_width, eval_points=None, eval_doys=None
+):
     # data_width, hour_width = kernels_width
     data_width = kernels_width
     if eval_points is None:
         eval_points = data
     if NE:
+
         def kernel(dist, width):
             _pi = np.pi
-            return ne.evaluate("(sqrt(2 * _pi) * width) ** -1 *"
-                               "exp(-dist ** 2 / (2 * width ** 2))")
+            return ne.evaluate(
+                "(sqrt(2 * _pi) * width) ** -1 *"
+                "exp(-dist ** 2 / (2 * width ** 2))"
+            )
+
     else:
-        kernel = lambda dist, width: \
-            ((np.sqrt(2 * np.pi) * width) ** -1 *
-             np.exp(old_div(-dist ** 2, (2 * width ** 2))))
+        kernel = lambda dist, width: (
+            (np.sqrt(2 * np.pi) * width) ** -1
+            * np.exp(old_div(-(dist**2), (2 * width**2)))
+        )
     # distance in data dimension
     distances = distance_array(data.ravel(), eval_points.ravel())
     densities = kernel(distances, abs(data_width))
     # distance in the two temporal dimensions
-    hour_dist, doy_dist = np.meshgrid(list(range(data.shape[1])),
-                                      list(range(data.shape[0])))
+    hour_dist, doy_dist = np.meshgrid(
+        list(range(data.shape[1])), list(range(data.shape[0]))
+    )
     hour_middle = data.shape[0] // 2
     doy_middle = data.shape[1] // 2
     time_distances = np.empty_like(data)
-    temp = ne.evaluate("sqrt((hour_dist - hour_middle) ** 2 + "
-                       "(doy_dist - doy_middle) ** 2)")
+    temp = ne.evaluate(
+        "sqrt((hour_dist - hour_middle) ** 2 + "
+        "(doy_dist - doy_middle) ** 2)"
+    )
     time_distances[:] = temp[..., None]
     time_dens = kernel(time_distances.ravel(), abs(hour_width))
     if NE:
@@ -210,19 +234,24 @@ def apply_2d_kernel(kernels_width, data, hour_width, eval_points=None,
 
 
 def gaussian_kernel(x, width):
-    return (1. / (np.sqrt(2 * np.pi) * width) *
-            np.exp(old_div(-x ** 2, (2 * width ** 2))))
+    return (
+        1.0
+        / (np.sqrt(2 * np.pi) * width)
+        * np.exp(old_div(-(x**2), (2 * width**2)))
+    )
 
 
 def gaussian_kernel_ne(x, width):
     _pi = np.pi
-    return ne.evaluate("(1. / (sqrt(2 * _pi) * width) *" +
-                       "exp(-x ** 2 / (2 * width ** 2)))")
+    return ne.evaluate(
+        "(1. / (sqrt(2 * _pi) * width) *" + "exp(-x ** 2 / (2 * width ** 2)))"
+    )
 
 
 @my.cache("dists", "rows", "cols")
-def apply_sparse_kernel(kernel, widths, data, mask, eval_points=None,
-                        **k_kwds):
+def apply_sparse_kernel(
+    kernel, widths, data, mask, eval_points=None, **k_kwds
+):
     """Apply a given kernel on parts of data indicated by a mask.
 
     Parameter
@@ -249,7 +278,7 @@ def apply_sparse_kernel(kernel, widths, data, mask, eval_points=None,
     else:
         y_vec = eval_points
     # this is a poor man's cache invalidation!
-    if self.dists is None or self.dists.size != data.size ** 2:
+    if self.dists is None or self.dists.size != data.size**2:
         # warning: this is a bit hacky! cache invalidation is a bitch
         if self.rows is None or np.sum(mask) != len(self.rows):
             self.cols, self.rows = np.where(mask)
@@ -258,9 +287,10 @@ def apply_sparse_kernel(kernel, widths, data, mask, eval_points=None,
         widths = widths[self.rows]
     except TypeError:
         pass
-    dens = sparse.coo_matrix((kernel(self.dists, widths, **k_kwds),
-                              (self.rows, self.cols)),
-                             shape=(len(x_vec), len(y_vec)))
+    dens = sparse.coo_matrix(
+        (kernel(self.dists, widths, **k_kwds), (self.rows, self.cols)),
+        shape=(len(x_vec), len(y_vec)),
+    )
     return dens.T.tocsr()
 
 
@@ -273,8 +303,9 @@ def doy_distance_int(doys1, doys2, doy_width=1):
         scaling factor for distance in the doy dimension
     """
     doys1, doys2 = list(map(np.atleast_1d, (doys1, doys2)))
-    doy_distance = np.squeeze(times.doy_distance(doys1[None, :],
-                                                 doys2[:, None]))
+    doy_distance = np.squeeze(
+        times.doy_distance(doys1[None, :], doys2[:, None])
+    )
     return doy_width * doy_distance
 
 
@@ -289,8 +320,9 @@ def hour_distance_using_doys(doys1, doys2, circ=1):
     """
     doys1, doys2 = list(map(np.atleast_1d, (doys1, doys2)))
     hours1, hours2 = [(doy % 1) * 24 for doy in (doys1, doys2)]
-    hour_distance = np.squeeze(times.hour_distance(hours1[None, :],
-                                                   hours2[:, None]))
+    hour_distance = np.squeeze(
+        times.hour_distance(hours1[None, :], hours2[:, None])
+    )
     return circ * hour_distance
 
 
@@ -316,9 +348,10 @@ def doyhour_distance(doys1, doys2, doy_width=1, circ=1):
     #                                                hours2[:, None]))
     # return np.sqrt((doy_width * doy_distance) ** 2 +
     #                (circ * hour_distance / 24.) ** 2)
-    return np.sqrt(doy_distance_int(doys1, doys2, doy_width=doy_width) ** 2 +
-                   (hour_distance_using_doys(doys1, doys2, circ=circ)
-                    / 24.) ** 2)
+    return np.sqrt(
+        doy_distance_int(doys1, doys2, doy_width=doy_width) ** 2
+        + (hour_distance_using_doys(doys1, doys2, circ=circ) / 24.0) ** 2
+    )
 
 
 def doyhour_distance_dt(dtimes1, dtimes2, circ):
@@ -339,4 +372,4 @@ def doyhour_distance_dt(dtimes1, dtimes2, circ):
     hours1, hours2 = list(map(times.datetime2hour, (dtimes1, dtimes2)))
     doy_distance = times.doy_distance(doys1, doys2)
     hour_distance = times.hour_distance(hours1, hours2)
-    return np.sqrt(doy_distance ** 2 + (circ * hour_distance / 24.) ** 2)
+    return np.sqrt(doy_distance**2 + (circ * hour_distance / 24.0) ** 2)

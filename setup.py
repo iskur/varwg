@@ -1,13 +1,16 @@
 from distribute_setup import use_setuptools
+
 use_setuptools()
 
 import sys
 import numpy as np
 from setuptools import setup, find_packages, findall
 from setuptools.extension import Extension
+
 try:
     from Cython.Build import cythonize
     from Cython.Distutils import build_ext
+
     USE_CYTHON = True
     ext = ".pyx"
 except ImportError:
@@ -22,19 +25,27 @@ else:
     extra_link_args = ["-fopenmp"]
 
 extensions = [
-    Extension("cresample",
-              ["vg/time_series_analysis/cresample" + ext],
-              include_dirs=[np.get_include()],
-              library_dirs=library_dirs),
-    Extension("ctimes", ["vg/ctimes" + ext],
-              include_dirs=[np.get_include()],
-              library_dirs=library_dirs),
-    Extension("meteox2y_cy",
-              ["vg/meteo/meteox2y_cy" + ext],
-              include_dirs=[np.get_include()],
-              extra_compile_args=['-fopenmp'],
-              extra_link_args=['-fopenmp'],
-              library_dirs=library_dirs)]
+    Extension(
+        "cresample",
+        ["vg/time_series_analysis/cresample" + ext],
+        include_dirs=[np.get_include()],
+        library_dirs=library_dirs,
+    ),
+    Extension(
+        "ctimes",
+        ["vg/ctimes" + ext],
+        include_dirs=[np.get_include()],
+        library_dirs=library_dirs,
+    ),
+    Extension(
+        "meteox2y_cy",
+        ["vg/meteo/meteox2y_cy" + ext],
+        include_dirs=[np.get_include()],
+        extra_compile_args=["-fopenmp"],
+        extra_link_args=["-fopenmp"],
+        library_dirs=library_dirs,
+    ),
+]
 
 if USE_CYTHON:
     ext_modules = cythonize(extensions)
@@ -55,40 +66,36 @@ setup(
     setup_requires=["numpy"],
     python_requires=">=3.5",
     install_requires=[
-        'matplotlib',
-        'scipy',
-        'numpy',
-        'pandas',
-        'cython',
-        'tqdm',
-        'future',
+        "matplotlib",
+        "scipy",
+        "numpy",
+        "pandas",
+        "cython",
+        "tqdm",
+        "future",
         "timezonefinder",
         "PICOS",
         "cvxopt",
-        ],
+    ],
     # dependency_links=[
     #     'http://sourceforge.net/projects/matplotlib/files/matplotlib/matplotlib-1.1.1/',
     #     'http://sourceforge.net/projects/scipy/files/scipy/0.11.0b1/',
     #     'http://sourceforge.net/projects/numpy/files/NumPy/1.6.2/',
     #     ],
-
     package_data={
         # If any package contains *.txt or *.rst files, include them:
-        '': ['*.txt', '*.dat', '*.met', "*.rst", "*.pyx", "*.c"],
+        "": ["*.txt", "*.dat", "*.met", "*.rst", "*.pyx", "*.c"],
         # 'doc': ['*.html', '*.rst'],
-        },
-
+    },
     include_package_data=True,
-
     # metadata for upload to PyPI
     author="Dirk Schlabing",
     author_email="dirk.schlabing@iws.uni-stuttgart.de",
     description="A Vector Autoregressive Weather Generator",
     license="BSD",
     keywords=("weather generator vector-autoregressive time-series-analysis"),
-    long_description=\
-        """The weather generator VG is a single-site Vector-Autoregressive
+    long_description="""The weather generator VG is a single-site Vector-Autoregressive
  weather generator that was developed for hydrodynamic and ecologic
  modelling of lakes. It includes a number of possibilities to define
- what-if scenarios."""
+ what-if scenarios.""",
 )

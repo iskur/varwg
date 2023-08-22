@@ -12,6 +12,7 @@ from scipy import optimize
 try:
     import pyfftw
     from pyfftw.interfaces import numpy_fft as fftw
+
     FFTW = True
 except ImportError:
     warnings.warn("Could not import pyfftw. Using the slower numpy functions.")
@@ -26,9 +27,16 @@ if FFTW:
 
 
 class Spectral(object):
-
-    def __init__(self, autocov, T, crange=None, cthresh=.01, sigma=1,
-                 pool_size=None, verbose=False):
+    def __init__(
+        self,
+        autocov,
+        T,
+        crange=None,
+        cthresh=0.01,
+        sigma=1,
+        pool_size=None,
+        verbose=False,
+    ):
         """Simulate a univariate time series using FFT.
         This is an attempt to simplify Philips spectralsim to 1d.
 
@@ -61,9 +69,9 @@ class Spectral(object):
         self.sigma = sigma
 
         if FFTW:
-            self.ifft_func = \
-                lambda *args, **kwds: fftw.ifft(threads=N_THREADS,
-                                                *args, **kwds)
+            self.ifft_func = lambda *args, **kwds: fftw.ifft(
+                threads=N_THREADS, *args, **kwds
+            )
         else:
             self.ifft_func = np.fft.ifft
         if crange is None:
@@ -86,10 +94,9 @@ class Spectral(object):
         size = 2 ** int(np.ceil(np.log2(size_old)))
         dists = np.arange(size)
         # "nonnegative definite embedding in circular matrices"
-        dists = np.min((dists,
-                        size - dists,
-                        np.full_like(dists, size_old)),
-                       axis=0)
+        dists = np.min(
+            (dists, size - dists, np.full_like(dists, size_old)), axis=0
+        )
         # recalculate covs to achieve periodic "grid"
         covs = autocov(dists)
 
@@ -102,15 +109,16 @@ class Spectral(object):
         self.size = self.npoints = size
         # eigenvalues of decomposition (??)
         self.sqrt_fft_covs = np.sqrt(old_div(fft_covs, self.npoints))
-        self.mslice = (slice(int(old_div((size - T), 2)),
-                             int(old_div((size + T), 2))),)
+        self.mslice = (
+            slice(int(old_div((size - T), 2)), int(old_div((size + T), 2))),
+        )
         if pool_size:
             self.pool = self.sim_n(pool_size)
 
     @property
     def output_size(self):
         if self.T:
-            return self.T,
+            return (self.T,)
         else:
             return 0
 
@@ -134,19 +142,22 @@ class Spectral(object):
         imag = np.random.normal(size=np.ravel(self.size))
         epsilon = real + 1j * imag
         rand = epsilon * self.sqrt_fft_covs
-        return ((np.real(self.ifft_func(rand)) * self.npoints)[self.mslice] *
-                self.sigma)
+        return (np.real(self.ifft_func(rand)) * self.npoints)[
+            self.mslice
+        ] * self.sigma
 
     def sim_white(self, epsilon):
         rand = epsilon * self.sqrt_fft_covs
-        return ((np.real(self.ifft_func(rand)) * self.npoints)[self.mslice] *
-                self.sigma)
+        return (np.real(self.ifft_func(rand)) * self.npoints)[
+            self.mslice
+        ] * self.sigma
 
     def sim_n(self, n):
         """Return (n x *size) array of simulations.  Will return a random
         sample of a pool, if a pool_size was given in initialization.
         The pool will grow, if n > pool_size.
         """
+
         def gen_n(extra_n):
             if self.verbose:
                 prog = tqdm(extra_n)
@@ -165,8 +176,9 @@ class Spectral(object):
             if self.pool is None:
                 self.pool = gen_n(n)
             if n > self.pool_size:
-                self.pool = np.concatenate((self.pool,
-                                            gen_n(n - self.pool_size)))
+                self.pool = np.concatenate(
+                    (self.pool, gen_n(n - self.pool_size))
+                )
                 self.pool_size = n
             return self.pool[np.random.randint(self.pool_size, size=n)]
 
@@ -175,8 +187,17 @@ class SpectralND(Spectral):
 
     """A clean-up re-write of philips old code."""
 
-    def __init__(self, cov, domainshape=(100, 100), crange=None, cthresh=.01,
-                 sigma=1, pool_size=None, verbose=False, scale=1.):
+    def __init__(
+        self,
+        cov,
+        domainshape=(100, 100),
+        crange=None,
+        cthresh=0.01,
+        sigma=1,
+        pool_size=None,
+        verbose=False,
+        scale=1.0,
+    ):
         """
         Parameter
         ---------
@@ -211,23 +232,28 @@ class SpectralND(Spectral):
             scale = np.repeat(scale, ndim)
 
         if FFTW:
-            self.ifft_func = \
-                lambda *args, **kwds: fftw.ifftn(threads=N_THREADS,
-                                                 *args, **kwds)
+            self.ifft_func = lambda *args, **kwds: fftw.ifftn(
+                threads=N_THREADS, *args, **kwds
+            )
         else:
             self.ifft_func = np.fft.ifftn
 
         if crange is None:
             root_func = lambda h: cthresh - cov(h)
-            maxdist = np.sqrt(np.sum((dim * dim_scale) ** 2
-                                     for dim, dim_scale
-                                     in zip(domainshape, scale)))
+            maxdist = np.sqrt(
+                np.sum(
+                    (dim * dim_scale) ** 2
+                    for dim, dim_scale in zip(domainshape, scale)
+                )
+            )
             try:
-                crange = optimize.brentq(root_func, 0., maxdist)
+                crange = optimize.brentq(root_func, 0.0, maxdist)
             except ValueError:
-                crange = .5 * maxdist
-                warnings.warn("Cannot determine correlation length. "
-                              "I will use %.3f" % crange)
+                crange = 0.5 * maxdist
+                warnings.warn(
+                    "Cannot determine correlation length. "
+                    "I will use %.3f" % crange
+                )
             cutoff = int(np.ceil(old_div(crange, np.max(scale))))
         else:
             cutoff = crange
@@ -236,15 +262,18 @@ class SpectralND(Spectral):
         # increase size to fit inside a power of two, in order to
         # speed up fft
         domainshape_larger = 2 ** np.ceil(np.log2(size_old)).astype(int)
-        grid = np.mgrid[[slice(0, dim_scale * dim, dim_scale)
-                         for dim, dim_scale
-                         in zip(domainshape_larger, scale)]]
+        grid = np.mgrid[
+            [
+                slice(0, dim_scale * dim, dim_scale)
+                for dim, dim_scale in zip(domainshape_larger, scale)
+            ]
+        ]
         for _ in range(ndim):
             domainshape_larger = domainshape_larger[:, np.newaxis]
         grid = np.min((grid, np.abs(domainshape_larger - grid)), axis=0)
 
         # distances to origin
-        origin_dists = np.sqrt((grid ** 2).sum(axis=0))
+        origin_dists = np.sqrt((grid**2).sum(axis=0))
         # covariances in fourier space
         covs = cov(origin_dists)
         if FFTW:
@@ -272,8 +301,9 @@ class MultiSpectral(Spectral):
 
     """Simulate multivariate time series."""
 
-    def __init__(self, autocovs, cov, T, sigma=1, pool_size=None,
-                 verbose=False):
+    def __init__(
+        self, autocovs, cov, T, sigma=1, pool_size=None, verbose=False
+    ):
         """Simulate multivariate time series with different autocovariances.
 
         Parameter
@@ -316,18 +346,22 @@ class MultiSpectral(Spectral):
             autocovs = [ac(i) for i in range(K)]
         if cov.shape[1] > K:
             cov = np.cov(cov)
-        self.specs = [Spectral(autocov, T, pool_size=pool_size)
-                      for autocov in autocovs]
+        self.specs = [
+            Spectral(autocov, T, pool_size=pool_size) for autocov in autocovs
+        ]
         # sigma = np.array([np.sqrt(autocov(0)) for autocov in autocovs])
         self.sigma = sigma = np.sqrt(np.diag(cov))
         sigma_xy = sigma[:, None] * sigma[None, :]
         try:
             self.cholesky = np.linalg.cholesky(cov / sigma_xy)
         except np.linalg.LinAlgError:
-            warnings.warn("LinAlgError occured. Fiddling with the " +
-                          "Covariance Matrix now!")
-            self.cholesky = np.linalg.cholesky(cov / sigma_xy +
-                                               np.diag(K * [1e-9]))
+            warnings.warn(
+                "LinAlgError occured. Fiddling with the "
+                + "Covariance Matrix now!"
+            )
+            self.cholesky = np.linalg.cholesky(
+                cov / sigma_xy + np.diag(K * [1e-9])
+            )
         if pool_size:
             self.pool = self.sim_n(pool_size)
         else:
@@ -357,6 +391,7 @@ class MultiSpectral(Spectral):
 
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
+
     cov_model = lambda h: np.exp(-h)
     domainshape = 100, 100
     spec = SpectralND(cov_model, domainshape)

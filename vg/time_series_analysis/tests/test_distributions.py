@@ -12,8 +12,11 @@ import vg.time_series_analysis.distributions as ds
 from vg import helpers as my
 
 
-distributions = {name: obj for name, obj in list(ds.__dict__.items())
-                 if isinstance(obj, ds.Dist)}
+distributions = {
+    name: obj
+    for name, obj in list(ds.__dict__.items())
+    if isinstance(obj, ds.Dist)
+}
 if "SkewNormal" in distributions and not ds.owens:
     del distributions["SkewNormal"]
 
@@ -26,17 +29,18 @@ if "SkewNormal" in distributions and not ds.owens:
 # rainmix_expon = ds.RainMix(ds.expon, rain_values)
 # distributions["rainmix expon"] = rainmix_expon
 
-dists_frozen = {name: dist(*dist._feasible_start)
-                for name, dist in list(distributions.items())}
+dists_frozen = {
+    name: dist(*dist._feasible_start)
+    for name, dist in list(distributions.items())
+}
 # avoid quantiles of 0 or 1, because that causes problems with the unbounded
 # distributions
 quantiles = np.linspace(1e-6, 1 - 1e-6, 11)
-quantiles_more = np.linspace(0.001, .999, 500)
+quantiles_more = np.linspace(0.001, 0.999, 500)
 incr = 1e-6
 
 
 class Test(npt.TestCase):
-
     def setUp(self):
         np.random.seed(0)
         self.verbose = False
@@ -57,12 +61,12 @@ class Test(npt.TestCase):
                 kwds = {}
             fitted_params = dist.fit(x, **kwds)
             if len(kwds) > 0:
-                known_params = known_params[:-len(kwds)]
+                known_params = known_params[: -len(kwds)]
             if isinstance(dist, ds.RainMix):
                 try:
-                    for name, known, fitted in zip(dist.parameter_names,
-                                                   known_params,
-                                                   fitted_params):
+                    for name, known, fitted in zip(
+                        dist.parameter_names, known_params, fitted_params
+                    ):
                         if name in dist.supplements_names:
                             continue
                         npt.assert_almost_equal(known, fitted, decimal=1)
@@ -73,11 +77,15 @@ class Test(npt.TestCase):
 
                     def rel_ranks(x):
                         n = len(x)
-                        return (np.arange(1, n + 1) - .5) / n
+                        return (np.arange(1, n + 1) - 0.5) / n
 
                     plt.plot(x, rel_ranks(x), "-o", label="x")
-                    plt.plot(dist.sample_data, rel_ranks(dist.sample_data),
-                             "-x", label="sample")
+                    plt.plot(
+                        dist.sample_data,
+                        rel_ranks(dist.sample_data),
+                        "-x",
+                        label="sample",
+                    )
                     plt.legend(loc="best")
                     plt.title(dist.name)
                     plt.show()
@@ -85,9 +93,9 @@ class Test(npt.TestCase):
                     raise
             else:
                 try:
-                    npt.assert_almost_equal(known_params,
-                                            fitted_params,
-                                            decimal=1)
+                    npt.assert_almost_equal(
+                        known_params, fitted_params, decimal=1
+                    )
                 except AssertionError:
                     print("\rfailed")
 
@@ -102,7 +110,7 @@ class Test(npt.TestCase):
             if self.verbose:
                 print("\t", dist_name)
             # get two feasible input values
-            q0, q1 = .25, .99
+            q0, q1 = 0.25, 0.99
             x0, x1 = dist_frozen.ppf([q0, q1])
             xx = np.linspace(x0, x1, 100)
             densities = dist_frozen.pdf(xx)
@@ -120,9 +128,11 @@ class Test(npt.TestCase):
     def test_rainmix_pdf(self):
         if self.verbose:
             print()
-        rainmix_dists = {name: dist
-                         for name, dist in dists_frozen.items()
-                         if isinstance(dist.dist, ds.RainMix)}
+        rainmix_dists = {
+            name: dist
+            for name, dist in dists_frozen.items()
+            if isinstance(dist.dist, ds.RainMix)
+        }
         for dist_name, dist_frozen in rainmix_dists.items():
             if self.verbose:
                 print("\t", dist_name)
@@ -134,29 +144,29 @@ class Test(npt.TestCase):
             x0, x1 = xx[[0, -1]]
             f_thresh = dist_frozen.parameter_dict["f_thresh"]
             q_thresh = dist_frozen.dist.q_thresh
-            npt.assert_almost_equal(dist_frozen.ppf(q_thresh), f_thresh,
-                                    decimal=3)
-            npt.assert_almost_equal(dist_frozen.cdf(f_thresh), q_thresh,
-                                    decimal=4)
+            npt.assert_almost_equal(
+                dist_frozen.ppf(q_thresh), f_thresh, decimal=3
+            )
+            npt.assert_almost_equal(
+                dist_frozen.cdf(f_thresh), q_thresh, decimal=4
+            )
             integral_par = integrate.quad(dist_frozen.pdf, x0, f_thresh)[0]
             integral_kde = integrate.quad(dist_frozen.pdf, f_thresh, x1)[0]
             try:
-                npt.assert_almost_equal(integral_par,
-                                        q_thresh - q0,
-                                        decimal=3)
+                npt.assert_almost_equal(integral_par, q_thresh - q0, decimal=3)
             except AssertionError as exc:
                 print("parametric part")
                 print(exc)
                 raise
             try:
-                npt.assert_almost_equal(integral_kde,
-                                        q1 - q_thresh,
-                                        decimal=2)
+                npt.assert_almost_equal(integral_kde, q1 - q_thresh, decimal=2)
             except AssertionError as exc:
                 print("KDE part")
                 print(exc)
-                print(f"exp/act: {integral_kde / (q1 - q_thresh)} "
-                      f"act/exp: {(q1 - q_thresh) / integral_kde}")
+                print(
+                    f"exp/act: {integral_kde / (q1 - q_thresh)} "
+                    f"act/exp: {(q1 - q_thresh) / integral_kde}"
+                )
                 raise
             integral = integrate.quad(dist_frozen.pdf, x0, x1)[0]
             try:
@@ -168,14 +178,14 @@ class Test(npt.TestCase):
                 print(exc)
                 sample = dist_frozen.sample(5000)
                 fig, (ax1, ax2) = dist_frozen.plot_fit(sample)
-                ax2.axhline(dist_frozen.dist.q_thresh,
-                            linestyle="--")
-                ax2.axvline(dist_frozen.parameter_dict["f_thresh"],
-                            linestyle="--")
+                ax2.axhline(dist_frozen.dist.q_thresh, linestyle="--")
+                ax2.axvline(
+                    dist_frozen.parameter_dict["f_thresh"], linestyle="--"
+                )
                 # pdf by cdf differentiation
-                cdf_diff = np.array([derivative(dist_frozen.cdf, x0,
-                                                dx=1e-6)
-                                     for x0 in xx])
+                cdf_diff = np.array(
+                    [derivative(dist_frozen.cdf, x0, dx=1e-6) for x0 in xx]
+                )
                 ax2.plot(xx, cdf_diff, "y--")
                 ax2.set_ylim([0, 1])
                 plt.show()
@@ -199,13 +209,14 @@ class Test(npt.TestCase):
                 quantiles_back[dry_mask] = quantiles_more[dry_mask]
             except KeyError:
                 pass
-            npt.assert_array_less(quantiles_back, 1.)
+            npt.assert_array_less(quantiles_back, 1.0)
             npt.assert_array_less(0, quantiles_back + sys.float_info.min)
             try:
                 # if isinstance(dist_frozen.dist, ds.RainMix):
                 #     quantiles_back -= 1e-4
-                npt.assert_almost_equal(quantiles_more,
-                                        quantiles_back, decimal=3)
+                npt.assert_almost_equal(
+                    quantiles_more, quantiles_back, decimal=3
+                )
             except AssertionError:
                 if not self.verbose:
                     raise
@@ -213,19 +224,24 @@ class Test(npt.TestCase):
 
                 def rel_ranks(x):
                     n = len(x)
-                    return (np.arange(n) - .5) / n
+                    return (np.arange(n) - 0.5) / n
 
-                fig, axs = plt.subplots(ncols=2,
-                                        sharey=True,
-                                        figsize=(8, 4),
-                                        # subplot_kw=dict(aspect="equal")
-                                        )
+                fig, axs = plt.subplots(
+                    ncols=2,
+                    sharey=True,
+                    figsize=(8, 4),
+                    # subplot_kw=dict(aspect="equal")
+                )
                 axs[0].scatter(quantiles_more, quantiles_back, marker="x")
                 if isinstance(dist_frozen.dist, ds.RainMix):
                     dist = dist_frozen.dist
                     axs[1].plot(x, rel_ranks(x), "-x", label="x")
-                    axs[1].plot(dist.sample_data, rel_ranks(dist.sample_data),
-                                "-x", label="sample_data")
+                    axs[1].plot(
+                        dist.sample_data,
+                        rel_ranks(dist.sample_data),
+                        "-x",
+                        label="sample_data",
+                    )
                     axs[1].legend(loc="best")
                     axs[0].axvline(dist.q_thresh)
                     axs[0].axhline(dist.q_thresh)
@@ -267,7 +283,7 @@ class Test(npt.TestCase):
                 print("\t", dist_name)
             self.assert_(np.isscalar(dist_frozen.pdf(1)))
             self.assert_(np.isscalar(dist_frozen.cdf(1)))
-            self.assert_(np.isscalar(dist_frozen.ppf(.5)))
+            self.assert_(np.isscalar(dist_frozen.ppf(0.5)))
 
     def test_out_of_bounds_pdf(self):
         """Do pdfs return nan for input outside the range?"""
@@ -333,8 +349,8 @@ class Test(npt.TestCase):
     #             self.assert_(np.isnan(ret), ret)
 
     def test_rain(self):
-        thresh = .1
-        exp = ds.expon(0., 1.)
+        thresh = 0.1
+        exp = ds.expon(0.0, 1.0)
         exp_rv = exp.ppf(quantiles_more)
         # rain and no rain in it
         exp_rv = np.concatenate((np.zeros(len(quantiles_more) // 2), exp_rv))
@@ -342,15 +358,17 @@ class Test(npt.TestCase):
         rain = rain_dist(*rain_dist.fit(exp_rv))
         ranks = my.rel_ranks(exp_rv)
         rain_qq = rain.cdf(exp_rv)
-        npt.assert_almost_equal(ranks[exp_rv > thresh],
-                                rain_qq[exp_rv > thresh],
-                                decimal=3)
+        npt.assert_almost_equal(
+            ranks[exp_rv > thresh], rain_qq[exp_rv > thresh], decimal=3
+        )
         rain_retrans = rain.ppf(rain_qq)
-        npt.assert_almost_equal(exp_rv[rain_retrans > thresh],
-                                rain_retrans[rain_retrans > thresh])
+        npt.assert_almost_equal(
+            exp_rv[rain_retrans > thresh], rain_retrans[rain_retrans > thresh]
+        )
 
 
 if __name__ == "__main__":
     import warnings
+
     warnings.simplefilter("error", RuntimeWarning)
     npt.run_module_suite()
