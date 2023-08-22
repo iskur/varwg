@@ -17,6 +17,7 @@ from scipy.integrate import cumtrapz, quad
 try:
     from multiprocessing import cpu_count
     import numexpr as ne
+
     ne.set_num_threads(min(64, cpu_count()))
     NE = True
 except ImportError:
@@ -108,9 +109,19 @@ stdtrit = np.vectorize(lambda df, qq: special.stdtrit(df, qq))
 
 sqrt2 = np.sqrt(2)
 
-def max_likelihood(density_func, x0, values=None, opt_func=None,
-                 disp=False, weights=None, method="BFGS",
-                 bounds=None, *args, **kwds):
+
+def max_likelihood(
+    density_func,
+    x0,
+    values=None,
+    opt_func=None,
+    disp=False,
+    weights=None,
+    method="BFGS",
+    bounds=None,
+    *args,
+    **kwds,
+):
     """Fits parameters of a density function to data, using the log-maximum-
     likelihood approach."""
     if opt_func is None:
@@ -125,8 +136,9 @@ def max_likelihood(density_func, x0, values=None, opt_func=None,
 
         def unlikelihood(params):
             return -np.sum(np.log(weights * density_func(params) + 1e-12))
+
     else:
-        args = values,
+        args = (values,)
 
         def unlikelihood(params, values):
             # we have to express fixed values in terms of kwds,
@@ -138,7 +150,8 @@ def max_likelihood(density_func, x0, values=None, opt_func=None,
             p_kwds = {
                 par_name: value
                 for par_name, value in zip(
-                    density_func.__self__.parameter_names, params)
+                    density_func.__self__.parameter_names, params
+                )
                 if par_name not in kwds
             }
             p_kwds.update(kwds)
@@ -160,8 +173,8 @@ def max_likelihood(density_func, x0, values=None, opt_func=None,
         # method=method,
         # method=("L-BFGS-B" if density_func._bounds else method),
         method=("L-BFGS-B" if bounds else method),
-        options={"maxiter": 1e4 * len(x0),
-                 "disp": disp})
+        options={"maxiter": 1e4 * len(x0), "disp": disp},
+    )
 
 
 def min_ks(cdf, x0, values, opt_func=None, disp=False, *args, **kwds):
@@ -171,8 +184,8 @@ def min_ks(cdf, x0, values, opt_func=None, disp=False, *args, **kwds):
         opt_func = sp_optimize.fmin
     n = len(values)
     values_sorted = np.sort(values)
-    ranks_plus = np.arange(0., n) / n
-    ranks_minus = np.arange(1., n + 1) / n
+    ranks_plus = np.arange(0.0, n) / n
+    ranks_minus = np.arange(1.0, n + 1) / n
 
     def ks(params):
         # we have to express fixed values in terms of kwds, because there
@@ -193,8 +206,14 @@ def min_ks(cdf, x0, values, opt_func=None, disp=False, *args, **kwds):
         dmin_minus = np.abs(cdf_values - ranks_minus).max()
         return max(dmin_plus, dmin_minus)
 
-    return opt_func(ks, x0, args=args, maxiter=1e4 * len(x0),
-                    maxfun=1e4 * len(x0), disp=disp)
+    return opt_func(
+        ks,
+        x0,
+        args=args,
+        maxiter=1e4 * len(x0),
+        maxfun=1e4 * len(x0),
+        disp=disp,
+    )
 
 
 def min_fsum(cdf, x0, values, opt_func=None, disp=False, *args, **kwds):
@@ -202,8 +221,8 @@ def min_fsum(cdf, x0, values, opt_func=None, disp=False, *args, **kwds):
         opt_func = sp_optimize.fmin
     n = len(values)
     values_sorted = np.sort(values)
-    ranks_plus = np.arange(0., n) / n
-    ranks_minus = np.arange(1., n + 1) / n
+    ranks_plus = np.arange(0.0, n) / n
+    ranks_minus = np.arange(1.0, n + 1) / n
 
     def ks(params):
         # we have to express fixed values in terms of kwds, because there
@@ -220,17 +239,23 @@ def min_fsum(cdf, x0, values, opt_func=None, disp=False, *args, **kwds):
 
         cdf_values = cdf(values_sorted, **p_kwds)
         cdf_values[np.isnan(cdf_values)] = np.inf
-        dmin_plus = ((cdf_values - ranks_plus)**2).sum()
-        dmin_minus = ((cdf_values - ranks_minus)**2).sum()
+        dmin_plus = ((cdf_values - ranks_plus) ** 2).sum()
+        dmin_minus = ((cdf_values - ranks_minus) ** 2).sum()
         return dmin_plus + dmin_minus
 
-    return opt_func(ks, x0, args=args, maxiter=1e4 * len(x0),
-                    maxfun=1e4 * len(x0), disp=disp)
+    return opt_func(
+        ks,
+        x0,
+        args=args,
+        maxiter=1e4 * len(x0),
+        maxfun=1e4 * len(x0),
+        disp=disp,
+    )
 
 
 class DistMeta(ABCMeta):
-    """Assure some class attributes are set, so that life is easier later on.
-    """
+    """Assure some class attributes are set, so that life is easier later on."""
+
     # pylint does not let me call the first parameter meta :(
     def __new__(cls, name, bases, cls_dict):
         new_cls = super(DistMeta, cls).__new__(cls, name, bases, cls_dict)
@@ -240,7 +265,7 @@ class DistMeta(ABCMeta):
         # could do some signature checks on cdf and ppf with that...
         code = cls_dict["_pdf"].__code__
         # first varname is self, second is x
-        varnames = list(code.co_varnames[2:code.co_argcount])
+        varnames = list(code.co_varnames[2 : code.co_argcount])
         # supplements are needed to call pdf, cdf and ppf, but are not
         # fitted (e.g. data for kernel density)
         # number of fittable parameters
@@ -259,6 +284,7 @@ class DistMeta(ABCMeta):
 class Dist(metaclass=DistMeta):
     """Mimics part of the interface of stats.rv_continuous. Comes with a few
     extra goodies."""
+
     # i would like to call the first item "solution", but in order to
     # have a nice compatibility to the optime.minimize result object,
     # it has to be "x"
@@ -288,9 +314,11 @@ class Dist(metaclass=DistMeta):
     def _clean_kwds(self, kwds):
         """Return a copy with only the keywords that are also in
         self.parameter_names."""
-        return {key: value
-           for key, value in list(kwds.items())
-           if key in self.parameter_names}
+        return {
+            key: value
+            for key, value in list(kwds.items())
+            if key in self.parameter_names
+        }
 
     def fit(self, *args, **kwds):
         return self._fit(*args, **self._clean_kwds(kwds))
@@ -330,8 +358,8 @@ class Dist(metaclass=DistMeta):
         finite_mask = np.isfinite(qq)
         quantiles_finite = np.where(finite_mask, qq, -1)
         x = np.atleast_1d(
-            self._ppf(quantiles_finite, *args[1:],
-                      **self._clean_kwds(kwds)))
+            self._ppf(quantiles_finite, *args[1:], **self._clean_kwds(kwds))
+        )
         if quantiles_finite.size == 1:
             quantiles_finite = np.full_like(x, quantiles_finite)
         x[(quantiles_finite < 0) | (quantiles_finite > 1)] = np.nan
@@ -350,12 +378,13 @@ class Dist(metaclass=DistMeta):
 
     def fit_ml(self, values, x0=None, *args, **kwds):
         if x0 is None:
-            x0 = (1, ) * len(self.parameter_names)
-        result = max_likelihood(self.pdf, x0, values, bounds=self._bounds,
-                                *args, **kwds)
-        return self.Result(x=result.x,
-                           supplements=None,
-                           success=result.success)
+            x0 = (1,) * len(self.parameter_names)
+        result = max_likelihood(
+            self.pdf, x0, values, bounds=self._bounds, *args, **kwds
+        )
+        return self.Result(
+            x=result.x, supplements=None, success=result.success
+        )
 
     # def fit_ml(self, values, x0=None, *args, **kwds):
     #     if x0 is None:
@@ -375,16 +404,18 @@ class Dist(metaclass=DistMeta):
     #         supplements = self.supplements
     #     return self.Result(x=params, supplements=supplements)
 
-    def fit_ks(self, values, opt_func=sp_optimize.fmin, x0=None, *args,
-               **kwds):
+    def fit_ks(
+        self, values, opt_func=sp_optimize.fmin, x0=None, *args, **kwds
+    ):
         if x0 is None:
-            x0 = (1, ) * len(self.parameter_names)
+            x0 = (1,) * len(self.parameter_names)
         return min_ks(self.cdf, x0, values, opt_func, *args, **kwds)
 
-    def fit_fsum(self, values, opt_func=sp_optimize.fmin, x0=None,
-                 *args, **kwds):
+    def fit_fsum(
+        self, values, opt_func=sp_optimize.fmin, x0=None, *args, **kwds
+    ):
         if x0 is None:
-            x0 = (1, ) * len(self.parameter_names)
+            x0 = (1,) * len(self.parameter_names)
         return min_fsum(self.cdf, x0, values, opt_func, *args, **kwds)
 
     def _constraints(self, *args, **kwds):
@@ -392,11 +423,15 @@ class Dist(metaclass=DistMeta):
         return np.full_like(param, False, dtype=bool)
 
     def _invalid_x(self, x, *args, **kwds):
-        """Returns a mask indicating where x < lower bound or x > upper bound.
-        """
+        """Returns a mask indicating where x < lower bound or x > upper bound."""
         x = np.atleast_1d(x)
-        lower_key = ("lc" if "lc" in self.parameter_names else "l"
-                     if "l" in self.parameter_names else None)
+        lower_key = (
+            "lc"
+            if "lc" in self.parameter_names
+            else "l"
+            if "l" in self.parameter_names
+            else None
+        )
         lower = kwds.get(lower_key, False)
         b_shape = np.broadcast(x, lower).shape
         mask = np.atleast_1d(np.full(b_shape, False, dtype=bool))
@@ -411,8 +446,13 @@ class Dist(metaclass=DistMeta):
                 warnings.simplefilter("ignore", RuntimeWarning)
                 mask[x < lower] = True
 
-        upper_key = ("uc" if "uc" in self.parameter_names else "u"
-                     if "u" in self.parameter_names else None)
+        upper_key = (
+            "uc"
+            if "uc" in self.parameter_names
+            else "u"
+            if "u" in self.parameter_names
+            else None
+        )
         upper = kwds.get(upper_key, False)
         if isinstance(upper, np.ndarray) or upper:
             if upper is None:
@@ -473,33 +513,38 @@ class Frozen(object):
         ax1 = fig.add_subplot(111)
 
         # the histogram of the data
-        bins = ax1.hist(values, n_classes, density=True,
-                        facecolor='green', alpha=0.75)[1]
+        bins = ax1.hist(
+            values, n_classes, density=True, facecolor="green", alpha=0.75
+        )[1]
 
         class_middles = 0.5 * (bins[1:] + bins[:-1])
         density = self.pdf(class_middles)
-        ax1.plot(class_middles, density, 'r--')
+        ax1.plot(class_middles, density, "r--")
 
         # the quantile part
         ax2 = ax1.twinx()
         # empirical cdf
         values_sort = np.sort(values)
-        ranks_emp = (.5 + np.arange(len(values))) / len(values)
+        ranks_emp = (0.5 + np.arange(len(values))) / len(values)
         ax2.plot(values_sort, ranks_emp)
         # theoretical cdf
         x = np.linspace(values.min(), values.max(), 5e2)
         ranks_theory = self.cdf(x)
-        ax2.plot(x, ranks_theory, 'r--')
+        ax2.plot(x, ranks_theory, "r--")
         ax2.grid()
-        plt.title(", ".join(" %s: %.3f" % (par_name, par)
-                            for par_name, par in self.parameter_dict.items()
-                            if par_name != "kernel_data"))
+        plt.title(
+            ", ".join(
+                " %s: %.3f" % (par_name, par)
+                for par_name, par in self.parameter_dict.items()
+                if par_name != "kernel_data"
+            )
+        )
         fig.suptitle(self.dist.name)
         return fig, (ax1, ax2)
 
     def plot_qq(self, values, *args, **kwds):
         """A qq-plot. Scatters theoretic over empirical ranks."""
-        ranks_emp = (stats.stats.rankdata(values) - .5) / len(values)
+        ranks_emp = (stats.stats.rankdata(values) - 0.5) / len(values)
         ranks_the = self.cdf(values)
         fig = plt.figure()
         plt.scatter(ranks_emp, ranks_the, marker="o", *args, **kwds)
@@ -523,7 +568,8 @@ class Censored(Dist):
         # have upper bounds above the upper cut.
         if hasattr(distribution, "parameter_names"):
             self.parameter_names = tuple(
-                list(distribution.parameter_names) + ["lc", "uc"])
+                list(distribution.parameter_names) + ["lc", "uc"]
+            )
         self.name = "censored " + distribution.name
 
     def _pdf(self, x, *args, **kwds):
@@ -584,12 +630,14 @@ class Censored(Dist):
         x = self.dist.ppf(qq, *args, **kwds)
         lower_ii = x < lc
         if np.any(lower_ii):
-            x[lower_ii] = (np.full_like(x, lc)
-                           if np.isscalar(lc) else lc)[lower_ii]
+            x[lower_ii] = (np.full_like(x, lc) if np.isscalar(lc) else lc)[
+                lower_ii
+            ]
         upper_ii = x > uc
         if np.any(upper_ii):
-            x[upper_ii] = (np.full_like(x, uc)
-                           if np.isscalar(uc) else uc)[upper_ii]
+            x[upper_ii] = (np.full_like(x, uc) if np.isscalar(uc) else uc)[
+                upper_ii
+            ]
         return x
 
     def _fit(self, x, *args, **kwds):
@@ -602,10 +650,15 @@ class Censored(Dist):
         # return min_ks(self.cdf, x0, x, lc=self.lc, uc=self.uc, *args)
         # fit on valid x
         valid_x = x[~self._invalid_x(x, *args, **kwds)]
-        return self.dist.fit(valid_x, *args, **{
-            key: val
-            for key, val in list(kwds.items()) if key != "lc" and key != "uc"
-        })
+        return self.dist.fit(
+            valid_x,
+            *args,
+            **{
+                key: val
+                for key, val in list(kwds.items())
+                if key != "lc" and key != "uc"
+            },
+        )
 
     def constraints(self, x, *args, **kwds):
         return self.dist.constraints(x, *args, **kwds)
@@ -624,7 +677,8 @@ class Truncated(Dist):
         # beta distribution. we can also truncate the beta distribution and
         # have upper bounds above the upper cut.
         self.parameter_names = tuple(
-            list(distribution.parameter_names) + ["lc", "uc"])
+            list(distribution.parameter_names) + ["lc", "uc"]
+        )
         self.name = "truncated " + distribution.name
 
     def _pdf(self, x, *args, **kwds):
@@ -642,11 +696,11 @@ class Truncated(Dist):
         else:
             lc = self.lc
         if len(args) > len(self.dist.parameter_names):
-            args = args[:len(self.dist.parameter_names)]
+            args = args[: len(self.dist.parameter_names)]
         # still sober
-        un_trunc = (self.dist.pdf(x, *args, **kwds) /
-                    (self.dist.cdf(uc, *args, **kwds) -
-                     self.dist.cdf(lc, *args, **kwds)))
+        un_trunc = self.dist.pdf(x, *args, **kwds) / (
+            self.dist.cdf(uc, *args, **kwds) - self.dist.cdf(lc, *args, **kwds)
+        )
         un_trunc[(x < lc) | (x > uc)] = 1e-9
         # now totally drunkated
         return un_trunc
@@ -666,12 +720,12 @@ class Truncated(Dist):
         else:
             lc = self.lc
         if len(args) > len(self.dist.parameter_names):
-            args = args[:len(self.dist.parameter_names)]
-        qq = ((self.dist.cdf(x, *args, **kwds)
-               - self.dist.cdf(lc, *args, **kwds))
-              /
-              (self.dist.cdf(uc, *args, **kwds)
-               - self.dist.cdf(lc, *args, **kwds)))
+            args = args[: len(self.dist.parameter_names)]
+        qq = (
+            self.dist.cdf(x, *args, **kwds) - self.dist.cdf(lc, *args, **kwds)
+        ) / (
+            self.dist.cdf(uc, *args, **kwds) - self.dist.cdf(lc, *args, **kwds)
+        )
         qq[qq < 0] = 0
         qq[qq > 1] = 1
         return qq
@@ -691,10 +745,13 @@ class Truncated(Dist):
         else:
             lc = self.lc
         if len(args) > len(self.dist.parameter_names):
-            args = args[:len(self.dist.parameter_names)]
-        x = self.dist.ppf(qq * self.dist.cdf(uc, *args, **kwds) +
-                          (1 - qq) * self.dist.cdf(lc, *args, **kwds), *args,
-                          **kwds)
+            args = args[: len(self.dist.parameter_names)]
+        x = self.dist.ppf(
+            qq * self.dist.cdf(uc, *args, **kwds)
+            + (1 - qq) * self.dist.cdf(lc, *args, **kwds),
+            *args,
+            **kwds,
+        )
         lower_ii = x < lc
         if np.sum(lower_ii) > 0:
             x[lower_ii] = lc[lower_ii]
@@ -742,16 +799,21 @@ class Normal(Dist):
         x, mu, sigma = np.atleast_1d(x, mu, sigma)
         if NE:
             _pi = np.pi
-            dens = ne.evaluate("(1. / (2 * _pi * sigma ** 2) ** .5 *" +
-                               "exp(-(x - mu) ** 2 / (2 * sigma ** 2)))")
+            dens = ne.evaluate(
+                "(1. / (2 * _pi * sigma ** 2) ** .5 *"
+                + "exp(-(x - mu) ** 2 / (2 * sigma ** 2)))"
+            )
         else:
-            dens = (1. / (2 * np.pi * sigma**2)**.5 *
-                    np.exp(-(x - mu)**2 / (2 * sigma**2)))
+            dens = (
+                1.0
+                / (2 * np.pi * sigma**2) ** 0.5
+                * np.exp(-((x - mu) ** 2) / (2 * sigma**2))
+            )
         return dens
 
     def _cdf(self, x, mu=0, sigma=1):
         x, mu, sigma = np.atleast_1d(x, mu, sigma)
-        qq = .5 * (1 + special.erf((x - mu) / (sigma * 2 ** .5)))
+        qq = 0.5 * (1 + special.erf((x - mu) / (sigma * 2**0.5)))
         return qq
 
     def _ppf(self, qq, mu=0, sigma=1):
@@ -971,36 +1033,37 @@ norm = Normal()
 
 #     def _ppf(self, q, mu, sigma, gamma):
 #         q, mu, sigma, gamma = np.atleast_1d(q, mu, sigma, gamma)
-        
-    
+
+
 class TruncatedNormal(Dist):
     _feasible_start = (0, 1, -1, 1)
     _additional_kwds = {"lc": -1, "uc": 1}
-    _bounds = [(-np.inf, np.inf),
-               (1e-9, np.inf)]
+    _bounds = [(-np.inf, np.inf), (1e-9, np.inf)]
 
     def _pdf(self, x, mu=0, sigma=1, lc=-np.inf, uc=np.inf):
         x, mu, sigma, lc, uc = np.atleast_1d(x, mu, sigma, lc, uc)
         if (x.shape != lc.shape) or (x.shape != uc.shape):
             x, mu, sigma, lc, uc = np.broadcast_arrays(x, mu, sigma, lc, uc)
         un_trunc = np.atleast_1d(
-            norm.pdf(x, mu, sigma) /
-            (norm.cdf(uc, mu, sigma) - norm.cdf(lc, mu, sigma)))
+            norm.pdf(x, mu, sigma)
+            / (norm.cdf(uc, mu, sigma) - norm.cdf(lc, mu, sigma))
+        )
         un_trunc[(x < lc) | (x > uc)] = 0
         sigma_neg_mask = sigma <= 0
         if np.any(sigma_neg_mask):
             if sigma.size == 1:
                 un_trunc += sigma**2
             else:
-                un_trunc[sigma_neg_mask] += sigma[sigma_neg_mask]**2
+                un_trunc[sigma_neg_mask] += sigma[sigma_neg_mask] ** 2
         return un_trunc
 
     def _cdf(self, x, mu=0, sigma=1, lc=-np.inf, uc=np.inf):
         x, mu, sigma, lc, uc = np.atleast_1d(x, mu, sigma, lc, uc)
         if (x.shape != lc.shape) or (x.shape != uc.shape):
             x, mu, sigma, lc, uc = np.broadcast_arrays(x, mu, sigma, lc, uc)
-        qq = ((norm.cdf(x, mu, sigma) - norm.cdf(lc, mu, sigma)) /
-              (norm.cdf(uc, mu, sigma) - norm.cdf(lc, mu, sigma)))
+        qq = (norm.cdf(x, mu, sigma) - norm.cdf(lc, mu, sigma)) / (
+            norm.cdf(uc, mu, sigma) - norm.cdf(lc, mu, sigma)
+        )
         qq = np.atleast_1d(qq)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)
@@ -1009,13 +1072,14 @@ class TruncatedNormal(Dist):
         return qq
 
     def _ppf(self, qq, mu=0, sigma=1, lc=-np.inf, uc=np.inf):
-        qq, mu, sigma, lc, uc = \
-            np.atleast_1d(qq, mu, sigma, lc, uc)
+        qq, mu, sigma, lc, uc = np.atleast_1d(qq, mu, sigma, lc, uc)
         if (qq.shape != lc.shape) or (qq.shape != uc.shape):
             qq, mu, sigma, lc, uc = np.broadcast_arrays(qq, mu, sigma, lc, uc)
-        x = norm.ppf(qq * norm.cdf(uc, mu, sigma) +
-                     (1 - qq) * norm.cdf(lc, mu, sigma),
-                     mu, sigma)
+        x = norm.ppf(
+            qq * norm.cdf(uc, mu, sigma) + (1 - qq) * norm.cdf(lc, mu, sigma),
+            mu,
+            sigma,
+        )
         x = np.atleast_1d(x)
         lower_ii = x < lc
         if np.sum(lower_ii) > 0:
@@ -1039,15 +1103,15 @@ class TruncatedNormal(Dist):
         return self.fit_ml(x, x0=x0, method="Nelder-Mead", **kwds).x
 
     def _constraints(self, x, mu, sigma, lc=-np.inf, uc=np.inf, **kwds):
-        mask = ((x > uc) |
-                (x < lc) |
-                (sigma <= 0))
+        mask = (x > uc) | (x < lc) | (sigma <= 0)
         return mask
+
+
 truncnorm = TruncatedNormal()
 
 
 class LogNormal(Dist):
-    _feasible_start = (2., .5)
+    _feasible_start = (2.0, 0.5)
 
     def _pdf(self, x, mu, sigma):
         return norm.pdf(np.log(x), mu, sigma) / x
@@ -1065,9 +1129,10 @@ class LogNormal(Dist):
         return mu, sigma
 
     def _constraints(self, x, mu, sigma):
-        mask = ((x <= 0) |
-                (sigma <= 0))
+        mask = (x <= 0) | (sigma <= 0)
         return mask
+
+
 lognormal = LogNormal()
 
 
@@ -1101,6 +1166,8 @@ class JohnsonSU(Dist):
 
     def _constraints(self, x, a, b, loc, scale):
         return b <= 0
+
+
 johnsonsu = JohnsonSU()
 
 
@@ -1108,22 +1175,24 @@ class Cauchy(Dist):
     _feasible_start = (0, 1)
 
     def _pdf(self, x, x0, gamma):
-        return 1 / (np.pi * gamma * (1 + ((x - x0) / gamma)**2))
+        return 1 / (np.pi * gamma * (1 + ((x - x0) / gamma) ** 2))
 
     def _cdf(self, x, x0, gamma):
-        return (1 / np.pi) * np.arctan2(x - x0, gamma) + .5
+        return (1 / np.pi) * np.arctan2(x - x0, gamma) + 0.5
 
     def _ppf(self, qq, x0, gamma):
-        return x0 + gamma * np.tan(np.pi * (qq - .5))
+        return x0 + gamma * np.tan(np.pi * (qq - 0.5))
 
     def _fit(self, x):
-        x0 = np.median(stats.trimboth(x, .38))
-        inner_quart = stats.trimboth(x, .25)
+        x0 = np.median(stats.trimboth(x, 0.38))
+        inner_quart = stats.trimboth(x, 0.25)
         inner_range = inner_quart.max() - inner_quart.min()
-        return self.fit_ml(x, x0=(x0, .5 * inner_range)).x
+        return self.fit_ml(x, x0=(x0, 0.5 * inner_range)).x
 
     def _constraints(self, x, x0, gamma):
         return gamma < 0
+
+
 cauchy = Cauchy()
 
 
@@ -1132,9 +1201,11 @@ class StudentT(Dist):
 
     def _pdf(self, x, mu=0, df=1):
         x, mu, df = np.atleast_1d(x, mu, df)
-        Px = (np.exp(gammaln((df + 1) / 2.) - gammaln(df / 2.)) /
-              np.sqrt(df * np.pi) * (1 + 
-                  (x - mu)**2 / df)**(-(df + 1) / 2.))
+        Px = (
+            np.exp(gammaln((df + 1) / 2.0) - gammaln(df / 2.0))
+            / np.sqrt(df * np.pi)
+            * (1 + (x - mu) ** 2 / df) ** (-(df + 1) / 2.0)
+        )
         return Px
 
     def _cdf(self, x, mu=0, df=1):
@@ -1156,13 +1227,15 @@ class StudentT(Dist):
             df = 6
         return self.fit_ml(
             x_noninf,
-            x0=(np.mean(x_noninf), df if df > 0 else .1),
-            method="Nelder-Mead").x
+            x0=(np.mean(x_noninf), df if df > 0 else 0.1),
+            method="Nelder-Mead",
+        ).x
 
     def _constraints(self, x, mu, df):
-        mask = ((df <= 0) |
-                (df > 8))
+        mask = (df <= 0) | (df > 8)
         return mask
+
+
 student_t = StudentT()
 
 
@@ -1172,42 +1245,59 @@ class NoncentralT(Dist):
     # stolen from scipy.stats.distributions.nct
     def _pdf(self, x, df, nc, mu=0):
         x, df, nc = (np.atleast_1d(var).astype(float) for var in (x, df, nc))
-        pdf_x = lambda x: ((df / x) *
-                           (self.cdf(x * (1 + 2 / df) ** .5, df + 2, nc) -
-                            self.cdf(x, df, nc)))
+        pdf_x = lambda x: (
+            (df / x)
+            * (
+                self.cdf(x * (1 + 2 / df) ** 0.5, df + 2, nc)
+                - self.cdf(x, df, nc)
+            )
+        )
         dens = np.where(
-            np.abs(x - mu) <= .5, self._pdf_old(x, df, nc, mu), pdf_x(x - mu))
+            np.abs(x - mu) <= 0.5, self._pdf_old(x, df, nc, mu), pdf_x(x - mu)
+        )
         dens[np.isinf(x)] = 0
         return dens
 
     def _pdf_old(self, x, df, nc, mu=0):
         n = df * 1.0
         nc = nc * 1.0
-        x2 = (x - mu)**2
+        x2 = (x - mu) ** 2
         ncx2 = nc * nc * x2
         fac1 = n + x2
-        trm1 = (n / 2. * np.log(n) + gammaln(n + 1) -
-                (n * np.log(2) + nc * nc / 2. +
-                 (n / 2.) * np.log(fac1) + gammaln(n / 2.)))
+        trm1 = (
+            n / 2.0 * np.log(n)
+            + gammaln(n + 1)
+            - (
+                n * np.log(2)
+                + nc * nc / 2.0
+                + (n / 2.0) * np.log(fac1)
+                + gammaln(n / 2.0)
+            )
+        )
         Px = np.exp(trm1)
         valF = ncx2 / (2 * fac1)
-        trm1 = (sqrt2 * nc *
-                (x - mu) * hyp1f1(n / 2 + 1, 1.5, valF) /
-                (np.asarray(fac1 * gamma_func((n + 1) / 2))))
-        trm2 = (hyp1f1((n + 1) / 2, 0.5, valF) / (np.asarray(
-                np.sqrt(fac1) * gamma_func(n / 2 + 1))))
+        trm1 = (
+            sqrt2
+            * nc
+            * (x - mu)
+            * hyp1f1(n / 2 + 1, 1.5, valF)
+            / (np.asarray(fac1 * gamma_func((n + 1) / 2)))
+        )
+        trm2 = hyp1f1((n + 1) / 2, 0.5, valF) / (
+            np.asarray(np.sqrt(fac1) * gamma_func(n / 2 + 1))
+        )
         Px *= trm1 + trm2
         return Px
 
     def _cdf(self, x, df, nc, mu=0):
-        x, df, nc, mu = (np.atleast_1d(var).astype(float)
-                         for var in (x, df, nc, mu))
+        x, df, nc, mu = (
+            np.atleast_1d(var).astype(float) for var in (x, df, nc, mu)
+        )
         qq = nctdtr(df, nc, x - mu)
         return qq
 
     def _ppf(self, qq, df, nc, mu=0):
-        qq, df, nc = (np.atleast_1d(var).astype(float)
-                      for var in (qq, df, nc))
+        qq, df, nc = (np.atleast_1d(var).astype(float) for var in (qq, df, nc))
         x = nctdtrit(df, nc, qq) + mu
         x[qq == 0] = -np.inf
         x[qq == 1] = np.inf
@@ -1224,8 +1314,7 @@ class NoncentralT(Dist):
         return df, nc, mu
 
     def _constraints(self, x, df, nc, mu):
-        mask = ((df < .1) |
-                (df > 8))
+        mask = (df < 0.1) | (df > 8)
         return mask
 
 
@@ -1400,19 +1489,18 @@ noncentral_t = NoncentralT()
 
 
 class Weibull(Dist):
-    _feasible_start = (.5, 2.0)
+    _feasible_start = (0.5, 2.0)
 
     def _pdf(self, x, alpha, beta):
         # alpha and beta should be positive
-        densities = alpha * beta * x ** (beta - 1) * \
-            np.exp(-alpha * x ** beta)
+        densities = alpha * beta * x ** (beta - 1) * np.exp(-alpha * x**beta)
         return densities
 
     def _cdf(self, x, alpha, beta):
         return 1 - np.exp(-alpha * x**beta)
 
     def _ppf(self, qq, alpha, beta):
-        return (-np.log(1 - qq) / alpha)**(1. / beta)
+        return (-np.log(1 - qq) / alpha) ** (1.0 / beta)
 
     def _fit(self, values, beta_start=10, *args, **kwds):
         """Implements a semi-analytical method of moments. beta is found by
@@ -1431,16 +1519,14 @@ class Weibull(Dist):
             of variation."""
             gamma1 = special.gamma(1 + 2 / beta)
             gamma2 = special.gamma(1 + 1 / beta)
-            return (cv - (gamma1 - gamma2**2)**.5 / gamma2)**2
+            return (cv - (gamma1 - gamma2**2) ** 0.5 / gamma2) ** 2
 
         beta = sp_optimize.fminbound(cv_error, -1, 1e6, disp=False)
-        alpha = (mean / special.gamma(1 / beta + 1))**(-beta)
+        alpha = (mean / special.gamma(1 / beta + 1)) ** (-beta)
         return alpha, beta
 
     def _constraints(self, x, alpha, beta):
-        mask = ((x < 0) |
-                (alpha <= 0) |
-                (beta <= 0))
+        mask = (x < 0) | (alpha <= 0) | (beta <= 0)
         return mask
 
 
@@ -1450,17 +1536,19 @@ weibull = Weibull()
 class Kumaraswamy(Dist):
     """Resembles the Beta distribution, but does not need a transcendental
     function."""
+
     _feasible_start = (2, 5, 0, 1)
 
     def _pdf(self, x, a, b, l=0, u=1):
         x = np.atleast_1d(x).astype(float)
         if NE:
             x = ne.evaluate("(x - l) / (u - l)")
-            dens = ne.evaluate("a * b * x ** (a - 1) * (1 - x ** a) ** " +
-                               "(b - 1) / (u - l)")
+            dens = ne.evaluate(
+                "a * b * x ** (a - 1) * (1 - x ** a) ** " + "(b - 1) / (u - l)"
+            )
         else:
             x = (x - l) / (u - l)
-            dens = a * b * x**(a - 1) * (1 - x**a)**(b - 1) / (u - l)
+            dens = a * b * x ** (a - 1) * (1 - x**a) ** (b - 1) / (u - l)
         return dens
 
     def _cdf(self, x, a, b, l=0, u=1):
@@ -1474,27 +1562,27 @@ class Kumaraswamy(Dist):
     def _ppf(self, qq, a, b, l=0, u=1):
         qq, a, b, l, u = np.atleast_1d(qq, a, b, l, u)
         if NE:
-            x = ne.evaluate("((1 - (1 - qq) ** (1 / b)) ** " +
-                            "(1 / a)) * (u - l) + l")
+            x = ne.evaluate(
+                "((1 - (1 - qq) ** (1 / b)) ** " + "(1 / a)) * (u - l) + l"
+            )
         else:
-            x = ((1 - (1 - qq) ** (1. / b)) ** (1. / a)) * (u - l) + l
+            x = ((1 - (1 - qq) ** (1.0 / b)) ** (1.0 / a)) * (u - l) + l
         return x
 
     def _fit(self, x, l=None, u=None):
         return beta.fit(x, l, u)
 
     def _constraints(self, x, a, b, l=0, u=1):
-        mask = ((a < 0) |
-                (b < 0) |
-                (x <= l) |
-                (x > u))
+        mask = (a < 0) | (b < 0) | (x <= l) | (x > u)
         return mask
+
 
 kumaraswamy = Kumaraswamy()
 
 
 class Beta(Dist):
     """Beta distribution on the interval [l, u]."""
+
     _feasible_start = (1, 1, 0, 1)
 
     def _pdf(self, x, alpha, beta, l=0, u=1):
@@ -1508,13 +1596,22 @@ class Beta(Dist):
         #        x_normed = np.where(x_normed <= ll, ll, x_normed)
         if NE:
             x = ne.evaluate("(x - l) / (u - l)")
-            return 1 / special.beta(alpha, beta) * \
-                ne.evaluate("x ** (alpha - 1) * (1 - x) ** (beta - 1) / " +
-                            "(u - l)")
+            return (
+                1
+                / special.beta(alpha, beta)
+                * ne.evaluate(
+                    "x ** (alpha - 1) * (1 - x) ** (beta - 1) / " + "(u - l)"
+                )
+            )
         else:
             x = (u - l) / (u - l)
-            return (1 / special.beta(alpha, beta)
-                    * x ** (alpha - 1) * (1 - x) ** (beta - 1) / (u - l))
+            return (
+                1
+                / special.beta(alpha, beta)
+                * x ** (alpha - 1)
+                * (1 - x) ** (beta - 1)
+                / (u - l)
+            )
 
     def _cdf(self, x, alpha, beta, l=0, u=1):
         if np.any((x < l) | (x > u)):
@@ -1573,25 +1670,28 @@ class Beta(Dist):
             return_list += [u]
         return np.squeeze(return_list)
 
-#        return self.fit_ml(x, x0=(alpha, beta, l, u))
+    #        return self.fit_ml(x, x0=(alpha, beta, l, u))
 
     def _constraints(self, x, alpha, beta, l=0, u=1):
-        mask = ((alpha <= 0) |
-                (beta <= 0) |
-                (x < l) |
-                (x >u))
+        mask = (alpha <= 0) | (beta <= 0) | (x < l) | (x > u)
         return mask
+
+
 beta = Beta()
 
 
 class Gamma(Dist):
     """Gamma distribution."""
+
     _feasible_start = (2, 2)
 
     def _pdf(self, x, k, theta):
         x = np.atleast_1d(x)
-        dens = (x**(k - 1) * np.exp(-x / float(theta)) /
-                (special.gamma(k) * theta**k))
+        dens = (
+            x ** (k - 1)
+            * np.exp(-x / float(theta))
+            / (special.gamma(k) * theta**k)
+        )
         return dens
 
     def _cdf(self, x, k, theta):
@@ -1613,25 +1713,34 @@ class Gamma(Dist):
 
         def psi(k):
             if k >= 8:
-                return (np.log(k) -
-                        (1. + (1. - (.1 - 1. / (21. * k ** 2)) / k ** 2)
-                         / (6. * k)) / (2. * k))
+                return np.log(k) - (
+                    1.0
+                    + (1.0 - (0.1 - 1.0 / (21.0 * k**2)) / k**2)
+                    / (6.0 * k)
+                ) / (2.0 * k)
             else:
-                return psi(k + 1) - 1. / k
+                return psi(k + 1) - 1.0 / k
 
         def psi_(k):
             if k >= 8:
-                return ((1. + (1. + (1. - (1. / 5. - 1. / (7. * k ** 2)) /
-                                     k ** 2) / (3. * k)) / (2. * k)) / k)
+                return (
+                    1.0
+                    + (
+                        1.0
+                        + (1.0 - (1.0 / 5.0 - 1.0 / (7.0 * k**2)) / k**2)
+                        / (3.0 * k)
+                    )
+                    / (2.0 * k)
+                ) / k
             else:
-                return psi_(k + 1) + 1. / k**2
+                return psi_(k + 1) + 1.0 / k**2
 
         xmean = x[np.isfinite(x)].mean()
         # we get problems here if there are 0's in x (log(x) = -inf, which
         # happens for wind)
         s = np.log(xmean) - np.mean(np.log(x[np.isfinite(x) & (x > 0)]))
-        k_old = (3 - s + ((s - 3)**2 + 24 * s)**.5) / (12 * s)
-        k_rec = lambda k: k - (np.log(k) - psi(k) - s) / (1. / k - psi_(k))
+        k_old = (3 - s + ((s - 3) ** 2 + 24 * s) ** 0.5) / (12 * s)
+        k_rec = lambda k: k - (np.log(k) - psi(k) - s) / (1.0 / k - psi_(k))
         k_new = k_rec(k_old)
         while abs(k_old - k_new) / k_old > rel_change:
             k_old = k_new
@@ -1640,9 +1749,7 @@ class Gamma(Dist):
         return self.fit_fsum(x, x0=(k_new, theta))
 
     def _constraints(self, x, k, theta):
-        mask = ((k <= 0) |
-                (theta <= 0) |
-                (x < 0))
+        mask = (k <= 0) | (theta <= 0) | (x < 0)
         return mask
 
 
@@ -1650,7 +1757,7 @@ gamma = Gamma()
 
 
 class Gamma1(Dist):
-    _feasible_start = (1, .5, 2)
+    _feasible_start = (1, 0.5, 2)
 
     def _pdf(self, x, a, loc, scale):
         x, a, loc, scale = np.atleast_1d(x, a, loc, scale)
@@ -1689,17 +1796,13 @@ gamma1 = Gamma1()
 
 
 class Expon(Dist):
-    _feasible_start = (1e-3, 1. / 5)
+    _feasible_start = (1e-3, 1.0 / 5)
 
     def _pdf(self, x, x0, lambd):
-        return np.where(x > x0,
-                        lambd * np.exp(-lambd * (x - x0)),
-                        0)
+        return np.where(x > x0, lambd * np.exp(-lambd * (x - x0)), 0)
 
     def _cdf(self, x, x0, lambd):
-        return np.where(x > x0,
-                        1 - np.exp(-lambd * (x - x0)),
-                        0)
+        return np.where(x > x0, 1 - np.exp(-lambd * (x - x0)), 0)
 
     def _ppf(self, qq, x0, lambd):
         return -np.log(1 - qq) / lambd + x0
@@ -1718,25 +1821,33 @@ expon = Expon()
 
 
 class ExponTwo(Dist):
-    _feasible_start = (0, .5, 1, 1)
+    _feasible_start = (0, 0.5, 1, 1)
 
     def _pdf(self, x, x0, q0, lambda1, lambda2):
         x = np.atleast_1d(x)
-        dens = np.where(x <= x0, q0 * expon.pdf(x0 - x, 0, lambda1),
-                        (1 - q0) * expon.pdf(x, x0, lambda2))
+        dens = np.where(
+            x <= x0,
+            q0 * expon.pdf(x0 - x, 0, lambda1),
+            (1 - q0) * expon.pdf(x, x0, lambda2),
+        )
         return dens
 
     def _cdf(self, x, x0, q0, lambda1, lambda2):
         x = np.atleast_1d(x)
-        qq = np.where(x <= x0, q0 * (1 - expon.cdf(x0 - x, 0, lambda1)),
-                     q0 + (1 - q0) * expon.cdf(x, x0, lambda2))
+        qq = np.where(
+            x <= x0,
+            q0 * (1 - expon.cdf(x0 - x, 0, lambda1)),
+            q0 + (1 - q0) * expon.cdf(x, x0, lambda2),
+        )
         return qq
 
     def _ppf(self, qq, x0, q0, lambda1, lambda2):
         qq = np.atleast_1d(qq)
         x = np.where(
-            qq <= q0, x0 + np.log(qq / q0) / lambda1,
-            x0 - np.log(1 - (qq - q0) / (1 - q0)) / lambda2)
+            qq <= q0,
+            x0 + np.log(qq / q0) / lambda1,
+            x0 - np.log(1 - (qq - q0) / (1 - q0)) / lambda2,
+        )
         return x
 
     def _fit(self, x):
@@ -1744,13 +1855,13 @@ class ExponTwo(Dist):
         x0 = stats.mode(np.round(x_noninf, 1))[0][0]
         lambda1 = -1 / np.mean(x_noninf[x_noninf < x0] - x0)
         lambda2 = 1 / np.mean(x_noninf[x_noninf > x0] - x0)
-        q0 = (np.argmin(np.abs(np.sort(x_noninf) - x0)) + .5) / len(x)
+        q0 = (np.argmin(np.abs(np.sort(x_noninf) - x0)) + 0.5) / len(x)
         return self.fit_ml(
-            x_noninf, x0=(x0, q0, lambda1, lambda2), method="Nelder-Mead").x
+            x_noninf, x0=(x0, q0, lambda1, lambda2), method="Nelder-Mead"
+        ).x
 
     def _constraints(self, x, x0, q0, lambda1, lambda2):
-        mask = ((lambda1 <= 0) |
-                (lambda2 <= 0))
+        mask = (lambda1 <= 0) | (lambda2 <= 0)
         return mask
 
 
@@ -1758,7 +1869,7 @@ expon_two = ExponTwo()
 
 
 class NoncentralLaplace(Dist):
-    _feasible_start = (1, .5, .5)
+    _feasible_start = (1, 0.5, 0.5)
 
     def _pdf(self, x, x0, q0, lambd):
         lambda2 = lambd * q0 / (1 - q0)
@@ -1766,39 +1877,43 @@ class NoncentralLaplace(Dist):
         dens = np.where(
             x <= x0,
             q0 * lambd * np.exp(-lambd * (x0 - x)),
-            (1 - q0) * lambda2 * np.exp(-lambda2 * (x - x0)), )
+            (1 - q0) * lambda2 * np.exp(-lambda2 * (x - x0)),
+        )
         dens[np.isinf(x)] = 0
         return dens
 
     def _cdf(self, x, x0, q0, lambd):
         lambda2 = lambd * q0 / (1 - q0)
         x = np.atleast_1d(x)
-        qq = np.where(x <= x0, q0 * (1 - expon.cdf(x0 - x, 0, lambd)),
-                     q0 + (1 - q0) * expon.cdf(x, x0, lambda2))
+        qq = np.where(
+            x <= x0,
+            q0 * (1 - expon.cdf(x0 - x, 0, lambd)),
+            q0 + (1 - q0) * expon.cdf(x, x0, lambda2),
+        )
         return qq
 
     def _ppf(self, qq, x0, q0, lambd):
         lambda2 = lambd * q0 / (1 - q0)
         qq = np.atleast_1d(qq)
         x = np.where(
-            qq <= q0, x0 + np.log(qq / q0) / lambd,
-            x0 - np.log(1 - (qq - q0) / (1 - q0)) / lambda2)
+            qq <= q0,
+            x0 + np.log(qq / q0) / lambd,
+            x0 - np.log(1 - (qq - q0) / (1 - q0)) / lambda2,
+        )
         return x
 
     def _fit(self, x):
         x0 = stats.mode(np.round(x, 1))[0][0]
-        q0 = (np.argmin(np.abs(np.sort(x) - x0)) + .5) / len(x)
+        q0 = (np.argmin(np.abs(np.sort(x) - x0)) + 0.5) / len(x)
         lambd = (1 - 2 * q0) / (q0 * np.mean(x[np.isfinite(x)]))
         if lambd < 0:
             # this actually means that x0 was not right, so provide a feasible
             # lambd and let the ml estimation figure the rest out
-            lambd = -1. / np.mean(x[(x < x0) & np.isfinite(x)] - x0)
+            lambd = -1.0 / np.mean(x[(x < x0) & np.isfinite(x)] - x0)
         return self.fit_ks(x, x0=(x0, q0, lambd))
 
     def _constraints(self, x, x0, q0, lambd):
-        mask = ((lambd <= 0) |
-                (q0 < 0) |
-                (q0 > 1))
+        mask = (lambd <= 0) | (q0 < 0) | (q0 > 1)
         return mask
 
 
@@ -1816,9 +1931,11 @@ class MDFt(object):
     @staticmethod
     def _marginal_pdf(x, sigma, df):
         x = np.atleast_1d(np.asarray(x))
-        dens = (gamma_func((df + 1) / 2.) /
-                (np.sqrt(df * np.pi) * gamma_func(df / 2.)) *
-                (1 + x**2 / df)**(-(df + 1) / 2.))
+        dens = (
+            gamma_func((df + 1) / 2.0)
+            / (np.sqrt(df * np.pi) * gamma_func(df / 2.0))
+            * (1 + x**2 / df) ** (-(df + 1) / 2.0)
+        )
         return dens
 
     @staticmethod
@@ -1826,17 +1943,21 @@ class MDFt(object):
         if np.any(~np.isfinite(sigma)):
             return np.inf
         sigma_inv_sqrt = np.linalg.inv(linalg.sqrtm(sigma))
-        yt = np.array([np.squeeze(np.asarray(sigma_inv_sqrt[i] @ data))/
-                       np.sqrt((dfi - 2) / dfi)
-                       for i, dfi in enumerate(df)
-                       ])
+        yt = np.array(
+            [
+                np.squeeze(np.asarray(sigma_inv_sqrt[i] @ data))
+                / np.sqrt((dfi - 2) / dfi)
+                for i, dfi in enumerate(df)
+            ]
+        )
         marginal_pdfs = [MDFt._marginal_pdf(yt, sigma, dfi) for dfi in df]
         llh = (
-            np.sum(np.log(np.sqrt(df - 2) / df)) +
-            np.sum(list(map(np.log, marginal_pdfs)))
+            np.sum(np.log(np.sqrt(df - 2) / df))
+            + np.sum(list(map(np.log, marginal_pdfs)))
             # is that needed? it should not change the location of
             # the maximum?!
-            - .5 * np.log(linalg.det(sigma)))
+            - 0.5 * np.log(linalg.det(sigma))
+        )
         return -llh
 
     @staticmethod
@@ -1845,7 +1966,7 @@ class MDFt(object):
         if isinstance(df, float):
             df = np.array(K * [df])
         yt = np.array([student_t.sample(size, df=dfi) for dfi in df])
-        zt = np.sqrt((df - 2.) / df)[:, None] * yt
+        zt = np.sqrt((df - 2.0) / df)[:, None] * yt
         return np.dot(linalg.sqrtm(sigma), zt)
 
     @staticmethod
@@ -1859,14 +1980,17 @@ class MDFt(object):
 
         sigma = np.cov(data)
         sigma_upper = sigma[np.triu_indices_from(sigma)]
-        df = np.array(
-            [student_t.fit(values) for values in data])
+        df = np.array([student_t.fit(values) for values in data])
         x0 = np.concatenate((sigma_upper, df))
-        bounds = [(0, None) if i == j else (None, None)
-                  for i in range(K) for j in range(i + 1)]
+        bounds = [
+            (0, None) if i == j else (None, None)
+            for i in range(K)
+            for j in range(i + 1)
+        ]
         bounds += K * [(5, None)]
         result = sp_optimize.minimize(
-            unlikelihood, x0=x0, bounds=bounds, options=dict(disp=True))
+            unlikelihood, x0=x0, bounds=bounds, options=dict(disp=True)
+        )
         sigma = fill_lower(result.x[:-K])
         df = result.x[-K:]
         return sigma, df
@@ -1885,10 +2009,11 @@ def fill_lower(sequence):
 class _Rain(Dist):
     def _mask_kwds(self, mask, kwds):
         return {
-            name: (vals[mask]
-                   if (hasattr(vals, "shape") and
-                       vals.shape == mask.shape)
-                   else vals)
+            name: (
+                vals[mask]
+                if (hasattr(vals, "shape") and vals.shape == mask.shape)
+                else vals
+            )
             for name, vals in kwds.items()
         }
 
@@ -1904,16 +2029,21 @@ class _Rain(Dist):
 
 class _KDE(object):
     # these are not part of the solution and should not be tested on
-    _cache_names = "kernel_data", "x_eval", "q_kde_eval",  # "kernel_width"
+    _cache_names = (
+        "kernel_data",
+        "x_eval",
+        "q_kde_eval",
+    )  # "kernel_width"
 
     def fit_kde(self, x, x0=None, bounds=None):
         if bounds is not None:
             bounds = np.squeeze(bounds)
         return kde.optimal_kernel_width(x, x0=None, bounds=bounds)
 
-    def _kde_integral(self, kernel_width, kernel_data, f_thresh, upper_eval,
-                    recalc=True):
-        lower_eval = max(.95 * f_thresh, 1e-9)
+    def _kde_integral(
+        self, kernel_width, kernel_data, f_thresh, upper_eval, recalc=True
+    ):
+        lower_eval = max(0.95 * f_thresh, 1e-9)
         if upper_eval is None or np.any(upper_eval < kernel_data):
             if len(kernel_data):
                 upper_eval = 1.75 * (kernel_data.max() + 1.75 * kernel_width)
@@ -1928,21 +2058,28 @@ class _KDE(object):
         if kernel_width is None:
             kernel_width = kde.silvermans_rule(kernel_data)
         if np.isnan(kernel_width):
-            kernel_data += (upper_eval * 1e-6 *
-                            np.random.randn(len(kernel_data)))
+            kernel_data += (
+                upper_eval * 1e-6 * np.random.randn(len(kernel_data))
+            )
             kernel_width = kde.silvermans_rule(kernel_data)
         dens_kde_eval = kde.kernel_density(
-            kernel_width, np.log(kernel_data), eval_points=x_eval_log,
-            recalc=recalc)
+            kernel_width,
+            np.log(kernel_data),
+            eval_points=x_eval_log,
+            recalc=recalc,
+        )
         while np.isclose(dens_kde_eval.sum(), 0):
             # increase number of evaluation points
             n_eval_points = len(x_eval_log) * 2
-            x_eval_log = np.log(np.linspace(lower_eval,
-                                            upper_eval,
-                                            n_eval_points))
+            x_eval_log = np.log(
+                np.linspace(lower_eval, upper_eval, n_eval_points)
+            )
             dens_kde_eval = kde.kernel_density(
-                kernel_width, np.log(kernel_data), eval_points=x_eval_log,
-                recalc=recalc)
+                kernel_width,
+                np.log(kernel_data),
+                eval_points=x_eval_log,
+                recalc=recalc,
+            )
         assert np.all(np.isfinite(dens_kde_eval))
 
         x_eval = np.exp(x_eval_log)
@@ -1953,8 +2090,8 @@ class _KDE(object):
         q_kde_eval /= q_kde_eval[-1]
         assert np.all(np.isfinite(q_kde_eval))
         # fill only the quantile range [q_thresh, 1]
-        q_kde_eval = self.q_thresh + (1. - self.q_thresh) * q_kde_eval
-        q_kde_eval = np.concatenate((q_kde_eval, [1.]))
+        q_kde_eval = self.q_thresh + (1.0 - self.q_thresh) * q_kde_eval
+        q_kde_eval = np.concatenate((q_kde_eval, [1.0]))
         assert np.all(np.isfinite(q_kde_eval))
         x_eval_log = np.concatenate((x_eval_log, [np.log(upper_eval)]))
         return q_kde_eval, x_eval_log
@@ -1970,17 +2107,16 @@ class _KDE(object):
             if not (x_eval_ := x_eval[i]).ndim:
                 x_eval_ = x_eval
             if x > x_eval_[-1]:
-                qq_kde[i] = 1.
+                qq_kde[i] = 1.0
                 continue
             if x < x_eval_[0]:
-                qq_kde[i] = 0.
+                qq_kde[i] = 0.0
                 continue
             if not (q_kde_eval_ := q_kde_eval[i]).ndim:
                 q_kde_eval_ = q_kde_eval
-            q_kde_interp = interpolate.interp1d(x_eval_,
-                                                q_kde_eval_,
-                                                kind="linear",
-                                                assume_sorted=True)
+            q_kde_interp = interpolate.interp1d(
+                x_eval_, q_kde_eval_, kind="linear", assume_sorted=True
+            )
             qq_kde[i] = q_kde_interp(x)
         return qq_kde
 
@@ -1997,23 +2133,29 @@ class _KDE(object):
                 x_eval_ = x_eval
             if not (q_kde_eval_ := q_kde_eval[i]).ndim:
                 q_kde_eval_ = q_kde_eval
-            x_kde_interp = interpolate.interp1d(q_kde_eval_,
-                                                x_eval_,
-                                                kind="linear",
-                                                assume_sorted=True)
+            x_kde_interp = interpolate.interp1d(
+                q_kde_eval_, x_eval_, kind="linear", assume_sorted=True
+            )
             xx_kde[i] = x_kde_interp(q)
         return xx_kde
 
 
 class RainMix(_KDE, _Rain):
-    supplements_names = ("q_thresh",
-                         "f_thresh",
-                         "kernel_data",
-                         "q_kde_eval",
-                         "x_eval")
+    supplements_names = (
+        "q_thresh",
+        "f_thresh",
+        "kernel_data",
+        "q_kde_eval",
+        "x_eval",
+    )
 
-    def __init__(self, distribution, threshold=.0015,
-               q_thresh_lower=.6, q_thresh_upper=.95):
+    def __init__(
+        self,
+        distribution,
+        threshold=0.0015,
+        q_thresh_lower=0.6,
+        q_thresh_upper=0.95,
+    ):
         """Mixed Rain distribution with lower threshold and KDE above
         q_threshold.
 
@@ -2041,8 +2183,9 @@ class RainMix(_KDE, _Rain):
         self.sample_data = sample_data
         self._feasible_start = self.fit(sample_data)
         # parameter_names exists because of the DistMeta class
-        self.parameter_names = (self.parameter_names +
-                                distribution.parameter_names)
+        self.parameter_names = (
+            self.parameter_names + distribution.parameter_names
+        )
         # n_pars is set in class construction time with the Dist metaclass
         self.n_pars += self.dist.n_pars
         self.name = "rainmix " + distribution.name
@@ -2052,24 +2195,30 @@ class RainMix(_KDE, _Rain):
         # as we have a mixed parametric, non-parametric distribution
         # here, supplying a feasible starting solution is non-trivial.
         # the data is part of the solution!
-        sample_quantiles = np.linspace(0.001, .999, 500)
-        sample_data = self.dist.ppf(sample_quantiles,
-                                    *self.dist._feasible_start)
+        sample_quantiles = np.linspace(0.001, 0.999, 500)
+        sample_data = self.dist.ppf(
+            sample_quantiles, *self.dist._feasible_start
+        )
         sample_data[-50:] *= 2
         sample_data = np.concatenate((np.zeros_like(sample_data), sample_data))
         return sample_data
 
-    def _pdf(self, x, q_thresh, rain_prob, kernel_width, kernel_data,
-           f_thresh, q_kde_eval=None, x_eval=None, *args, **kwds):
-        (x,
-         q_thresh,
-         rain_prob,
-         kernel_width,
-         f_thresh) = np.atleast_1d(x,
-                                   q_thresh,
-                                   rain_prob,
-                                   kernel_width,
-                                   f_thresh)
+    def _pdf(
+        self,
+        x,
+        q_thresh,
+        rain_prob,
+        kernel_width,
+        kernel_data,
+        f_thresh,
+        q_kde_eval=None,
+        x_eval=None,
+        *args,
+        **kwds,
+    ):
+        (x, q_thresh, rain_prob, kernel_width, f_thresh) = np.atleast_1d(
+            x, q_thresh, rain_prob, kernel_width, f_thresh
+        )
         assert np.all(np.isfinite(rain_prob))
         if len(rain_prob) == 1:
             rain_prob = np.broadcast_to(rain_prob, x.shape)
@@ -2077,8 +2226,9 @@ class RainMix(_KDE, _Rain):
             kernel_width = np.broadcast_to(kernel_width, x.shape)
         if isinstance(kernel_data, np.ndarray):
             if kernel_data.ndim == 1 and kernel_data.dtype != np.dtype("O"):
-                kernel_data = np.broadcast_to(kernel_data,
-                                              (x.size, kernel_data.size))
+                kernel_data = np.broadcast_to(
+                    kernel_data, (x.size, kernel_data.size)
+                )
         else:
             kernel_data = np.asarray(kernel_data, dtype=object)
         if len(q_thresh) == 1:
@@ -2086,12 +2236,11 @@ class RainMix(_KDE, _Rain):
         if len(f_thresh) == 1:
             f_thresh = np.broadcast_to(f_thresh, x.shape)
         if x.ndim > 1 and rain_prob.ndim > 1:
-            (x,
-             rain_prob,
-             f_thresh,
-            ) = np.broadcast_arrays(x,
-                                    rain_prob,
-                                    f_thresh)
+            (
+                x,
+                rain_prob,
+                f_thresh,
+            ) = np.broadcast_arrays(x, rain_prob, f_thresh)
 
         rain_mask = x > self.thresh
         par_mask = (x < f_thresh) & rain_mask
@@ -2101,7 +2250,7 @@ class RainMix(_KDE, _Rain):
         dens = np.zeros_like(rain_prob + rain_mask)
 
         def par_scale(x):
-            return ((x - self.thresh) / (f_thresh[par_mask] - self.thresh))
+            return (x - self.thresh) / (f_thresh[par_mask] - self.thresh)
 
         def par_rescale(dens):
             return dens / (f_thresh[par_mask] - self.thresh) * self.q_thresh
@@ -2125,12 +2274,12 @@ class RainMix(_KDE, _Rain):
             if len(kernel_data.ravel()) == 0:
                 dens[mask] = 0
                 return
-            dens_kde = kde.kernel_density(kernel_width,
-                                          np.log(kernel_data),
-                                          eval_points=np.log(x_kde))
+            dens_kde = kde.kernel_density(
+                kernel_width, np.log(kernel_data), eval_points=np.log(x_kde)
+            )
             # dividing by x_kde because of chain-rule differentiation
             # of ln(x)
-            dens[mask] = (1. - self.q_thresh) * dens_kde / x_kde
+            dens[mask] = (1.0 - self.q_thresh) * dens_kde / x_kde
             if kernel_data.size:
                 dens[mask] /= kernel_data.size - 1
 
@@ -2138,27 +2287,39 @@ class RainMix(_KDE, _Rain):
         if np.any(kde_mask):
             if kde_mask.ndim == 2:
                 for tt, mask in enumerate(kde_mask):
-                    kde_single(dens[tt], x[tt, mask], mask,
-                               kernel_width[tt],
-                               kernel_data[tt],
-                               )
+                    kde_single(
+                        dens[tt],
+                        x[tt, mask],
+                        mask,
+                        kernel_width[tt],
+                        kernel_data[tt],
+                    )
             else:
-                kde_single(dens, x[kde_mask], kde_mask,
-                           kernel_width[kde_mask],
-                           kernel_data)
+                kde_single(
+                    dens,
+                    x[kde_mask],
+                    kde_mask,
+                    kernel_width[kde_mask],
+                    kernel_data,
+                )
         return dens
 
-    def _cdf(self, x, q_thresh, rain_prob, kernel_width, kernel_data,
-           f_thresh, q_kde_eval=None, x_eval=None, *args, **kwds):
-        (x,
-         q_thresh,
-         rain_prob,
-         kernel_width,
-         f_thresh) = np.atleast_1d(x,
-                                   q_thresh,
-                                   rain_prob,
-                                   kernel_width,
-                                   f_thresh)
+    def _cdf(
+        self,
+        x,
+        q_thresh,
+        rain_prob,
+        kernel_width,
+        kernel_data,
+        f_thresh,
+        q_kde_eval=None,
+        x_eval=None,
+        *args,
+        **kwds,
+    ):
+        (x, q_thresh, rain_prob, kernel_width, f_thresh) = np.atleast_1d(
+            x, q_thresh, rain_prob, kernel_width, f_thresh
+        )
         # i want to manipulate kwds, but only here
         kwds = {k: v for k, v in kwds.items()}
         if len(rain_prob) == 1:
@@ -2167,8 +2328,9 @@ class RainMix(_KDE, _Rain):
             kernel_width = np.broadcast_to(kernel_width, x.shape)
         if isinstance(kernel_data, np.ndarray):
             if kernel_data.ndim == 1 and kernel_data.dtype != np.dtype("O"):
-                kernel_data = np.broadcast_to(kernel_data,
-                                              (len(x), len(kernel_data)))
+                kernel_data = np.broadcast_to(
+                    kernel_data, (len(x), len(kernel_data))
+                )
         else:
             kernel_data = np.asarray(kernel_data, dtype=object)
         if len(q_thresh) == 1:
@@ -2192,28 +2354,27 @@ class RainMix(_KDE, _Rain):
         qq = np.zeros_like(x, dtype=float)
         n_non_rain = (~rain_mask).sum()
         if n_non_rain > 0:
-            qq[~rain_mask] = ((1 - rain_prob[~rain_mask])
-                              * np.random.random(n_non_rain))
+            qq[~rain_mask] = (1 - rain_prob[~rain_mask]) * np.random.random(
+                n_non_rain
+            )
 
         if self.debug:
             fig, ax = plt.subplots(nrows=1, ncols=1)
-            ax.hist(qq[~rain_mask], 40, histtype="step",
-                    label="norain")
+            ax.hist(qq[~rain_mask], 40, histtype="step", label="norain")
         # parametric part
         if np.any(par_mask):
             x_par = x[par_mask]
             kwds_par = self._mask_kwds(par_mask, kwds)
-            x_par = ((x_par - self.thresh) /
-                     (f_thresh[par_mask] - self.thresh))
+            x_par = (x_par - self.thresh) / (f_thresh[par_mask] - self.thresh)
             if "l" in kwds_par:
                 x_par = np.maximum(x_par, kwds_par["l"])
             if self.debug:
                 assert np.all(x_par >= 0)
                 assert np.all(x_par <= 1)
             if "l" not in kwds_par:
-                kwds_par["l"] = 0.
+                kwds_par["l"] = 0.0
             if "u" not in kwds_par:
-                kwds_par["u"] = 1.
+                kwds_par["u"] = 1.0
             q_par = self.dist.cdf(x_par, *args, **kwds_par)
             p0 = (1 - rain_prob)[par_mask]
             p1 = q_thresh[par_mask]
@@ -2232,9 +2393,7 @@ class RainMix(_KDE, _Rain):
                 x_eval = [x_eval[i] for i in np.where(kde_mask)[0]]
             elif x_eval.ndim == 2:
                 x_eval = x_eval[kde_mask]
-            q_kde = self._kde_cdf(x[kde_mask],
-                                  q_kde_eval,
-                                  x_eval)
+            q_kde = self._kde_cdf(x[kde_mask], q_kde_eval, x_eval)
             qq[kde_mask] = q_kde
             if self.debug:
                 assert np.all(np.isfinite(q_kde))
@@ -2244,17 +2403,22 @@ class RainMix(_KDE, _Rain):
             assert np.all(np.isfinite(q_kde))
         return qq
 
-    def _ppf(self, qq, q_thresh, rain_prob, kernel_width, kernel_data,
-           f_thresh, q_kde_eval=None, x_eval=None, *args, **kwds):
-        (qq,
-         q_thresh,
-         rain_prob,
-         kernel_width,
-         f_thresh) = np.atleast_1d(qq,
-                                   q_thresh,
-                                   rain_prob,
-                                   kernel_width,
-                                   f_thresh)
+    def _ppf(
+        self,
+        qq,
+        q_thresh,
+        rain_prob,
+        kernel_width,
+        kernel_data,
+        f_thresh,
+        q_kde_eval=None,
+        x_eval=None,
+        *args,
+        **kwds,
+    ):
+        (qq, q_thresh, rain_prob, kernel_width, f_thresh) = np.atleast_1d(
+            qq, q_thresh, rain_prob, kernel_width, f_thresh
+        )
         assert np.all(np.isfinite(qq))
         # i want to manipulate kwds, but only here
         kwds = {k: v for k, v in kwds.items()}
@@ -2264,8 +2428,9 @@ class RainMix(_KDE, _Rain):
             kernel_width = np.broadcast_to(kernel_width, qq.shape)
         if isinstance(kernel_data, np.ndarray):
             if kernel_data.ndim == 1 and kernel_data.dtype != np.dtype("O"):
-                kernel_data = np.broadcast_to(kernel_data,
-                                              (len(qq), len(kernel_data)))
+                kernel_data = np.broadcast_to(
+                    kernel_data, (len(qq), len(kernel_data))
+                )
         else:
             kernel_data = np.asarray(kernel_data, dtype=object)
         if len(q_thresh) == 1:
@@ -2300,20 +2465,19 @@ class RainMix(_KDE, _Rain):
             if self.debug:
                 assert np.all(q_par >= 0)
                 assert np.all(q_par <= 1)
-            x_par = ((f_thresh[par_mask] - self.thresh) * x_par
-                     + self.thresh)
+            x_par = (f_thresh[par_mask] - self.thresh) * x_par + self.thresh
             x[par_mask] = x_par
             assert np.all(np.isfinite(x_par))
 
         # non-parametric (KDE) part
         if np.any(kde_mask):
-            if (q_kde_eval.ndim == 2) or (q_kde_eval.dtype == np.dtype("object")):
+            if (q_kde_eval.ndim == 2) or (
+                q_kde_eval.dtype == np.dtype("object")
+            ):
                 q_kde_eval = q_kde_eval[kde_mask]
             if (x_eval.ndim == 2) or (x_eval.dtype == np.dtype("object")):
                 x_eval = x_eval[kde_mask]
-            x_kde = self._kde_ppf(qq[kde_mask],
-                                  q_kde_eval,
-                                  x_eval)
+            x_kde = self._kde_ppf(qq[kde_mask], q_kde_eval, x_eval)
             x[kde_mask] = x_kde
             assert np.all(np.isfinite(x_kde))
 
@@ -2328,7 +2492,7 @@ class RainMix(_KDE, _Rain):
 
     def median(self, *args, **kwds):
         return self.ppf(0.5, *args, **kwds)
-    
+
     def mean(self, *args, **kwds):
         f_thresh = kwds["f_thresh"]
         epsilon = 1e-6
@@ -2346,54 +2510,61 @@ class RainMix(_KDE, _Rain):
         )
         return 0.5 * (result_par[0] + result_kde[0])
 
-    def _fit_qthresh(self, q_thresh, x, x0=None, kernel_bounds=None, *args, **kwds):
+    def _fit_qthresh(
+        self, q_thresh, x, x0=None, kernel_bounds=None, *args, **kwds
+    ):
         rain_mask = x > self.thresh
         rain_prob = np.mean(rain_mask)
         self.q_thresh = q_thresh
-        f_thresh = max(np.percentile(x, 100 * self.q_thresh),
-                       self.thresh)
+        f_thresh = max(np.percentile(x, 100 * self.q_thresh), self.thresh)
         kde_mask = x >= f_thresh
         par_mask = rain_mask & ~kde_mask
         if np.sum(par_mask) > 1:
             rain_kwds = self._mask_kwds(par_mask, kwds)
             x_par = x[rain_mask & ~kde_mask]
-            x_par = ((x_par - self.thresh) /
-                     (f_thresh - self.thresh))
+            x_par = (x_par - self.thresh) / (f_thresh - self.thresh)
             par_names = self.dist.parameter_names
             if "u" in par_names:
                 # the supplied upper limit is not meant for the
                 # parametric but for the kde part
-                rain_kwds["u"] = 1.
+                rain_kwds["u"] = 1.0
                 # lower bound is not to be fitted
-                rain_kwds["l"] = 0.
+                rain_kwds["l"] = 0.0
             par_solution = list(self.dist.fit(x_par, **rain_kwds))
         else:
             par_solution = self.dist._feasible_start
-        self.success = True     # haha!
+        self.success = True  # haha!
         kernel_data = x[kde_mask]
         if np.any(par_mask):
             kernel_data = np.concatenate(([np.max(x[par_mask])], kernel_data))
         # if len(kernel_data) >= 5:
         if len(kernel_data) > 2:
-            kernel_width = self.fit_kde(np.log(kernel_data),
-                                        None if x0 is None else x0[2],
-                                        bounds=kernel_bounds)
+            kernel_width = self.fit_kde(
+                np.log(kernel_data),
+                None if x0 is None else x0[2],
+                bounds=kernel_bounds,
+            )
             if np.isnan(kernel_width):
                 kernel_width = None
         else:
             kernel_data = np.array([])
             kernel_width = None
         upper_eval = kwds.pop("u", None)
-        q_kde_eval, x_eval_log = self._kde_integral(kernel_width,
-                                                    kernel_data,
-                                                    f_thresh,
-                                                    upper_eval)
+        q_kde_eval, x_eval_log = self._kde_integral(
+            kernel_width, kernel_data, f_thresh, upper_eval
+        )
         x_eval = np.exp(x_eval_log)
         if kernel_width:
             kernel_width = float(kernel_width)
-        self.fitted_pars = ((q_thresh, rain_prob, kernel_width,
-                             kernel_data, f_thresh, q_kde_eval,
-                             x_eval) + tuple(par_solution))
+        self.fitted_pars = (
+            q_thresh,
+            rain_prob,
+            kernel_width,
+            kernel_data,
+            f_thresh,
+            q_kde_eval,
+            x_eval,
+        ) + tuple(par_solution)
         self.q_thresh = q_thresh
         density = self.pdf(x, *self.fitted_pars)
         mask = (density > 0) & np.isfinite(density)
@@ -2404,61 +2575,75 @@ class RainMix(_KDE, _Rain):
         result = sp_optimize.minimize_scalar(
             partial(self._fit_qthresh, kernel_bounds=kernel_bounds, **kwds),
             args=(x, x0) + args,
-            bounds=[self.q_thresh_lower,
-                    self.q_thresh_upper],
-            method="bounded")
+            bounds=[self.q_thresh_lower, self.q_thresh_upper],
+            method="bounded",
+        )
         return self.fitted_pars
 
     def fit_ml(self, x, x0=None, bounds=None, *args, **kwds):
         """This is a lie, we don't fit rainmix with ML."""
         params = self._fit(x, x0, bounds=bounds, *args, **kwds)
         params = list(params)
-        supplements = {name: params[self.parameter_names.index(name)]
-                       for name in self.supplements_names}
-        fixed_names = [name for name in kwds.keys()
-                       if name in self.parameter_names]
-        params = [param
-                  for name, param in zip(self.parameter_names,
-                                      params)
-                  if
-                  (name not in self.supplements_names) and
-                  (name not in fixed_names)]
-        return self.Result(x=params,
-                           supplements=supplements,
-                           success=self.success)
+        supplements = {
+            name: params[self.parameter_names.index(name)]
+            for name in self.supplements_names
+        }
+        fixed_names = [
+            name for name in kwds.keys() if name in self.parameter_names
+        ]
+        params = [
+            param
+            for name, param in zip(self.parameter_names, params)
+            if (name not in self.supplements_names)
+            and (name not in fixed_names)
+        ]
+        return self.Result(
+            x=params, supplements=supplements, success=self.success
+        )
 
-    def _constraints(self, x, q_thresh, rain_prob, kernel_width,
-                   kernel_data, f_thresh, q_kde_eval=None,
-                   x_eval=None, **kwds):
-        (rain_prob,
-         kernel_width,
-         kernel_data,
-         f_thresh) = map(np.asarray, (rain_prob, kernel_width,
-                                      kernel_data, f_thresh))
+    def _constraints(
+        self,
+        x,
+        q_thresh,
+        rain_prob,
+        kernel_width,
+        kernel_data,
+        f_thresh,
+        q_kde_eval=None,
+        x_eval=None,
+        **kwds,
+    ):
+        (rain_prob, kernel_width, kernel_data, f_thresh) = map(
+            np.asarray, (rain_prob, kernel_width, kernel_data, f_thresh)
+        )
         if "kernel_bounds" in kwds:
             kwds.pop("kernel_bounds")
-        mask = ((q_thresh < self.q_thresh_lower) |
-                (q_thresh > self.q_thresh_upper) |
-                (rain_prob < 0) |
-                (rain_prob > 1) |
-                (kernel_width <= 0) |
-                (f_thresh < 0))
+        mask = (
+            (q_thresh < self.q_thresh_lower)
+            | (q_thresh > self.q_thresh_upper)
+            | (rain_prob < 0)
+            | (rain_prob > 1)
+            | (kernel_width <= 0)
+            | (f_thresh < 0)
+        )
         kde_mask = x >= f_thresh
         par_mask = (x > self.thresh) & ~kde_mask
         mask[par_mask] |= self.dist._constraints(
             x[par_mask],
-            **{key: value[par_mask] for key, value in kwds.items()})
+            **{key: value[par_mask] for key, value in kwds.items()},
+        )
         return mask
 
     def _invalid_x(self, x, *args, **kwds):
         mask = np.atleast_1d(np.full_like(x, False, dtype=bool))
         return mask
 
+
 # q_threshold = .75
-q_threshold = .9
+q_threshold = 0.9
 # rainmix_kumaraswamy = RainMix(kumaraswamy, threshold=.001,
 #                               q_threshold=q_threshold)
-rainmix_kumaraswamy = RainMix(kumaraswamy, threshold=.001)
+rainmix_kumaraswamy = RainMix(kumaraswamy, threshold=0.001)
 # rainmix_expon = RainMix(expon, q_threshold=q_threshold)
 # rainmix_weibull = RainMix(weibull, q_threshold=q_threshold)
 # rainmix_gamma = RainMix(gamma, q_threshold=q_threshold)
@@ -2467,13 +2652,14 @@ rainmix_kumaraswamy = RainMix(kumaraswamy, threshold=.001)
 
 
 class Rain(_Rain):
-    def __init__(self, distribution, threshold=.0001):
+    def __init__(self, distribution, threshold=0.0001):
         self.dist = distribution
         self.thresh = threshold
-        self.parameter_names = tuple(["rain_prob"] +
-                                     list(distribution.parameter_names))
+        self.parameter_names = tuple(
+            ["rain_prob"] + list(distribution.parameter_names)
+        )
         self.n_pars = len(self.parameter_names)
-        self._feasible_start = (0.98, ) + self.dist._feasible_start
+        self._feasible_start = (0.98,) + self.dist._feasible_start
         self.name = "rain " + distribution.name
 
     def _pdf(self, x, rain_prob, *args, **kwds):
@@ -2488,9 +2674,10 @@ class Rain(_Rain):
         dens = np.empty_like(rain_prob + rain_mask, dtype=float)
         dens[~rain_mask] = (1 - rain_prob[~rain_mask]) / self.thresh
         kwds_rain = self._mask_kwds(rain_mask, kwds)
-        dens_rain = (self.dist.pdf(x[rain_mask] - self.thresh, *args,
-                                   **kwds_rain)
-                     * rain_prob[rain_mask])
+        dens_rain = (
+            self.dist.pdf(x[rain_mask] - self.thresh, *args, **kwds_rain)
+            * rain_prob[rain_mask]
+        )
         if dens.shape == rain_mask.shape:
             try:
                 dens[rain_mask] = np.atleast_1d(dens_rain)
@@ -2515,12 +2702,12 @@ class Rain(_Rain):
         # as we mask x, we also have to mask the parameters given in **kwds
         kwds_rain = self._mask_kwds(rain_mask, kwds)
         p0 = 1 - rain_prob[rain_mask]
-        qq[rain_mask] = (p0
-                         + rain_prob[rain_mask]
-                         * self.dist.cdf(x[rain_mask] - self.thresh,
-                                         *args, **kwds_rain))
-        qq[non_rain_mask] = (rng.uniform(size=non_rain_mask.sum())
-                             * (1 - rain_prob[non_rain_mask]))
+        qq[rain_mask] = p0 + rain_prob[rain_mask] * self.dist.cdf(
+            x[rain_mask] - self.thresh, *args, **kwds_rain
+        )
+        qq[non_rain_mask] = rng.uniform(size=non_rain_mask.sum()) * (
+            1 - rain_prob[non_rain_mask]
+        )
         qq[~finite_mask] = np.nan
         return qq
 
@@ -2539,11 +2726,9 @@ class Rain(_Rain):
         # done with values where ~rain_mask.
         # as we mask x, we also have to mask the parameters given in **kwds
         kwds_rain = self._mask_kwds(rain_mask, kwds)
-        x[rain_mask] = (self.thresh +
-                        self.dist.ppf(1 -
-                                      (1 - qq[rain_mask])
-                                      / rain_prob[rain_mask],
-                                      *args, **kwds_rain))
+        x[rain_mask] = self.thresh + self.dist.ppf(
+            1 - (1 - qq[rain_mask]) / rain_prob[rain_mask], *args, **kwds_rain
+        )
         return x
 
     def _fit(self, x, **kwds):
@@ -2556,19 +2741,22 @@ class Rain(_Rain):
         return tuple([rain_prob] + list(solution))
 
 
-rain_expon = Rain(expon, threshold=.002)
-rain_weibull = Rain(weibull, threshold=.002)
+rain_expon = Rain(expon, threshold=0.002)
+rain_weibull = Rain(weibull, threshold=0.002)
 
 if __name__ == "__main__":
     import vg
     from vg import vg_base, vg_plotting
+
     # import config_konstanz_disag as conf
     import config_konstanz as conf
+
     vg.set_conf(conf)
     # times_hourly, met = vg.read_met(vg.conf.met_file)
     # rain, times = vg.my.sumup(met["R"], 24, times_hourly)
-    met_vg = vg.VG(("R", "theta", "ILWR", "Qsw", "rh"),
-                   verbose=True, refit="R")
+    met_vg = vg.VG(
+        ("R", "theta", "ILWR", "Qsw", "rh"), verbose=True, refit="R"
+    )
     rain_dist, solution = met_vg.dist_sol["R"]
     met_vg.simulate()
     # rain = met_vg.data_raw[0]
@@ -2579,10 +2767,11 @@ if __name__ == "__main__":
     # rain_dist.plot_seasonality_fit()
     # rain_dist.plot_monthly_params()
     rain_dist.plot_fourier_fit()
-    rain_dist.plot_monthly_fit(solution,
-                               # dists_alt=(Rain(gamma, threshold=.015),
-                               #            expon)
-                               )
+    rain_dist.plot_monthly_fit(
+        solution,
+        # dists_alt=(Rain(gamma, threshold=.015),
+        #            expon)
+    )
     met_vg.plot_monthly_hists("R")
     met_vg.plot_meteogramm_daily()
     # rain_dist.plot_monthly_params()
