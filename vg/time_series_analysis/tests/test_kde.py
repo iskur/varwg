@@ -5,6 +5,7 @@ import datetime
 import numpy as np
 from scipy import integrate
 import numpy.testing as npt
+import vg
 from vg.time_series_analysis import _kde as kde
 from vg import times
 
@@ -22,7 +23,7 @@ class Test(npt.TestCase):
         x = np.arange(len(self.dtimes))
         # this is roughly a daily cycle within a yearly cycle
         # the strength of the daily cycle is dependent on the doy
-        self.noise = np.random.randn(len(x))
+        self.noise = vg.rng.normal(size=len(x))
         self.data = (
             15 * -np.cos(x * 2 * np.pi / (365 * 24))
             + 5
@@ -57,8 +58,8 @@ class Test(npt.TestCase):
         pass
 
     def test_kernel_integration(self):
-        np.random.seed(0)
-        sample = np.random.normal(size=1000)
+        vg.reseed(0)
+        sample = vg.rng.normal(size=1000)
         q1, q2 = 0.25, 0.75
         x0, x1 = map(lambda q: np.percentile(sample, 100 * q), (q1, q2))
         kernel_width = kde.optimal_kernel_width(sample)
@@ -88,8 +89,8 @@ class Test(npt.TestCase):
         npt.assert_almost_equal(integral, q2 - q1, decimal=3)
 
     def test_log_kernel_integration(self):
-        np.random.seed(0)
         sample = np.exp(np.linspace(0, 1, 500))
+        vg.reseed(0)
         kernel_width = kde.optimal_kernel_width(np.log(sample))
         q1, q2 = 1e-3, 1 - 1e-3
         x0, x1 = map(lambda q: np.percentile(sample, 100 * q), (q1, q2))

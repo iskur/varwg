@@ -6,6 +6,7 @@ import os
 import numpy as np
 import numpy.testing as npt
 import numpy.testing.decorators as decorators
+import vg
 from vg.time_series_analysis import models, tests
 
 # the following parameters and data are taken from p.707 in order to test
@@ -170,9 +171,9 @@ class Test(npt.TestCase):
     def test_VAR_LS_sim_m(self):
         """Does VAR_LS_sim change means as requested."""
         T = 500
-        np.random.seed(0)
+        vg.reseed(0)
         sim = models.VAR_LS_sim(B_test, sigma_u_test, T)
-        np.random.seed(0)
+        vg.reseed(0)
         m = np.array([2, 1, 0.5])
         mt = np.empty((len(m), T))
         mt.T[:] = m
@@ -212,7 +213,7 @@ class Test(npt.TestCase):
     #     VARMA_LS_residuals when simulating with VARMA_LS_sim?"""
     #     T = 5
     #     residuals_test = np.asmatrix(
-    #                         [np.random.multivariate_normal(VAR_K * [0],
+    #                         [vg.rng.multivariate_normal(VAR_K * [0],
     #                                                        sigma_u_test)
     #                          for t in xrange(T)]).reshape((VAR_K, T))
     #     AM, sigma_u = models.VARMA_LS_prelim(data, VARMA_p, VARMA_q)[:-1]
@@ -222,7 +223,7 @@ class Test(npt.TestCase):
     #     npt.assert_almost_equal(residuals, residuals_test, decimal=3)
 
     # def test_MGARCH_sim_MGARCH_residuals(self):
-    #     np.random.seed(0)
+    #     vg.reseed(0)
     #     # B = [[-.24e-3, -.00, 0.02, -.18, .16, -.08, .11],
     #     #      [-.42e-3, 0.12, -.13, -.08, .03, -.01, .01]]
     #     # sigma_u = [[1., .8],
@@ -232,7 +233,7 @@ class Test(npt.TestCase):
     #     a0, a1 = .25, .5
     #     sigma_t = np.ones((2, T))
     #     ut = np.zeros((2, T))
-    #     zts = sigma_z * np.random.multivariate_normal([0, 0],
+    #     zts = sigma_z * vg.rng.multivariate_normal([0, 0],
     #                                                   [[1., .8],
     #                                                    [.8, 1.]],
     #                                                   T)
@@ -261,7 +262,7 @@ class Test(npt.TestCase):
         T = 5
         residuals_test = np.array(
             [
-                np.random.multivariate_normal(VAR_K * [0], sigma_u_test)
+                vg.rng.multivariate_normal(VAR_K * [0], sigma_u_test)
                 for t in range(T)
             ]
         ).reshape((VAR_K, T))
@@ -273,7 +274,7 @@ class Test(npt.TestCase):
 
     def test_VAR_LS_B_recover(self):
         T = 10000
-        np.random.seed(0)
+        vg.reseed(0)
         sim = models.VAR_LS_sim(B_test, sigma_u_test, T)
         # fit on simulated values check if we can recover B
         B_fit, sigma_u_fit = models.VAR_LS(sim, p=VAR_p)
@@ -301,7 +302,7 @@ class Test(npt.TestCase):
         T = 5
         residuals_test = np.array(
             [
-                np.random.multivariate_normal(VAR_K * [0], sigma_u_test)
+                vg.rng.multivariate_normal(VAR_K * [0], sigma_u_test)
                 for t in range(T)
             ]
         ).reshape((VAR_K, T))
@@ -319,7 +320,7 @@ class Test(npt.TestCase):
         T = 5
         residuals_test = np.array(
             [
-                np.random.multivariate_normal(VAR_K * [0], sigma_u_test)
+                vg.rng.multivariate_normal(VAR_K * [0], sigma_u_test)
                 for t in range(T)
             ]
         ).reshape((VAR_K, T))
@@ -378,13 +379,14 @@ class Test(npt.TestCase):
         T = 5 * 365
         residuals_test = np.array(
             [
-                np.random.multivariate_normal(VAR_K * [0], sigma_u_test)
+                vg.rng.multivariate_normal(VAR_K * [0], sigma_u_test)
                 for t in range(T)
             ]
         ).reshape((VAR_K, T))
         doys = np.arange(1, T + 1) % 365
         # residuals_test[:] = 0
         Bs_test = self.Bs_test(T)
+        models.SVAR_LS_sim.clear_cache()
         sim = models.SVAR_LS_sim(
             Bs_test,
             self.sigma_u_test_s(T),
@@ -414,8 +416,7 @@ class Test(npt.TestCase):
 
     def test_SVAR_LS_B_recover(self):
         T = 50 * 365
-        seed = 100
-        np.random.seed(seed)
+        vg.reseed(0)
         doys = np.arange(T) % 365
         Bs_test = self.Bs_test(T)
         sigma_u_test_s = self.sigma_u_test_s(T)
@@ -425,7 +426,6 @@ class Test(npt.TestCase):
         sim = models.SVAR_LS_sim(Bs_test, sigma_u_test_s, doys)
         # sigma_u_test_s[:, :] = sigma_u_test_mean[..., None]
         # sim = models.SVAR_LS_sim(Bs_test, sigma_u_test_s, doys)
-        np.random.seed(1)
         sim_stat = models.VAR_LS_sim(B_test_mean, sigma_u_test_mean, T)
         means = sim.mean(axis=1)
         means_stat = sim_stat.mean(axis=1)

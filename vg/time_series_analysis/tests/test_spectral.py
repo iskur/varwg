@@ -5,6 +5,7 @@ import numpy as np
 import numpy.testing as npt
 from vg.time_series_analysis import spectral, time_series, models
 from vg.time_series_analysis.tests import test_models
+import vg
 
 # these are empirical covariances from stdn constance data
 # theta, Qsw and ILWR
@@ -41,14 +42,14 @@ autocovs = [ac(0), ac(1), ac(2)]
 
 class Test(npt.TestCase):
     def setUp(self):
-        np.random.seed(3)
+        vg.reseed(3)
         # spectral.simulate is sensitive towards T! low T -> bad fit
         self.T = 25000
         # generating a ar-1 time series which has a well known
         # autocovariance function
         # high rho, worse fit
         self.rho = rho = 0.75
-        test_data = np.random.normal(size=self.T)
+        test_data = vg.rng.normal(size=self.T)
         for t in range(1, self.T):
             test_data[t] += rho * test_data[t - 1]
         self.test_data = test_data - test_data.mean()

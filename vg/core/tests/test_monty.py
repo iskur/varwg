@@ -51,7 +51,7 @@ class Test(TestCase):
         met_vg = vg.VG(**vg_kwds)
         met_vg.fit(**fit_kwds)
         for ri in range(n_realizations):
-            np.random.seed(ri)
+            vg.reseed(ri)
             met_vg.simulate(**sim_kwds)
             met_vg.disaggregate(**dis_kwds)
             met_vg.to_glm(outfilepath_seq % ri)

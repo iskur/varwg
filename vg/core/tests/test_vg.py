@@ -14,6 +14,7 @@ import vg
 config_template = vg.config_template
 vg.set_conf(config_template)
 
+seed = 0
 p = 3
 T = 2 * 365
 var_names = (
@@ -65,8 +66,8 @@ class TestVG(npt.TestCase):
             met_file=met_file,
             verbose=self.verbose,
         )
+        vg.reseed(seed)
         self.met_vg.fit(p)
-        np.random.seed(1)
 
     def tearDown(self):
         shutil.rmtree(self.data_dir)

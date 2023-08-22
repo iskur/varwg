@@ -9,6 +9,7 @@ import numpy.testing as npt
 import matplotlib.pyplot as plt
 
 import vg.time_series_analysis.distributions as ds
+import vg
 from vg import helpers as my
 
 
@@ -42,8 +43,8 @@ incr = 1e-6
 
 class Test(npt.TestCase):
     def setUp(self):
-        np.random.seed(0)
         self.verbose = False
+        vg.reseed(0)
 
     @npt.dec.slow
     def test_fit(self):

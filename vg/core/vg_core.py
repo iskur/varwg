@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+import vg
 from vg.time_series_analysis import seasonal_distributions as sd
 from vg import helpers as my, times
 from vg.meteo import avrwind, meteox2y
@@ -217,7 +218,7 @@ def interannual_variability(T, mean_arrival=30, disturbance_std=0.1):
 
     def arrival():
         return distributions.expon.ppf(
-            np.random.rand(),
+            vg.rng.random(),
             lambd=1.0 / mean_arrival,
             # loc=1 weil wir taegliche Werte
             # berechnen und daher 1 Tag die
@@ -228,7 +229,8 @@ def interannual_variability(T, mean_arrival=30, disturbance_std=0.1):
     def disturbance():
         return abs(
             distributions.norm.ppf(
-                np.random.rand(), sigma=float(disturbance_std)
+                vg.rng.random(),
+                sigma=float(disturbance_std),
             )
         )
 
@@ -663,8 +665,8 @@ class VG(vg_plotting.VGPlotting):
         ex_kwds : None or dict
             Keyword arguments to be passed to ex.
         seed_before_sim : None or int, optional
-            Seed np.random before simulating. The integer passed will be used
-            as seed (also if it is a 0).
+            Seed the Random Generator before simulating. The integer
+            passed will be used as seed (also if it is a 0).
             (_scenario_parameters also draws random numbers).
         loc_shift : bool, optional
             Change on the primary variables will be removed after simulation
@@ -692,9 +694,9 @@ class VG(vg_plotting.VGPlotting):
             with open(random_state, "rb") as pi_file:
                 random_state = pickle.load(pi_file)
         if random_state is not None:
-            np.random.set_state(random_state)
+            vg.rng.bit_generator.state = random_state
         # we record the random state to later dump it
-        pre_sim_random_state = np.random.get_state()
+        pre_sim_random_state = vg.rng.bit_generator.state
 
         if mean_arrival is None and disturbance_std is not None:
             raise RuntimeError(
@@ -803,7 +805,7 @@ class VG(vg_plotting.VGPlotting):
         if self.verbose:
             print("Simulating a time-series.")
         if type(seed_before_sim) is int:
-            np.random.seed(seed_before_sim)
+            vg.reseed(seed_before_sim)
         var_names_back = None
         if sim_func is not None:
             if sim_func_kwds is None:
@@ -1820,7 +1822,7 @@ class VG(vg_plotting.VGPlotting):
         else:
             m_primvar = scale_nn(delta_primvar)
         if self.phase_randomize and self.phase_randomize_vary_mean:
-            m_primvar += 0.25 * np.random.randn()
+            m_primvar += 0.25 * vg.rng.normal()
         self._m_single += [m_primvar * scale.reshape((self.K, 1)) + intercept]
         return self._m_single[-1]
 
@@ -2159,10 +2161,9 @@ class VG(vg_plotting.VGPlotting):
         summer_ii = np.where((months >= month_start) & (months <= month_end))[
             0
         ]
-        durations = np.random.randint(duration_min, duration_max + 1, n_events)
-
+        durations = vg.rng.integers(duration_min, duration_max + 1, n_events)
         for event_i in range(n_events):
-            i = np.random.choice(summer_ii)
+            i = vg.rng.choice(summer_ii)
             duration = durations[event_i]
             rh_signal[i : i + duration] = event_dryness
 
