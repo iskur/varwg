@@ -116,6 +116,9 @@ class SeasonalKDE(seasonal.Seasonal):
                 np.sign(lower[lower_ii]) * np.abs(lower[lower_ii]) * (1 + 1e-3)
             )
 
+    def __str__(self):
+        return "SeasonalKDE()"
+
     @property
     def data_bounds(self):
         """

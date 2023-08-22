@@ -1088,6 +1088,9 @@ class SlidingDist(SeasonalDist):
         self._doy_mask = self._sliding_pars = None
         self._qq_shift_cache = None
 
+    def __str__(self):
+        return f"SlidingDist({self.dist.name})"
+
     @property
     def doy_mask(self):
         """Returns a (n_unique_doys, len(data)) ndarray"""
