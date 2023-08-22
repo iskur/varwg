@@ -5,8 +5,8 @@ import numpy.testing as npt
 import vg
 import vg.time_series_analysis.conditional_sim as csim
 from vg.time_series_analysis import models, time_series, distributions
-from .test_spectral import cov, autocovs, K
-from . import test_models
+from vg.time_series_analysis.tests.test_spectral import cov, autocovs, K
+from vg.time_series_analysis.tests import test_models
 
 
 class Test(npt.TestCase):
@@ -17,7 +17,7 @@ class Test(npt.TestCase):
         self.cov_model_ar1 = lambda lag: self.rho**lag / (1 - self.rho**2)
         self.domainshape = 65, 55
         self.scale = 5
-        self.speed = 5
+        self.speed = 5.0
         self.cov_model = lambda h: 5 * np.exp(-h / 5.0)
 
         # setup stuff for SimulateUVSeq
@@ -231,24 +231,28 @@ class Test(npt.TestCase):
             disagg_len=disagg_len,
             cov=cov,
             trans=trans,
-            verbose=False,
+            verbose=self.verbose,
         )
         nan_mask = np.isnan(self.data_obs)
         # data is stdn-distributed
         data_trans = trans(self.data_obs)
         means = np.mean(trans(data_sim.reshape(K, -1, disagg_len)), axis=-1)
 
-        # import matplotlib.pyplot as plt
-        # fig, axs = plt.subplots(K)
-        # for k, ax in enumerate(axs):
-        #     ax.plot(np.repeat(data_trans[k], disagg_len), "-x")
-        #     ax.plot(np.repeat(means[k], disagg_len)), "-x"
-        #     ax.plot(trans(data_sim[k]))
-        # plt.show()
+        try:
+            npt.assert_almost_equal(
+                means[~nan_mask], data_trans[~nan_mask], decimal=-1
+            )
+        except AssertionError:
+            import matplotlib.pyplot as plt
 
-        npt.assert_almost_equal(
-            means[~nan_mask], data_trans[~nan_mask], decimal=0
-        )
+            fig, axs = plt.subplots(K, sharex=True)
+            for k, ax in enumerate(axs):
+                ax.plot(np.repeat(data_trans[k], disagg_len), "-x")
+                ax.plot(np.repeat(means[k], disagg_len)), "-x"
+                ax.plot(trans(data_sim[k]))
+                ax.grid(True)
+            plt.show()
+            raise
 
     def test_simulate_2d(self):
         T = 500

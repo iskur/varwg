@@ -233,9 +233,12 @@ def get_hyd_years_mask(times):
     return (times.month == 10) & (times.day == 1) & (times.hour == 0)
 
 
-def hyd_year_sums(data_xar, fun_name="sum", full_years=True):
+def hyd_year_sums(
+    data_xar, fun_name="sum", full_years=True, hyd_years_mask=None
+):
     time = data_xar.time
-    hyd_years_mask = get_hyd_years_mask(time.dt)
+    if hyd_years_mask is None:
+        hyd_years_mask = get_hyd_years_mask(time.dt)
     hyd_year = hyd_years_mask.cumsum() - 1
     hyd_year += hyd_year.time[0].dt.year
     if fun_name == "sum":

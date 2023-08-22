@@ -280,9 +280,9 @@ class Test(npt.TestCase):
                 continue
             if self.verbose:
                 print("\t", dist_name)
-            self.assert_(np.isscalar(dist_frozen.pdf(1)))
-            self.assert_(np.isscalar(dist_frozen.cdf(1)))
-            self.assert_(np.isscalar(dist_frozen.ppf(0.5)))
+            self.assertTrue(np.isscalar(dist_frozen.pdf(1)))
+            self.assertTrue(np.isscalar(dist_frozen.cdf(1)))
+            self.assertTrue(np.isscalar(dist_frozen.ppf(0.5)))
 
     def test_out_of_bounds_pdf(self):
         """Do pdfs return nan for input outside the range?"""
@@ -298,12 +298,12 @@ class Test(npt.TestCase):
                 if self.verbose:
                     print("\t lower bound of ", dist_name)
                 ret = dist_frozen.pdf(lower - incr)
-                self.assert_(np.isnan(ret), ret)
+                self.assertTrue(np.isnan(ret), ret)
             if upper:
                 if self.verbose:
                     print("\t upper bound of ", dist_name)
                 ret = dist_frozen.pdf(upper + incr)
-                self.assert_(np.isnan(ret), ret)
+                self.assertTrue(np.isnan(ret), ret)
 
     # def test_out_of_bounds_cdf(self):
     #     """Do cdfs return nan for input outside the range?"""
@@ -319,12 +319,12 @@ class Test(npt.TestCase):
     #             if self.verbose:
     #                 print("\t lower bound of ", dist_name)
     #             ret = dist_frozen.cdf(lower - incr)
-    #             self.assert_(np.isnan(ret), ret)
+    #             self.assertTrue(np.isnan(ret), ret)
     #         if upper:
     #             if self.verbose:
     #                 print("\t upper bound of ", dist_name)
     #             ret = dist_frozen.cdf(upper + incr)
-    #             self.assert_(np.isnan(ret), ret)
+    #             self.assertTrue(np.isnan(ret), ret)
 
     # def test_out_of_bounds_ppf(self):
     #     """Do ppfs return nan for input outside the range?"""
@@ -340,12 +340,12 @@ class Test(npt.TestCase):
     #             if self.verbose:
     #                 print("\t lower bound of ", dist_name)
     #             ret = dist_frozen.ppf(lower - incr)
-    #             self.assert_(np.isnan(ret), ret)
+    #             self.assertTrue(np.isnan(ret), ret)
     #         if upper:
     #             if self.verbose:
     #                 print("\t upper bound of ", dist_name)
     #             ret = dist_frozen.ppf(upper + incr)
-    #             self.assert_(np.isnan(ret), ret)
+    #             self.assertTrue(np.isnan(ret), ret)
 
     def test_rain(self):
         thresh = 0.1

@@ -175,7 +175,7 @@ class ADict(UserDict):
         left_dict = dict(self)
         if isinstance(other, dict):
             del_keys = list(other.keys())
-        elif isinstance(other, basestring):
+        elif isinstance(other, str):
             del_keys = (other,)
         else:
             del_keys = other
@@ -775,7 +775,7 @@ def splom(
                         density=True,
                         # want to achieve red when inverting
                         facecolor=cc.to_rgba(facecolor, alpha=0),
-                        **h_kwds
+                        **h_kwds,
                     )
                     # store the ii-index as an attribute to identify the
                     # variable later in the brush function
@@ -800,7 +800,7 @@ def splom(
                     picker=5,
                     facecolors=facecolors,
                     edgecolors=cc.to_rgba(edgecolor, e_opacity),
-                    **s_kwds
+                    **s_kwds,
                 )
             # show ticklabels only on the margins
             #                if (jj != 0) or (ii == jj):
@@ -1006,7 +1006,7 @@ def hist(
     figsize=None,
     legend=True,
     *args,
-    **kwds
+    **kwds,
 ):
     """Plots a histogram and therotical or empirical densities."""
     try:
@@ -1042,7 +1042,7 @@ def hist(
             facecolor="grey",
             alpha=0.75,
             *args,
-            **kwds
+            **kwds,
         )[1]
 
     ax1.set_ylabel("relative frequency")
@@ -1174,12 +1174,17 @@ def yscale_subplots(fig=None, per_type=False, regrid=False):
     if per_type:
         key_func = type
     else:
-        key_func = lambda x: "the one to rule them all"
+
+        def key_func(x):
+            return "the one to rule them all"
 
     # see http://matplotlib.sourceforge.net/faq/howto_faq.html#\
     # find-all-objects-in-figure-of-a-certain-type
-    ylim_getable = lambda sub: hasattr(sub, "get_ylim")
-    ylim_setable = lambda sub: hasattr(sub, "set_ylim")
+    def ylim_getable(sub):
+        return hasattr(sub, "get_ylim")
+
+    def ylim_setable(sub):
+        return hasattr(sub, "set_ylim")
 
     # find the y-limits of each subplot
     ymins, ymaxs = {}, {}

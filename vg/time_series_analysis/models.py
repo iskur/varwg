@@ -900,6 +900,8 @@ def VAR_LS_sim(
     VAR_residuals : Returns the residuals based on given data and LS estimator
     VAR_LS_predict : Predict given prior data and LS estimator.
     """
+    if p_kwds is None:
+        p_kwds = dict()
     # number of variables
     K = B.shape[0]
     # order of VAR_LS-process

@@ -4,6 +4,7 @@ import shutil
 import os
 import numpy as np
 import numpy.testing as npt
+
 import vg
 
 config_template = vg.config_template

@@ -664,7 +664,7 @@ def disaggregate_piecewice(
     # reshape input data so that we can iterate through it the same way as
     # with data_sim
     n_chunks = data_sim.shape[0]
-    chunk_len_agg = data_sim.shape[-1] / disagg_len
+    chunk_len_agg = data_sim.shape[-1] // disagg_len
     data_chunked = [
         data[:, t : t + chunk_len_agg]
         for t in range(0, data.shape[1] + chunk_len_agg - 1, chunk_len_agg)

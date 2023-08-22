@@ -315,7 +315,7 @@ def vg_for_elcom(
     )
     # save random_state:
     p = met_vg.p
-    if met_vg.q == None:
+    if met_vg.q is None:
         q = 0
     else:
         q = met_vg.q
@@ -391,7 +391,7 @@ def vg2dyresm(
     wind_fkt : float
         factor for wind speed. Default: 1.0 (for Konstanz wind data: 1.3)
     """
-    if type(meteo) == str:
+    if isinstance(meteo, str):
         #         alt_text = meteo
         meteo = my.csv2dict(meteo, delimiter="\t")
         # date = times.iso2unix(meteo["time"])
@@ -588,7 +588,7 @@ def vg2elcom(
         meteo is dictionary
     info : information text string in file header
     """
-    if simdict == False:
+    if not simdict:
         print("inputfile:", meteo)
         meteo = my.csv2dict(meteo, delimiter="\t")
         meteo["time"] = times.str2datetime(meteo["time"], "%Y-%m-%dT%H:%M:%S")
@@ -653,7 +653,7 @@ def kopf(neufile, funct, infile, info=None, varis=None, bc_n=0):
     neufile.write(
         "! aus %s erstellt von %s \n" % (infile.split("\\")[-1], funct)
     )
-    if info == None:
+    if info is None:
         neufile.write("!---------------------------------------\n")
     else:
         neufile.write("! %s\n" % info)
@@ -668,7 +668,7 @@ def kopf(neufile, funct, infile, info=None, varis=None, bc_n=0):
 
 
 def plot_elcom_meteo(meteofile, windfile=None, ma=None, simdict=True):
-    if simdict == True:
+    if simdict:
         date, at = times.datetime2unix(meteofile["time"]), meteofile["theta"]
         rh, sw, lw = meteofile["rh"], meteofile["Qsw"], meteofile["ILWR"]
     else:
@@ -706,8 +706,8 @@ def plot_elcom_meteo(meteofile, windfile=None, ma=None, simdict=True):
     )
     print(text)
 
-    if windfile or simdict == True:
-        if simdict == True:
+    if windfile or simdict:
+        if simdict:
             dr, sp = avrwind.component2angle(
                 meteofile["u"].astype(np.float64),
                 meteofile["v"].astype(np.float64),
@@ -795,7 +795,7 @@ def plot_elcom_meteo(meteofile, windfile=None, ma=None, simdict=True):
     plt.setp(plt2, ylim=(100, 500), ylabel="W/m$^{2}$", title="\nlw radiation")
     plt.matplotlib.dates.AutoDateLocator()
     plt.gcf().autofmt_xdate(rotation=45)
-    if windfile or simdict == True:
+    if windfile or simdict:
         ax1 = plt.subplot(nfig, 1, 5, sharex=plt1)  # ### 5
         plt.setp(ax1, ylim=(0, 360), title="\n" + wtitel)
         ax1.plot(datew, dr, color=[0.5, 0.5, 0.5], label="wind direction")
@@ -849,7 +849,7 @@ def keep_random_state(
             random_state = None
         else:
             p = met_vg.p
-            if met_vg.q == None:
+            if met_vg.q is None:
                 q = 0
             else:
                 q = met_vg.q

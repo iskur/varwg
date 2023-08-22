@@ -1,9 +1,12 @@
 import os
 import numpy as np
 import numpy.testing as npt
-import numpy.testing.decorators as decorators
+from numpy.testing import dec
 import vg
 from vg.time_series_analysis import models, tests
+
+setastest = dec.setastest
+knownfailureif = dec.knownfailureif
 
 # the following parameters and data are taken from p.707 in order to test
 # functions regarding the VAR least-squares estimator
@@ -46,8 +49,8 @@ class Test(npt.TestCase):
     # Test is not conclusive: solutions are for ML estimator of VAR process...
     # We get however, the same p!
 
-    @decorators.setastest(False)
-    @decorators.knownfailureif(True, msg)
+    @setastest(False)
+    @knownfailureif(True, msg)
     def test_AIC(self):
         """See p.148"""
         order_data = np.copy(data[:, 4:])
@@ -68,8 +71,8 @@ class Test(npt.TestCase):
         AICs = -24 - np.array([0.42, 0.5, 0.59, 0.41, 0.36])
         npt.assert_almost_equal(AICs, objectives, decimal=2)
 
-    @decorators.setastest(False)
-    @decorators.knownfailureif(True, msg)
+    @setastest(False)
+    @knownfailureif(True, msg)
     def test_HQ(self):
         order_data = np.copy(data[:, 4:])
         objectives = np.array(
@@ -83,8 +86,8 @@ class Test(npt.TestCase):
         HQs = -24 - np.array([0.42, 0.38, 0.37, 0.07, -0.1])
         npt.assert_almost_equal(HQs, objectives, decimal=2)
 
-    @decorators.setastest(False)
-    @decorators.knownfailureif(True, msg)
+    @setastest(False)
+    @knownfailureif(True, msg)
     def test_SC(self):
         order_data = np.copy(data[:, 4:])
         objectives = np.array(
@@ -98,8 +101,8 @@ class Test(npt.TestCase):
         SCs = np.array([-24.42, -24.21, -24.02, -23.55, -23.21])
         npt.assert_almost_equal(SCs, objectives, decimal=2)
 
-    @decorators.setastest(False)
-    @decorators.knownfailureif(True, msg)
+    @setastest(False)
+    @knownfailureif(True, msg)
     def test_FPE(self):
         order_data = np.copy(data[:, 4:])
         K, T = order_data.shape
