@@ -51,9 +51,12 @@ def matr_img(
         plt.yticks(np.arange(len(ylabels)), ylabels)
     if title is not None:
         plt.title(title)
-        fig.canvas.set_window_title(
-            "%s (%d)" % (title, fig.canvas.manager.num)
-        )
+        try:
+            fig.canvas.set_window_title(
+                "%s (%d)" % (title, fig.canvas.manager.num)
+            )
+        except AttributeError:
+            pass
     ax = plt.gca()
     ax.tick_params(left="off", bottom="off", top="off", right="off")
 
