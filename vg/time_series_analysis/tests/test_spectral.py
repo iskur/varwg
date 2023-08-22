@@ -75,7 +75,9 @@ class Test(npt.TestCase):
         npt.assert_almost_equal(cov_act, cov_exp, decimal=1)
 
     def test_nd_simulate(self):
-        cov_model = lambda h: np.exp(-h)
+        def cov_model(h):
+            return np.exp(-h)
+
         domainshape = 500, 500, 10
         # cov_exp = cov_model(np.arange(domainshape[0]))
         spec = spectral.SpectralND(

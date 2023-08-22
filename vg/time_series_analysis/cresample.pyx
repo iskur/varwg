@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 import os
-import shelve
 import sys
 from contextlib import closing
 

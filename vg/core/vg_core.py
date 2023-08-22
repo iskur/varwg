@@ -690,6 +690,8 @@ class VG(vg_plotting.VGPlotting):
         sim_sea : (K, T) float ndarray
 
         """
+        if sim_func_kwds is None:
+            sim_func_kwds = dict()
         if isinstance(random_state, str):
             with open(random_state, "rb") as pi_file:
                 random_state = pickle.load(pi_file)
@@ -985,9 +987,10 @@ class VG(vg_plotting.VGPlotting):
         #     #     r_index = self.var_names.index("R")
         #     #     sim_sea[r_index] *= self.sum_interval[r_index]
 
-        if self.theta_incr:
+        if self.theta_incr is not None:
             mean_shifts = dict(
-                theta=self.theta_incr * self.sum_interval[self.primary_var_ii]
+                theta=self.theta_incr
+                * self.sum_interval.ravel()[self.primary_var_ii]
             )
         else:
             mean_shifts = None

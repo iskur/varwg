@@ -2,7 +2,7 @@ import tempfile
 import shutil
 import numpy as np
 import numpy.testing as npt
-from vg.time_series_analysis import resample, time_series
+from vg.time_series_analysis import resample, cresample, time_series
 import vg
 
 # import config_konstanz
