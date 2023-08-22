@@ -12,6 +12,7 @@ from numpy.testing import (
     TestCase,
     run_module_suite,
 )
+import vg
 from vg.time_series_analysis import rain_stats
 
 
@@ -42,7 +43,7 @@ class Test(TestCase):
         assert_equal(wet, expected)
 
     def test_richardson_model(self):
-        np.random.seed(1)
+        vg.reseed(0)
         # trans_probs = np.array([[0.33020467, 0.16190849],
         #                         [0.16177813, 0.34597836]])
         # trans_probs = np.array([[0.330, 0.162],

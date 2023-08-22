@@ -11,6 +11,7 @@ from builtins import range, zip
 from numpy.testing import TestCase, assert_almost_equal, run_module_suite
 from past.utils import old_div
 
+import vg
 from vg.time_series_analysis import time_series
 
 
@@ -97,7 +98,7 @@ class Test(TestCase):
     def gen_time_series(self, rho):
         # time series with known autocorrelation
         self.T = int(1e5)
-        sim = np.random.randn(self.T)
+        sim = vg.rng.normal(size=self.T)
         for tt in range(self.T):
             sim[tt] += rho * sim[tt - 1]
         return sim

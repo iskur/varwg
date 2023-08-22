@@ -26,7 +26,7 @@ class Test(TestCase):
     #     x = np.arange(len(self.dtimes))
     #     # this is roughly a daily cycle within a yearly cycle
     #     # the strength of the daily cycle is dependent on the doy
-    #     self.noise = np.random.randn(len(x))
+    #     self.noise = vg.rng.normal(len(x))
     #     self.data = (15 * -np.cos(x * 2 * np.pi / (365 * 24)) +
     #                  5 * (1 + np.cos(x * 2 * np.pi / (365 * 24))) *
     #                  -np.cos(x * 2 * np.pi / 24) +

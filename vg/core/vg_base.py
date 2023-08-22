@@ -10,12 +10,12 @@ import warnings
 from tqdm import tqdm
 
 import numpy as np
-from numpy.random import default_rng
 import pandas as pd
 from scipy import interpolate, stats
 
 import vg.time_series_analysis.seasonal_kde as skde
 from vg import helpers as my, times
+import vg
 from vg.meteo import avrwind, meteox2y, meteox2y_cy
 from vg.time_series_analysis import (
     distributions,
@@ -575,11 +575,11 @@ class VGBase(object):
                         ctimes.doy_distance(doy_out, doys_in) <= doy_tolerance
                     )[0]
                     pool = list(set(pool) & finite_ii)
-                    src_point = pool[np.random.randint(len(pool))]
+                    src_point = pool[vg.rng.integers(len(pool))]
                     while src_point >= (nn - autocorr_len):
-                        src_point = pool[np.random.randint(len(pool))]
+                        src_point = pool[vg.rng.integers(len(pool))]
                 else:
-                    src_point = np.random.choice(finite_ii[:-autocorr_len])
+                    src_point = vg.rng.choice(finite_ii[:-autocorr_len])
                 # src_point -= self.start_hour_of_src
                 # hour of day from 0 to 23 in destination
                 hour_of_dst = mod0(dst_point, tpd)
@@ -1433,8 +1433,9 @@ class VGBase(object):
             try:
                 A = np.linalg.cholesky(sigma_u)
             except np.linalg.LinAlgError:
-                sigma_u.ravel()[:: self.K + 1] += rng.normal(self.K) * 1e-6
+                sigma_u.ravel()[:: self.K + 1] += vg.rng.normal(self.K) * 1e-6
                 A = np.linalg.cholesky(sigma_u)
+            vg.reseed(0)
             data_infilled = models.SVAR_LS_fill(
                 Bs, sigma_us, self.data_doys, data_for_sim, A=A
             )
@@ -1558,7 +1559,7 @@ class VGBase(object):
 
 
 if __name__ == "__main__":
-    np.random.seed(0)
+    vg.reseed(0)
     warnings.simplefilter("error", RuntimeWarning)
     import matplotlib.pyplot as plt
     import vg

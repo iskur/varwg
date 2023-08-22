@@ -234,7 +234,7 @@ def _run_one_realization(task):
     met_vg = _run_one_realization.met_vg
 
     if params["use_seed"]:
-        np.random.seed(ri)
+        vg.reseed(ri)
 
     sim_kwds = params["sim_kwds"]
     if sim_kwds is None:
@@ -967,7 +967,7 @@ if __name__ == "__main__":
 
     vg.conf = config_kinneret
     #     vg.delete_cache()
-    np.random.seed(0)
+    vg.reseed(0)
     met_vg = vg.VG(("theta", "Qsw", "rh", "u", "v"), verbose=True)
     met_vg.fit(3)
     met_vg.simulate()

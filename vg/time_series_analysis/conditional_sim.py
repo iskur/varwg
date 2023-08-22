@@ -16,6 +16,7 @@ except ImportError:
 from scipy import optimize
 from tqdm import tqdm
 
+import vg
 import vg.helpers as my
 from vg.time_series_analysis import spectral, time_series
 
@@ -348,7 +349,7 @@ class SimulateMulti(object):
         realizations_compl = self.spec.sim_n(self.n_realizations)
         cv_total_compl = np.zeros_like(self.cv_total)
         norm_compl = 0.0
-        alpha = np.random.uniform(-1, 1, A.shape[1] - n_conditions)
+        alpha = vg.rng.uniform(-1, 1, A.shape[1] - n_conditions)
         while norm_compl < (1.0 - norm_inner):
             if self.verbose > 1:
                 print("Finding complementary solution.")
@@ -359,7 +360,7 @@ class SimulateMulti(object):
             except np.linalg.LinAlgError:
                 if self.verbose:
                     print("LinAlgError in second step. Shuffling.")
-                np.random.shuffle(realizations_compl)
+                vg.rng.shuffle(realizations_compl)
                 A = self.gen_A(realizations_compl)
                 A1 = A[:n_conditions, :n_conditions]
                 continue
@@ -379,11 +380,11 @@ class SimulateMulti(object):
             sol = np.hstack((sol, idd))
 
             # each combination of Ax + A(alpha*sol) is a valid solution
-            # alpha = np.random.uniform(-1, 1, A.shape[1] - n_conditions)
+            # alpha = vg.rng.uniform(-1, 1, A.shape[1] - n_conditions)
             len_diff = A.shape[1] - n_conditions - len(alpha)
             if len_diff > 0:
                 alpha = np.concatenate(
-                    (alpha, np.random.uniform(-1, 1, len_diff))
+                    (alpha, vg.rng.uniform(-1, 1, len_diff))
                 )
             if self.mean_trans is not None:
                 interim = InterimFactory(
@@ -489,7 +490,7 @@ class SimulateMulti(object):
                     self.spec.sim_n(self.n_extra + n_throwaway),
                 )
             )
-            # np.random.shuffle(realizations_compl)
+            # vg.rng.shuffle(realizations_compl)
             if self.verbose:
                 print(
                     ("RMSE: %.4f. " % rmse)
@@ -780,7 +781,7 @@ if __name__ == "__main__":
     import warnings
 
     warnings.simplefilter("error", RuntimeWarning)
-    np.random.seed(1)
+    vg.reseed(1)
     import vg
     import config_konstanz_disag
 

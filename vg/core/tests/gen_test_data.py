@@ -30,6 +30,7 @@ def main():
     cache_dir = tempfile.mkdtemp("vg_test_data_gen")
 
     var_names = ("R", "theta", "Qsw", "ILWR", "rh", "u", "v")
+    vg.reseed(test_vg.seed)
     met_vg = vg.VG(
         var_names,
         met_file=test_in_data_filepath,
@@ -39,7 +40,7 @@ def main():
         verbose=True,
     )
     met_vg.fit(p)
-    np.random.seed(1)
+    vg.reseed(test_vg.seed)
     met_vg.simulate(T=T)
     met_vg.disaggregate()
     shutil.copy(met_vg.outfilepath, test_out_data_filepath)
