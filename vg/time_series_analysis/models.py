@@ -35,6 +35,7 @@ from scipy.linalg import kron
 from scipy.stats import skew, rankdata, distributions as sp_distributions
 from tqdm import tqdm
 
+import vg
 from vg import helpers as my
 from vg.time_series_analysis import time_series as ts
 from vg.time_series_analysis.distributions import MDFt, norm
@@ -44,7 +45,6 @@ from vg.time_series_analysis import phase_randomization
 mgarch_param_factory = namedtuple(
     "mgarch_params", ("gamma0", "Gammas", "Gs", "cov_residuals")
 )
-rng = np.random.default_rng()
 
 
 def MGARCH_ML(residuals, q, m):
@@ -183,7 +183,7 @@ def MGARCH_sim(params, T, sigma0, epsilon=None, n_presim_steps=100):
     if epsilon is None:
         # epsilon = np.random.multivariate_normal(K * [0], cov_residuals,
         #                                         n_sim_steps - max(q, m))
-        epsilon = rng.multivariate_normal(
+        epsilon = vg.rng.multivariate_normal(
             K * [0], cov_residuals, n_sim_steps - max(q, m)
         )
         epsilon = epsilon.T
@@ -279,7 +279,7 @@ def VAR_LS(data, p=2):
         inv = np.linalg.inv(Z @ Z.T)
     except np.linalg.LinAlgError:
         print("Adding a little random noise in order to invert matrix...")
-        Z += (rng.normal(Z.size) * Z.std() * 1e-9).reshape(Z.shape)
+        Z += (vg.rng.normal(Z.size) * Z.std() * 1e-9).reshape(Z.shape)
         inv = np.linalg.inv(Z @ Z.T)
     B = Y @ Z.T @ inv
 
@@ -523,7 +523,7 @@ def SVAR_LS_sim(
     if u is None:
         u = np.array(
             [
-                rng.multivariate_normal(K * [0], sigma_us[..., doy_i])
+                vg.rng.multivariate_normal(K * [0], sigma_us[..., doy_i])
                 for doy_i in doys_ii
             ]
         )
@@ -640,7 +640,7 @@ def _cholesky_partial(u, sigma_us, A=None):
         A = np.linalg.cholesky(sigma_us)
     finite_mask = np.isfinite(u)
     z = np.empty_like(u)
-    z[~finite_mask] = rng.normal(size=np.sum(~finite_mask))
+    z[~finite_mask] = vg.rng.normal(size=np.sum(~finite_mask))
     z[finite_mask] = u[finite_mask]
     ii = np.where(finite_mask)[0]
     for i, u_i in zip(ii, u[finite_mask]):
@@ -710,9 +710,9 @@ def VAR_LS_sim_asy(
     def swap(data):
         # i, j, k = np.random.randint(data.shape[1], size=3)
         width = 10
-        j = rng.randint(1, data.shape[1] - 2)
-        i = rng.randint(max(0, j - 2), j)
-        k = rng.randint(j + 1, min(data.shape[1] - 1, j + width))
+        j = vg.rng.randint(1, data.shape[1] - 2)
+        i = vg.rng.randint(max(0, j - 2), j)
+        k = vg.rng.randint(j + 1, min(data.shape[1] - 1, j + width))
         di, dj, dk = data[skewed_i, [i, j, k]]
         if di < dj < dk:
             data[:, [j, k]] = dk, dj
@@ -763,7 +763,7 @@ def VAR_LS_sim_asy(
         accept[m] = True
         if error_new > error_old:
             p = np.exp(old_div((error_old - error_new), temp))
-            if not rng.rand() < p:
+            if not vg.rng.rand() < p:
                 accept[m] = False
 
         if error_new < error_best:
@@ -934,7 +934,7 @@ def VAR_LS_sim(
             u, T=T, taboo_period_min=None, taboo_period_max=None
         )
     elif u is None:
-        u = rng.multivariate_normal(K * [0], sigma_u, n_sim_steps - p)
+        u = vg.rng.multivariate_normal(K * [0], sigma_u, n_sim_steps - p)
         u = u.T
 
     Y[:, -u.shape[1] :] += u
@@ -1068,7 +1068,7 @@ def VAREX_LS_sim(
     C = B[:, -1]
 
     if u is None:
-        u = rng.multivariate_normal(K * [0], sigma_u, n_sim_steps - p)
+        u = vg.rng.multivariate_normal(K * [0], sigma_u, n_sim_steps - p)
         u = u.T
 
     Y[:, -u.shape[1] :] += u
@@ -1386,12 +1386,12 @@ def VARMA_LS_sim(
     Y[:, -m.shape[1] :] += m
     start_t = Y.shape[1] - T
     ut = np.array(
-        [rng.multivariate_normal(K * [0], sigma_u) for i in range(q)]
+        [vg.rng.multivariate_normal(K * [0], sigma_u) for i in range(q)]
     ).reshape((K, q))
     for t in range(p, n_sim_steps):
         # shift the old values back and draw a new random vector
         ut[:, :-1] = ut[:, 1:]
-        ut[:, -1] = rng.multivariate_normal(K * [0], sigma_u)
+        ut[:, -1] = vg.rng.multivariate_normal(K * [0], sigma_u)
         Y[:, t] = ut[:, -1][np.newaxis, :]
 
         # non-standard scenario stuff
@@ -1692,7 +1692,7 @@ def VAR_LS_predict(data_past, B, sigma_u, T=1, n_realizations=1):
         for r in range(n_realizations):
             Y[:, t, r] = nu
             if n_realizations > 1:
-                Y[:, t, r] += rng.multivariate_normal(K * [0], sigma_u)
+                Y[:, t, r] += vg.rng.multivariate_normal(K * [0], sigma_u)
 
             for i in range(p):
                 Ai = B[:, 1 + i * K : 1 + (i + 1) * K]
@@ -1769,7 +1769,7 @@ def VAR_YW_sim(A, sigma_u, T):
     Y = np.zeros((K, T + p))
 
     for t in range(p, T + p):
-        ut = rng.multivariate_normal(K * [0], sigma_u).reshape(K, 1)
+        ut = vg.rng.multivariate_normal(K * [0], sigma_u).reshape(K, 1)
         Y[:, t] = ut
         for i in range(p):
             Ai = A[:, i * K : (i + 1) * K]
