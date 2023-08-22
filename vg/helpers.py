@@ -6,8 +6,7 @@ again..."""
 # needed.  As importing some of the modules can be quite costly speed-wise,
 # the clarity of having the import statements at the beginning is consciously
 # compromised.
-from __future__ import division, print_function, with_statement
-
+from collections import UserDict
 import contextlib
 import inspect
 import itertools
@@ -15,15 +14,6 @@ import os
 import re
 import sys
 import warnings
-
-from builtins import map, object, range, str, zip
-from future import standard_library
-
-standard_library.install_aliases()
-
-from future.moves.collections import UserDict
-from past.builtins import basestring
-from past.utils import old_div
 
 
 try:
@@ -304,9 +294,7 @@ def chi2_test(x, y, k=None, n_parameters=0):
         # k = n_parameters + 2
     observed, bins = np.histogram(x, k)[:2]
     expected = np.histogram(y, bins)[0]
-    chi_test = np.sum(
-        old_div((observed.astype(float) - expected) ** 2, expected)
-    )
+    chi_test = np.sum((observed.astype(float) - expected) ** 2 / expected)
     # degrees of freedom:
     dof = k - n_parameters - 1
     print(chi_test, stats.chi2.ppf(0.95, dof))
@@ -342,7 +330,7 @@ def round_to_float(values, precision):
     values = np.asarray(values, dtype=float)
     rest = values % precision
     return np.where(
-        rest > old_div(precision, 2.0),
+        rest > precision / 2.0,
         values + (precision - rest),
         values - rest,
     )
@@ -496,21 +484,21 @@ def sumup(
             summed_values[nan_counts > 0] = np.nan
         else:
             nan_ii = (nan_counts > 0) & (nan_counts <= acceptable_nans)
-            summed_values[nan_ii] *= old_div(
-                width, (float(width) - nan_counts[nan_ii])
+            summed_values[nan_ii] *= width / (
+                float(width) - nan_counts[nan_ii]
             )
             summed_values[nan_counts > acceptable_nans] = np.nan
     if mean:
         summed_values = summed_values.astype(float)
         summed_values /= width - np.sum(np.isnan(values), axis=1)
 
-    new_columns = int(np.ceil(old_div(float(orig_columns), width)))
+    new_columns = int(np.ceil(float(orig_columns) / width))
     summed_values = summed_values.reshape((orig_rows, new_columns))
 
     if times_ is not None:
         if middle_time:
             # use the time in the middle between the data points
-            time_shift = round(old_div(width, 2.0))
+            time_shift = round(width / 2.0)
         else:
             time_shift = None
         times_ = times_[time_shift::width][: summed_values.shape[1]]
@@ -882,15 +870,14 @@ def kde_gauss(
             )
             optMatrix = ne.evaluate(ne_str)
         else:
-            preTerm = old_div(1.0, (np.sqrt(2 * np.pi) * kernel_width))
-            optMatrix = old_div(
-                preTerm,
-                np.exp(old_div(optMatrix**2, (2 * kernel_width**2))),
+            preTerm = 1.0 / (np.sqrt(2 * np.pi) * kernel_width)
+            optMatrix = (
+                preTerm / np.exp(optMatrix**2 / (2 * kernel_width**2)),
             )
         nDataset = np.shape(dataset)[0]
         # sets diagonal to 0, i.e. leave-one-out method
         optMatrix.ravel()[:: nDataset + 1] = 0
-        densities = old_div(np.sum(optMatrix, axis=1), float(nDataset - 1))
+        densities = np.sum(optMatrix, axis=1) / float(nDataset - 1)
         # LN if <>0 for MLM
         d_sum = 0
         err = 0
@@ -913,16 +900,14 @@ def kde_gauss(
     # optimizing kernel width if d=None
     if kernel_width is None:
         data_width = dataset.max() - dataset.min()
-        d_0 = old_div(data_width, 10)
+        d_0 = data_width / 10
         if d_0 < 0.0001:
             d_0 = 0.0001
         if len(dataset) > 1000:
             fluct = True  # while values fluctuate, repeat iteration
             d_n = []  # list of d's
             d_act, d_old = d_0, 0
-            n_min = 8 + np.sqrt(
-                old_div(len(dataset), maxopt)
-            )  # min nr of iterations
+            n_min = 8 + np.sqrt(len(dataset) / maxopt)  # min nr of iterations
             n_act = 0
 
             while fluct or n_act <= n_min:
@@ -935,9 +920,9 @@ def kde_gauss(
                         disp=verbose,
                     )[0]
                 )
-                d_act = old_div(sum(d_n), float(len(d_n)))
+                d_act = sum(d_n) / float(len(d_n))
                 # stop if fluct < 1%
-                if old_div(abs(d_act - d_old), float(d_act)) < 0.01:
+                if abs(d_act - d_old) / float(d_act) < 0.01:
                     fluct = False
                 if verbose:
                     print(d_act, d_old, d_n[-1])
@@ -983,7 +968,7 @@ def kde_gauss(
 
     if len(dataset) * len(evaluation_points) > 1e7:
         parts = int(len(dataset) * len(evaluation_points) / 1e7) + 1
-        brIncr = int(old_div(len(evaluation_points), parts))
+        brIncr = int(len(evaluation_points) / parts)
         densities = np.array([])
         for i in range(parts + 1):
             if verbose:
@@ -991,14 +976,11 @@ def kde_gauss(
             kdeMatrix = residual_matrix(
                 dataset, evaluation_points[i * brIncr : (i + 1) * brIncr]
             )
-            preTerm = old_div(1.0, (np.sqrt(2 * np.pi) * kernel_width))
-            kdeMatrix = old_div(
-                preTerm,
-                np.exp(old_div(kdeMatrix**2, (2 * kernel_width**2))),
+            preTerm = 1.0 / (np.sqrt(2 * np.pi) * kernel_width)
+            kdeMatrix = (
+                preTerm / np.exp(kdeMatrix**2 / (2 * kernel_width**2)),
             )
-            tmp_densities = old_div(
-                np.sum(kdeMatrix, axis=1), float(len(dataset))
-            )
+            tmp_densities = np.sum(kdeMatrix, axis=1) / float(len(dataset))
             densities = np.hstack((densities, tmp_densities))
     else:
         kdeMatrix = residual_matrix(dataset, evaluation_points)
@@ -1049,7 +1031,7 @@ def hist(
             bins = bins + bin_offset + i
             freqs = np.bincount(values.astype(int))
             freqs = freqs[freqs >= bins.min()]
-            freqs = old_div(freqs.astype(float), values.size)
+            freqs = freqs.astype(float) / values.size
             ax1.vlines(bins, 0, freqs, linewidth=3)
             ax1.set_xlim(bins[0] - 1, bins[-1] + 1)
     else:
@@ -1091,7 +1073,7 @@ def hist(
         for values in values_2d:
             # empirical cdf
             values_sort = np.sort(values)
-            ranks_emp = old_div((0.5 + np.arange(len(values))), len(values))
+            ranks_emp = (0.5 + np.arange(len(values))) / len(values)
             ax2.plot(values_sort, ranks_emp)
             pdf = []
             for dist in dists:

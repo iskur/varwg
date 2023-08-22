@@ -3,8 +3,6 @@ Created on 06.09.2012
 
 @author: dirk
 """
-from __future__ import division, print_function
-
 import matplotlib.pyplot as plt
 import numpy as np
 from builtins import range, zip

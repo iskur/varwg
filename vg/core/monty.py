@@ -17,18 +17,6 @@ DYRESM-CAEDYM and ELCOM.
     vg2elcom
     vg_for_elcom
 """
-from __future__ import print_function
-from __future__ import division
-from builtins import zip
-from builtins import str
-from builtins import range
-from past.utils import old_div
-from builtins import object
-
-try:
-    from importlib import reload
-except ImportError:
-    pass
 import os
 import shutil
 import glob
@@ -509,7 +497,7 @@ def test_theta_incr(
         # replace inf by nan:
         sim[0, np.where(np.isinf(sim[0, :]))] = np.nan
         av_incr = np.nanmean(sim[0, :]) - 9.5755
-        fkt.append(old_div(av_incr, theta_incr))
+        fkt.append(av_incr / theta_incr)
         print("type of increase: ", typ)
         print("theta_incr =", theta_incr)
         print("average temperature increase =", av_incr)
@@ -521,7 +509,7 @@ def test_theta_incr(
     plt.figure()
     plt.scatter(th_i, fkt, c=nans)
     if typ == "grad":
-        plt.scatter(th_i, old_div(temp_end, th_i), c=nans, marker="^")
+        plt.scatter(th_i, temp_end / th_i, c=nans, marker="^")
     plt.grid()
     plt.xlabel("theta_incr (user defined) [$^{\circ}$C]")
     plt.ylabel("theta_incr (out) / theta_incr (user)")
@@ -565,9 +553,7 @@ def q_stuff(pth, plotting=True):
             plt.plot(date, maxi, "k--", label="max")
             plt.plot(date, mini, "k:", label="min")
             plt.plot(date, data[0, :, k], c=[0.2, 0.2, 0.2], alpha=0.5)
-            plt.plot(
-                date, data[old_div(i, 2), :, k], c=[0.5, 0.5, 0.5], alpha=0.5
-            )
+            plt.plot(date, data[i / 2, :, k], c=[0.5, 0.5, 0.5], alpha=0.5)
             plt.plot(date, data[i - 1, :, k], c=[0.8, 0.8, 0.8], alpha=0.5)
             plt.plot(date, median, label="median", linewidth=2)
             plt.plot(date, q_10, label="q10", linewidth=2)
@@ -638,7 +624,7 @@ def vg2elcom(
             u = np.array(meteo["U"], dtype=float)
             u[np.where(u < 0)] = 0
             if ts != 86400:
-                u = u.repeat(old_div(86400, ts))
+                u = u.repeat(86400 / ts)
             u = windfaktor * u
             data = np.array((date, u)).transpose(1, 0)
             np.savetxt(wind, data, fmt="%10.2f\t%5.2f")
@@ -922,7 +908,7 @@ def get_means(met_vg=None, varnames=("Qsw", "ILWR", "theta")):
         _ = met_vg.simulate()
     _T = (2 * np.pi / 365 * met_vg.sim_doys)[np.newaxis, :]
     dist, solution = met_vg.dist_sol[met_vg.primary_var]
-    means = old_div(dist.trig2pars(solution, _T)[0], 24.0)
+    means = dist.trig2pars(solution, _T)[0] / 24.0
     return means
 
 

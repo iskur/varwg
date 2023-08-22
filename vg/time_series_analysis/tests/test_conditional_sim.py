@@ -1,9 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import print_function
-from __future__ import absolute_import
-from __future__ import division
-from builtins import range
-from past.utils import old_div
 import time
 import numpy as np
 import numpy.testing as npt
@@ -22,7 +17,7 @@ class Test(npt.TestCase):
         self.domainshape = 65, 55
         self.scale = 5
         self.speed = 5
-        self.cov_model = lambda h: 5 * np.exp(old_div(-h, 5.0))
+        self.cov_model = lambda h: 5 * np.exp(-h / 5.0)
 
         # setup stuff for SimulateUVSeq
         # now we need a time-series of conditioning points
@@ -82,9 +77,9 @@ class Test(npt.TestCase):
     def test_simulate(self):
         """Are the conditioning points met? Are the covs ok?"""
         T = 25000
-        cond_eq_ii = list(range(0, T, int(old_div(T, 50))))
+        cond_eq_ii = list(range(0, T, int(T / 50)))
         cond_vals = len(cond_eq_ii) * [3]
-        cond_eq_ii += list(range(3, T, int(old_div(T, 20))))
+        cond_eq_ii += list(range(3, T, int(T / 20)))
         cond_vals += (len(cond_eq_ii) - len(cond_vals)) * [0]
         data_sim = csim.simulate(
             self.cov_model_ar1,

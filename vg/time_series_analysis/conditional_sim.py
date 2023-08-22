@@ -1,10 +1,3 @@
-from __future__ import print_function
-from __future__ import division
-from builtins import zip
-from builtins import map
-from builtins import range
-from builtins import object
-from past.utils import old_div
 from collections import namedtuple
 
 import numpy as np
@@ -771,9 +764,7 @@ def disaggregate_piecewice(
         try:
             data_sim[i] = np.atleast_2d(data_sim_pad)[:, n_overlap:]
         except ValueError:
-            data_sim[i] = np.atleast_2d(data_sim_pad)[
-                :, old_div(n_overlap, 2) :
-            ]
+            data_sim[i] = np.atleast_2d(data_sim_pad)[:, n_overlap / 2 :]
     return np.hstack(tuple(data_sim))[:, :T]
 
 
