@@ -1,12 +1,8 @@
-from __future__ import division
-
 import datetime
 
 import numpy as np
 import numpy.testing as npt
-from builtins import range
 from numpy.testing import TestCase, run_module_suite
-from past.utils import old_div
 
 from vg import times
 from vg.time_series_analysis import (

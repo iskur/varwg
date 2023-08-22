@@ -1,6 +1,3 @@
-from __future__ import division
-from builtins import range
-from past.utils import old_div
 import numpy as np
 import numpy.testing as npt
 from vg.time_series_analysis import spectral, time_series, models
@@ -59,9 +56,9 @@ class Test(npt.TestCase):
         pass
 
     def test_1d_simulate(self):
-        cov_model_ar1 = lambda lag: old_div(
-            self.rho**lag, (1 - self.rho**2)
-        )
+        def cov_model_ar1(lag):
+            return self.rho**lag / (1 - self.rho**2)
+
         n_lags = 10
         cov_exp = cov_model_ar1(np.arange(n_lags))
         spec = spectral.Spectral(cov_model_ar1, self.T, pool_size=2)
@@ -114,7 +111,7 @@ class Test(npt.TestCase):
         lags = list(range(1, 7))
         for var_i, var in enumerate(data_sim):
             cov0 = autocovs[var_i](0)
-            ac_exp = [old_div(autocovs[var_i](lag), cov0) for lag in lags]
+            ac_exp = [autocovs[var_i](lag) / cov0 for lag in lags]
             ac_act = [time_series.auto_corr(var, lag) for lag in lags]
             npt.assert_almost_equal(ac_act, ac_exp, decimal=1)
 

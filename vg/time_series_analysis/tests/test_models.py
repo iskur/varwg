@@ -1,7 +1,3 @@
-from __future__ import print_function
-from __future__ import division
-from builtins import range
-from past.utils import old_div
 import os
 import numpy as np
 import numpy.testing as npt
@@ -109,7 +105,7 @@ class Test(npt.TestCase):
         K, T = order_data.shape
         objectives = np.array(
             [
-                (old_div(float(T - K * p - 1), T))
+                (float(T - K * p - 1) / T)
                 * models.FPE(models.VAR_LS(order_data, p)[1], p, T)
                 for p in range(5)
             ]
