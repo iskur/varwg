@@ -424,7 +424,7 @@ class SeasonalKDE(seasonal.Seasonal):
     def solution(self, solution):
         self.kernel_widths, self.quantile_grid = solution
 
-    def pdf(self, solution, data, doys):
+    def pdf(self, solution, data, doys, **kwds):
         data, doys = np.atleast_1d(data, doys)
         densities = np.empty((len(doys), len(data)))
         for doy in doys:
@@ -436,7 +436,7 @@ class SeasonalKDE(seasonal.Seasonal):
             )
         return densities
 
-    def cdf(self, solution=None, x=None, doys=None):
+    def cdf(self, solution=None, x=None, doys=None, **kwds):
         if solution is not None:
             self.solution = solution
         if x is None:
@@ -461,7 +461,7 @@ class SeasonalKDE(seasonal.Seasonal):
             quantiles = my.interp_nan(quantiles, max_interp=3)
         return quantiles
 
-    def ppf(self, solution, quantiles, doys=None, mean_shift=None):
+    def ppf(self, solution, quantiles, doys=None, mean_shift=None, **kwds):
         if solution is not None:
             self.solution = solution
         if doys is None:
