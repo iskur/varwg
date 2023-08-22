@@ -411,6 +411,9 @@ class VG(vg_plotting.VGPlotting):
         # when creating a VGPlotting instance
         return vg_base.VGBase.__getattribute__(self, name)
 
+    def __str__(self):
+        return f"VG({self.station_name}, {self.rain_method})"
+
     def fit(
         self,
         p=None,
