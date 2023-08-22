@@ -2,8 +2,9 @@ import tempfile
 import shutil
 import numpy as np
 import numpy.testing as npt
-from vg.time_series_analysis import (resample, time_series)
+from vg.time_series_analysis import resample, time_series
 import vg
+
 # import config_konstanz
 # vg.conf = vg.vg_base.conf = config_konstanz
 
@@ -12,8 +13,9 @@ class Test(npt.TestCase):
     def setUp(self):
         np.random.seed(0)
         self.tempdir = tempfile.mkdtemp()
-        self.met_vg = vg.VG((  # "R",
-            "theta", "Qsw", "ILWR", "rh", "u", "v"), verbose=False)
+        self.met_vg = vg.VG(
+            ("theta", "Qsw", "ILWR", "rh", "u", "v"), verbose=False  # "R",
+        )
         self.data = self.met_vg.data_trans
         self.times = self.met_vg.times
 
@@ -22,8 +24,9 @@ class Test(npt.TestCase):
 
     def test_resample(self):
         res = resample.resample(self.data, self.times, p=3)[0]
-        npt.assert_almost_equal(time_series.auto_corr(self.data, 0),
-                                time_series.auto_corr(res, 0))
+        npt.assert_almost_equal(
+            time_series.auto_corr(self.data, 0), time_series.auto_corr(res, 0)
+        )
 
     def test_bias_funcs(self):
         a, b, c, d = 1.245, 0.978, 1.205, 0.120
@@ -34,12 +37,11 @@ class Test(npt.TestCase):
 
     def test_resample_mean(self):
         np.random.seed(0)
-        res = resample.resample(self.data, self.times, p=3,
-                                theta_incr=0)[0]
-        npt.assert_almost_equal(np.mean(res, axis=1),
-                                np.mean(self.data, axis=1),
-                                decimal=1)
-        theta_incr = 1.
+        res = resample.resample(self.data, self.times, p=3, theta_incr=0)[0]
+        npt.assert_almost_equal(
+            np.mean(res, axis=1), np.mean(self.data, axis=1), decimal=1
+        )
+        theta_incr = 1.0
 
         # we only expect to hit the right theta_incr in the mean of a
         # lot of realizations.  so we do a very long simulation which
@@ -53,12 +55,16 @@ class Test(npt.TestCase):
         for theta_incr in theta_incrs:
             ress = []
             for _ in range(2):
-                res = resample.resample(self.data, self.times, p=3,
-                                        n_sim_steps=n_sim_steps,
-                                        theta_incr=theta_incr,
-                                        theta_i=theta_i,
-                                        cache_dir=self.tempdir,
-                                        verbose=False)[0]
+                res = resample.resample(
+                    self.data,
+                    self.times,
+                    p=3,
+                    n_sim_steps=n_sim_steps,
+                    theta_incr=theta_incr,
+                    theta_i=theta_i,
+                    cache_dir=self.tempdir,
+                    verbose=False,
+                )[0]
                 ress += [res[theta_i]]
             means += [np.mean(ress) - data_mean]
 

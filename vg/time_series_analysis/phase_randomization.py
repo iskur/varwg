@@ -46,7 +46,9 @@ def _random_phases(phases, T_sim, T_data, verbose=False, mask_fun=None):
             if _random_phases.mask is None:
                 _random_phases.mask = mask
             else:
-                _random_phases.mask = np.concatenate((_random_phases.mask, mask))
+                _random_phases.mask = np.concatenate(
+                    (_random_phases.mask, mask)
+                )
     return phases_stacked
 
 
@@ -81,14 +83,11 @@ def randomize2d(
     if rphases is None:
         rphases = _random_phases(phases_data, T_sim, T_data, mask_fun=mask_fun)
     fft_sim = np.concatenate(
-        [
-            np.fft.ifft(A * np.exp(1j * rphases_)).real
-            for rphases_ in rphases
-        ],
+        [np.fft.ifft(A * np.exp(1j * rphases_)).real for rphases_ in rphases],
         axis=1,
-    )[:, : T_sim]
+    )[:, :T_sim]
     assert np.all(np.isfinite(fft_sim))
-    
+
     # data_means = np.mean(data, axis=1)
     # fft_sim += data_means[:, None] - fft_sim.mean(axis=1)[:, None]
     # fft_sim -= fft_sim.mean(axis=1)[:, None]
@@ -104,7 +103,11 @@ def randomize2d(
 
 
 def randomize2d_old(
-    data, T=None, taboo_period_min=None, taboo_period_max=None, return_rphases=False
+    data,
+    T=None,
+    taboo_period_min=None,
+    taboo_period_max=None,
+    return_rphases=False,
 ):
     """
     assumes daily discretization and does not touch yearly cycles."""
@@ -121,7 +124,8 @@ def randomize2d_old(
     print(f"{taboo_period_max=}")
     if taboo_period_min is not None and taboo_period_max is not None:
         taboo_freqs_ii = np.where(
-            (np.abs(periods) > taboo_period_min) & (np.abs(periods) < taboo_period_max)
+            (np.abs(periods) > taboo_period_min)
+            & (np.abs(periods) < taboo_period_max)
         )[0]
     else:
         taboo_freqs_ii = None

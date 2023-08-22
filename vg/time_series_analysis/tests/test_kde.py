@@ -10,38 +10,48 @@ from vg import times
 
 
 class Test(npt.TestCase):
-
     def setUp(self):
         n_years = 2
         # construct n_years of hourly data
-        self.dtimes = np.array([datetime.datetime(2000, 1, 1) +
-                                t * datetime.timedelta(hours=1)
-                                for t in np.arange(n_years * 365 * 24)])
+        self.dtimes = np.array(
+            [
+                datetime.datetime(2000, 1, 1) + t * datetime.timedelta(hours=1)
+                for t in np.arange(n_years * 365 * 24)
+            ]
+        )
         x = np.arange(len(self.dtimes))
         # this is roughly a daily cycle within a yearly cycle
         # the strength of the daily cycle is dependent on the doy
         self.noise = np.random.randn(len(x))
-        self.data = (15 * -np.cos(x * 2 * np.pi / (365 * 24)) +
-                     5 * (1 + np.cos(x * 2 * np.pi / (365 * 24))) *
-                     -np.cos(x * 2 * np.pi / 24) +
-                     1.5 * self.noise)
+        self.data = (
+            15 * -np.cos(x * 2 * np.pi / (365 * 24))
+            + 5
+            * (1 + np.cos(x * 2 * np.pi / (365 * 24)))
+            * -np.cos(x * 2 * np.pi / 24)
+            + 1.5 * self.noise
+        )
         self.circ = circ = 1.5
-        self.dists_exp = [0.,
-                          ((6. / 24) ** 2 + (circ * 6 / 24.) ** 2) ** .5,
-                          ((12. / 24) ** 2 + (circ * 12 / 24.) ** 2) ** .5,
-                          ((18. / 24) ** 2 + (circ * 6 / 24.) ** 2) ** .5,
-                          1.,
-                          ((30. / 24) ** 2 + (circ * 6 / 24.) ** 2) ** .5,
-                          ((36. / 24) ** 2 + (circ * 12 / 24.) ** 2) ** .5,
-                          ((42. / 24) ** 2 + (circ * 6 / 24.) ** 2) ** .5
-                          ]
-        doys = times.datetime2doy(self.dtimes[:2 * 24:6])
+        self.dists_exp = [
+            0.0,
+            ((6.0 / 24) ** 2 + (circ * 6 / 24.0) ** 2) ** 0.5,
+            ((12.0 / 24) ** 2 + (circ * 12 / 24.0) ** 2) ** 0.5,
+            ((18.0 / 24) ** 2 + (circ * 6 / 24.0) ** 2) ** 0.5,
+            1.0,
+            ((30.0 / 24) ** 2 + (circ * 6 / 24.0) ** 2) ** 0.5,
+            ((36.0 / 24) ** 2 + (circ * 12 / 24.0) ** 2) ** 0.5,
+            ((42.0 / 24) ** 2 + (circ * 6 / 24.0) ** 2) ** 0.5,
+        ]
+        doys = times.datetime2doy(self.dtimes[: 2 * 24 : 6])
         n_dist = len(self.dists_exp)
-        self.dists_exp2 = [[kde.doyhour_distance(doys[i], doys[j],
-                                                 doy_width=1,
-                                                 circ=self.circ)
-                            for i in range(n_dist)]
-                           for j in range(n_dist)]
+        self.dists_exp2 = [
+            [
+                kde.doyhour_distance(
+                    doys[i], doys[j], doy_width=1, circ=self.circ
+                )
+                for i in range(n_dist)
+            ]
+            for j in range(n_dist)
+        ]
 
     def tearDown(self):
         pass
@@ -49,9 +59,8 @@ class Test(npt.TestCase):
     def test_kernel_integration(self):
         np.random.seed(0)
         sample = np.random.normal(size=1000)
-        q1, q2 = .25, .75
-        x0, x1 = map(lambda q: np.percentile(sample, 100 * q),
-                     (q1, q2))
+        q1, q2 = 0.25, 0.75
+        x0, x1 = map(lambda q: np.percentile(sample, 100 * q), (q1, q2))
         kernel_width = kde.optimal_kernel_width(sample)
 
         def density_func(x):
@@ -83,18 +92,15 @@ class Test(npt.TestCase):
         sample = np.exp(np.linspace(0, 1, 500))
         kernel_width = kde.optimal_kernel_width(np.log(sample))
         q1, q2 = 1e-3, 1 - 1e-3
-        x0, x1 = map(lambda q: np.percentile(sample, 100 * q),
-                     (q1, q2))
+        x0, x1 = map(lambda q: np.percentile(sample, 100 * q), (q1, q2))
 
         def density_func(x):
-            density = kde.kernel_density(kernel_width,
-                                         np.log(sample),
-                                         eval_points=np.log(x))
+            density = kde.kernel_density(
+                kernel_width, np.log(sample), eval_points=np.log(x)
+            )
             return density / x
 
-        xx = np.linspace(x0,
-                         x1 + 5 * kernel_width,
-                         1000)
+        xx = np.linspace(x0, x1 + 5 * kernel_width, 1000)
         densities = density_func(xx)
         integral = integrate.trapz(y=densities, x=xx)
         npt.assert_almost_equal(integral, q2 - q1, decimal=3)
@@ -112,47 +118,45 @@ class Test(npt.TestCase):
     def test_apply_sparse_kernel(self):
         """Does sparse output the same as dense?"""
         data = np.arange(50)
-        width = 5.
+        width = 5.0
         mask = np.full((len(data), len(data)), True, dtype=bool)
-        mask_mask = (slice(None, None, 2),
-                     slice(None, None, 4))
+        mask_mask = (slice(None, None, 2), slice(None, None, 4))
         mask_sparse = np.copy(mask)
         mask_sparse[mask_mask] = False
         dens_exp = kde.apply_kernel(width, data)
         dens_exp_sparse = np.copy(dens_exp)
-        dens_exp_sparse[~mask_sparse] = 0.
-        for kernel in (kde.gaussian_kernel,
-                       kde.gaussian_kernel_ne):
+        dens_exp_sparse[~mask_sparse] = 0.0
+        for kernel in (kde.gaussian_kernel, kde.gaussian_kernel_ne):
             # let's start with all unmasked points
             dens_act = kde.apply_sparse_kernel(kernel, width, data, mask)
             npt.assert_almost_equal(dens_exp, dens_act.toarray())
             kde.apply_sparse_kernel.clear_cache()
             # some masked points
-            dens_act = kde.apply_sparse_kernel(kernel, width, data,
-                                                mask_sparse)
+            dens_act = kde.apply_sparse_kernel(
+                kernel, width, data, mask_sparse
+            )
             npt.assert_almost_equal(dens_exp_sparse, dens_act.toarray())
             kde.apply_sparse_kernel.clear_cache()
 
     def test_doyhour_distance_dt(self):
-        dtimes = self.dtimes[:2 * 24:6]
+        dtimes = self.dtimes[: 2 * 24 : 6]
         from_time = self.dtimes[0]
-        dists = kde.doyhour_distance_dt(from_time, dtimes,
-                                        circ=self.circ)
+        dists = kde.doyhour_distance_dt(from_time, dtimes, circ=self.circ)
         npt.assert_almost_equal(dists, self.dists_exp)
 
     def test_doyhour_distance(self):
-        doys = kde.times.datetime2doy(self.dtimes[:2 * 24:6])
+        doys = kde.times.datetime2doy(self.dtimes[: 2 * 24 : 6])
         from_time = doys[0]
-        dists = kde.doyhour_distance(from_time, doys, doy_width=1,
-                                     circ=self.circ)
+        dists = kde.doyhour_distance(
+            from_time, doys, doy_width=1, circ=self.circ
+        )
         npt.assert_almost_equal(dists, self.dists_exp)
-        dists = kde.doyhour_distance(doys, doys, doy_width=1,
-                                     circ=self.circ)
+        dists = kde.doyhour_distance(doys, doys, doy_width=1, circ=self.circ)
         npt.assert_almost_equal(dists, self.dists_exp2)
-        dist = kde.doyhour_distance(1., 365., 1., 1.)
-        npt.assert_almost_equal(dist, 1.)
-        dist = kde.doyhour_distance(1., 365. + old_div(23., 24), 1., 1.)
-        npt.assert_almost_equal(dist, np.sqrt(2 * (old_div(1., 24)) ** 2))
+        dist = kde.doyhour_distance(1.0, 365.0, 1.0, 1.0)
+        npt.assert_almost_equal(dist, 1.0)
+        dist = kde.doyhour_distance(1.0, 365.0 + old_div(23.0, 24), 1.0, 1.0)
+        npt.assert_almost_equal(dist, np.sqrt(2 * (old_div(1.0, 24)) ** 2))
 
 
 if __name__ == "__main__":

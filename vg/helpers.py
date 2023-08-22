@@ -18,6 +18,7 @@ import warnings
 
 from builtins import map, object, range, str, zip
 from future import standard_library
+
 standard_library.install_aliases()
 
 from future.moves.collections import UserDict
@@ -35,9 +36,11 @@ import hashlib
 import functools
 import random
 import numpy as np
+
 try:
     from multiprocessing import cpu_count
     import numexpr as ne
+
     ne.set_num_threads(min(64, cpu_count()))
     NE = True
 except ImportError:
@@ -54,10 +57,12 @@ PY2 = sys.version_info.major == 2
 
 def asscalar(func):
     """Return the result as a scalar if it has len == 1."""
+
     @functools.wraps(func)
     def wrapped(*args, **kwds):
         result = np.atleast_1d(func(*args, **kwds))
         return result.item() if result.size == 1 else result
+
     return wrapped
 
 
@@ -73,8 +78,7 @@ def _build_arg_str(function, *func_args, **func_kwds):
     spec_arg_values = inspect.getargspec(function).defaults
     # spec_arg_values apply to the last n spec_arg_names
     if spec_arg_names and spec_arg_values:
-        for name, val in zip(spec_arg_names[::-1],
-                             spec_arg_values[::-1]):
+        for name, val in zip(spec_arg_names[::-1], spec_arg_values[::-1]):
             arg_dict[name] = val
 
     # change the default values according to the passed values
@@ -82,14 +86,16 @@ def _build_arg_str(function, *func_args, **func_kwds):
         arg_dict[arg_name] = arg
     arg_dict.update(func_kwds)
 
-    return "__".join("%s_%s" % (key, arg_dict[key])
-                     for key in sorted(arg_dict.keys()))
+    return "__".join(
+        "%s_%s" % (key, arg_dict[key]) for key in sorted(arg_dict.keys())
+    )
 
 
 def pickle_cache(filepath_template="%s.pkl", clear_cache=False, warn=True):
     """Use this as a function decorator to cache the result of a function as a
     pickle-file. The filename is determined by the arguments in the function.
     If the filename turns out to be too long, a hash of it is used."""
+
     def function_wrapper(function):
         @functools.wraps(function)
         def pickle_function(*args, **kwds):
@@ -104,10 +110,11 @@ def pickle_cache(filepath_template="%s.pkl", clear_cache=False, warn=True):
                 filepath = filepath_template
 
             def hash_(filepath):
-                name_hash = (hashlib.md5(os.path.basename(filepath.encode()))
-                             .hexdigest())
+                name_hash = hashlib.md5(
+                    os.path.basename(filepath.encode())
+                ).hexdigest()
                 return os.path.join(os.path.dirname(filepath), name_hash)
-            
+
             filepath_hash = hash_(filepath)
             if clear_cache:
                 if os.path.exists(filepath):
@@ -125,7 +132,6 @@ def pickle_cache(filepath_template="%s.pkl", clear_cache=False, warn=True):
                 #                     "py2" if PY2 else "py3",
                 #                     name_parts[1]))
 
-
             def read(filepath):
                 with open(filepath, "rb") as pi_file:
                     return pickle.load(pi_file)
@@ -134,11 +140,12 @@ def pickle_cache(filepath_template="%s.pkl", clear_cache=False, warn=True):
                 try:
                     if warn:
                         warnings.warn(
-                            "I am not executing %s, but restoring the " %
-                            repr(function) +
-                            "result from its last execution with the " +
-                            "same parameters. \nThe result is stored " +
-                            "here: %s" % filepath)
+                            "I am not executing %s, but restoring the "
+                            % repr(function)
+                            + "result from its last execution with the "
+                            + "same parameters. \nThe result is stored "
+                            + "here: %s" % filepath
+                        )
                     return read(filepath)
                 except IOError:
                     if os.path.exists(filepath_hash):
@@ -152,13 +159,16 @@ def pickle_cache(filepath_template="%s.pkl", clear_cache=False, warn=True):
             def dump(filepath):
                 with open(filepath, "wb") as pi_file:
                     pickle.dump(result, pi_file)
+
             try:
                 dump(filepath)
             except IOError:
                 # maybe the filename was too long
                 dump(hash_(filepath))
             return result
+
         return pickle_function
+
     return function_wrapper
 
 
@@ -176,7 +186,7 @@ class ADict(UserDict):
         if isinstance(other, dict):
             del_keys = list(other.keys())
         elif isinstance(other, basestring):
-            del_keys = other,
+            del_keys = (other,)
         else:
             del_keys = other
         for del_key in del_keys:
@@ -195,15 +205,18 @@ def cache(*names, **name_values):
     *names : str
 
     """
+
     def wrapper(function):
         @functools.wraps(function)
         def cache_holder(*args, **kwds):
             return function(*args, **kwds)
+
         cache_holder._cache_names = names
         cache_holder._cache_name_values = name_values
         cache_holder.clear_cache = lambda: clear_def_cache(cache_holder)
         cache_holder.clear_cache()
         return cache_holder
+
     return wrapper
 
 
@@ -231,6 +244,7 @@ def clear_def_cache(function, cache_names=None, cache_name_values=None):
 
 # Filesystem
 
+
 @contextlib.contextmanager
 def chdir(dirname):
     """Temporarily change the working directory with a with-statement."""
@@ -242,6 +256,7 @@ def chdir(dirname):
 
 
 # Numeric
+
 
 def kendalls_tau(x, y):
     """Kendall's Rank correlation coefficient. See Hartung p.599f
@@ -263,8 +278,10 @@ def kendalls_tau(x, y):
     # correlation between a variable and itself is not 1 when there are
     # equal values inside
     # comment on the comment: changed that back to do it "by the book"
-    q_i = np.array([np.sum(y_ranks[ii + 1:] <= y_ranks[ii])
-                    for ii in range(n)], dtype=float)
+    q_i = np.array(
+        [np.sum(y_ranks[ii + 1 :] <= y_ranks[ii]) for ii in range(n)],
+        dtype=float,
+    )
     return 1 - 4 * np.sum(q_i) / (n * (n - 1))
 
 
@@ -283,14 +300,16 @@ def chi2_test(x, y, k=None, n_parameters=0):
     """
     n = len(x)
     if k is None:
-        k = int(n ** .5)
+        k = int(n**0.5)
         # k = n_parameters + 2
     observed, bins = np.histogram(x, k)[:2]
     expected = np.histogram(y, bins)[0]
-    chi_test = np.sum(old_div((observed.astype(float) - expected) ** 2, expected))
+    chi_test = np.sum(
+        old_div((observed.astype(float) - expected) ** 2, expected)
+    )
     # degrees of freedom:
     dof = k - n_parameters - 1
-    print(chi_test, stats.chi2.ppf(.95, dof))
+    print(chi_test, stats.chi2.ppf(0.95, dof))
     return stats.chisqprob(chi_test, dof)
 
 
@@ -298,8 +317,8 @@ def rel_ranks(values, method="average"):
     """Returns ranks of values in the range [0,1]."""
     if isinstance(values, int):
         N = values
-        return (np.arange(N) + .5) / N
-    return (stats.stats.rankdata(values, method) - .5) / len(values)
+        return (np.arange(N) + 0.5) / N
+    return (stats.stats.rankdata(values, method) - 0.5) / len(values)
 
 
 def val2ind(values, value):
@@ -322,9 +341,11 @@ def round_to_float(values, precision):
     """
     values = np.asarray(values, dtype=float)
     rest = values % precision
-    return np.where(rest > old_div(precision, 2.),
-                    values + (precision - rest),
-                    values - rest)
+    return np.where(
+        rest > old_div(precision, 2.0),
+        values + (precision - rest),
+        values - rest,
+    )
 
 
 def fourier_approx(data, order=4, size=None, how="longest"):
@@ -347,7 +368,7 @@ def fourier_approx(data, order=4, size=None, how="longest"):
         ii_below = list(range(order + 1, len(data)))
     elif how == "strongest":
         # find the order biggest amplitudes
-        ii_below = np.argsort(np.abs(data_freq))[:len(data_freq) - order - 1]
+        ii_below = np.argsort(np.abs(data_freq))[: len(data_freq) - order - 1]
     pars = np.copy(data_freq)
     pars[ii_below] = 0
     return np.fft.irfft(pars, size)
@@ -403,19 +424,28 @@ def interp_nan(values, times=None, max_interp=None, pad_periodic=False):
             for episode_i, nan_length in enumerate(nan_lengths):
                 if nan_length > max_interp:
                     start_i = nan_beginnings[episode_i]
-                    nans[start_i:start_i + nan_length] = False
+                    nans[start_i : start_i + nan_length] = False
 
         if np.any(nans):
-            values[row_i, nans] = \
-                np.interp(times[nans], times[~nans], row[~nans])
+            values[row_i, nans] = np.interp(
+                times[nans], times[~nans], row[~nans]
+            )
     if pad_periodic:
         values = values[:, half:-half]
     return np.squeeze(values)
 
 
-def sumup(values, width=24, times_=None, drop_extra=True, mean=False,
-          middle_time=True, sum_to_nan=False, acceptable_nans=6,
-          max_interp=3):
+def sumup(
+    values,
+    width=24,
+    times_=None,
+    drop_extra=True,
+    mean=False,
+    middle_time=True,
+    sum_to_nan=False,
+    acceptable_nans=6,
+    max_interp=3,
+):
     """Sum up width number of values along the rows. If there are surplus
     entries, they are dropped as if they were hot (Snoop Dog et al).
 
@@ -452,8 +482,9 @@ def sumup(values, width=24, times_=None, drop_extra=True, mean=False,
         values = values[:, :-surplus_columns]
         orig_columns -= surplus_columns
     elif (not drop_extra) and surplus_columns:
-        last_values_mean = values[:, np.newaxis,
-                                  - surplus_columns:].mean(axis=2)
+        last_values_mean = values[:, np.newaxis, -surplus_columns:].mean(
+            axis=2
+        )
         last_values_mean = np.array(last_values_mean, dtype=values.dtype)
         values = np.concatenate((values, last_values_mean), axis=1)
     values = values.reshape((values.size // width, width))
@@ -465,8 +496,9 @@ def sumup(values, width=24, times_=None, drop_extra=True, mean=False,
             summed_values[nan_counts > 0] = np.nan
         else:
             nan_ii = (nan_counts > 0) & (nan_counts <= acceptable_nans)
-            summed_values[nan_ii] *= \
-                old_div(width, (float(width) - nan_counts[nan_ii]))
+            summed_values[nan_ii] *= old_div(
+                width, (float(width) - nan_counts[nan_ii])
+            )
             summed_values[nan_counts > acceptable_nans] = np.nan
     if mean:
         summed_values = summed_values.astype(float)
@@ -478,15 +510,15 @@ def sumup(values, width=24, times_=None, drop_extra=True, mean=False,
     if times_ is not None:
         if middle_time:
             # use the time in the middle between the data points
-            time_shift = round(old_div(width, 2.))
+            time_shift = round(old_div(width, 2.0))
         else:
             time_shift = None
-        times_ = times_[time_shift::width][:summed_values.shape[1]]
+        times_ = times_[time_shift::width][: summed_values.shape[1]]
         return np.squeeze(summed_values), times_
     else:
         return np.squeeze(summed_values)
 
- 
+
 def gaps(data):
     """Return indices referring to start and end points of gaps (marked by nans
     in the given array 'data'
@@ -549,25 +581,38 @@ def list_transpose(list_):
     return list(map(list, list(zip(*list_))))
 
 
-def csv2list(filename, startfrom=None, delimiter=None, column_ids=None,
-             conversions=None, comment="#"):
+def csv2list(
+    filename,
+    startfrom=None,
+    delimiter=None,
+    column_ids=None,
+    conversions=None,
+    comment="#",
+):
     """Returns a list of each column of a csv-file."""
     if conversions is None:
         # no conversion corresponds to a string-conversion.  itertools.repeat
         # gives us those for as many columns that might be there.
         conversions = itertools.repeat(str)
-    if ((len(np.atleast_1d(column_ids)) > 1) and
-            (len(np.atleast_1d(conversions)) == 1)):
+    if (len(np.atleast_1d(column_ids)) > 1) and (
+        len(np.atleast_1d(conversions)) == 1
+    ):
         # as convenience, this expands the conversions to the length of the
         # given column_ids
         column_conversions = conversions
         conversions = itertools.repeat(conversions)
 
     with open(filename) as csv_file:
-        all_data = [[conversion(value.strip()) for value, conversion
-                     in zip(line.split(delimiter), conversions)]
-                    for line in itertools.islice(csv_file, startfrom)
-                    if not line.lstrip().startswith(comment)]
+        all_data = [
+            [
+                conversion(value.strip())
+                for value, conversion in zip(
+                    line.split(delimiter), conversions
+                )
+            ]
+            for line in itertools.islice(csv_file, startfrom)
+            if not line.lstrip().startswith(comment)
+        ]
 
     # "transpose" rows to columns
     columns = list_transpose(all_data)
@@ -576,11 +621,14 @@ def csv2list(filename, startfrom=None, delimiter=None, column_ids=None,
         return columns
     elif len(column_ids) == 1:
         # do not return a nested list if there is only one column
-        return [column_conversions[0](value)
-                for value in columns[column_ids[0]]]
+        return [
+            column_conversions[0](value) for value in columns[column_ids[0]]
+        ]
     else:
-        return [[conversion(value) for value in columns[ii]]
-                for ii, conversion in zip(column_ids, column_conversions)]
+        return [
+            [conversion(value) for value in columns[ii]]
+            for ii, conversion in zip(column_ids, column_conversions)
+        ]
 
 
 def csv2dict(filename, *args, **kwds):
@@ -599,11 +647,17 @@ class LegendSubtitleHandler(object):
         handlebox.set_width(0)
         # a dummy with zero width and no visible edge
         x0, y0 = handlebox.xdescent, handlebox.ydescent
-        patch = mpatches.Rectangle([x0, y0], 0, handlebox.height,
-                                   edgecolor=(0, 0, 0, 0),
-                                   transform=handlebox.get_transform())
+        patch = mpatches.Rectangle(
+            [x0, y0],
+            0,
+            handlebox.height,
+            edgecolor=(0, 0, 0, 0),
+            transform=handlebox.get_transform(),
+        )
         handlebox.add_artist(patch)
         return patch
+
+
 legend_subtitle = LegendSubtitleHandler()
 
 
@@ -626,17 +680,33 @@ def square_subplots(n_variables, *args, **kwds):
             else:
                 sharey_ax = axes[ii, 0]
 
-            axes[ii, jj] = fig.add_subplot(n_variables, n_variables,
-                                           ii * n_variables + jj + 1,
-                                           sharex=sharex_ax,
-                                           sharey=sharey_ax)
+            axes[ii, jj] = fig.add_subplot(
+                n_variables,
+                n_variables,
+                ii * n_variables + jj + 1,
+                sharex=sharex_ax,
+                sharey=sharey_ax,
+            )
     return fig, axes
 
 
-def splom(data, variable_names=None, f_kwds=None, h_kwds=None, s_kwds=None,
-          opacity=.1, highlight_mask=None, ticklabels=True, figsize=None,
-          hists=True, facecolor=(0, .5, .5), edgecolor=(1, 1, 1),
-          f_opacity=None, e_opacity=None, highlight_color="red"):
+def splom(
+    data,
+    variable_names=None,
+    f_kwds=None,
+    h_kwds=None,
+    s_kwds=None,
+    opacity=0.1,
+    highlight_mask=None,
+    ticklabels=True,
+    figsize=None,
+    hists=True,
+    facecolor=(0, 0.5, 0.5),
+    edgecolor=(1, 1, 1),
+    f_opacity=None,
+    e_opacity=None,
+    highlight_color="red",
+):
     """Scatter-plot matrix with interactive capabilities.
 
     Parameters
@@ -675,14 +745,16 @@ def splom(data, variable_names=None, f_kwds=None, h_kwds=None, s_kwds=None,
         """Highlight points in all plots."""
         # cache the collections. we will hopefully not get any more subplots
         if not hasattr(brush, "collections"):
-            brush.collections = [sub.collections[0]
-                                 for sub in fig.get_children()
-                                 if hasattr(sub, "collections")
-                                 and len(sub.collections) == 1]
+            brush.collections = [
+                sub.collections[0]
+                for sub in fig.get_children()
+                if hasattr(sub, "collections") and len(sub.collections) == 1
+            ]
         # handle the click on a histogram bin
         if type(event.artist) is mpl.patches.Rectangle:
-            event.artist._facecolor = \
-                tuple(1 - color_comp for color_comp in event.artist._facecolor)
+            event.artist._facecolor = tuple(
+                1 - color_comp for color_comp in event.artist._facecolor
+            )
             # find the indices of the points within the bin clicked on
             lower = event.artist._x
             upper = lower + event.artist._width
@@ -708,13 +780,15 @@ def splom(data, variable_names=None, f_kwds=None, h_kwds=None, s_kwds=None,
         for jj in range(n_variables):
             if ii == jj:
                 if hists:
-                    axes[ii, jj].hist(np.where(np.isnan(data[ii]), 0,
-                                               data[ii]),
-                                      min(20, int(len(data[ii]) ** .5)),
-                                      picker=5, density=True,
-                                      # want to achieve red when inverting
-                                      facecolor=cc.to_rgba(facecolor, alpha=0),
-                                      **h_kwds)
+                    axes[ii, jj].hist(
+                        np.where(np.isnan(data[ii]), 0, data[ii]),
+                        min(20, int(len(data[ii]) ** 0.5)),
+                        picker=5,
+                        density=True,
+                        # want to achieve red when inverting
+                        facecolor=cc.to_rgba(facecolor, alpha=0),
+                        **h_kwds
+                    )
                     # store the ii-index as an attribute to identify the
                     # variable later in the brush function
                     axes[ii, jj].var_i = ii
@@ -725,21 +799,26 @@ def splom(data, variable_names=None, f_kwds=None, h_kwds=None, s_kwds=None,
                     facecolors = cc.to_rgba(facecolor, alpha=f_opacity)
                 else:
                     facecolors = np.empty((data.shape[1], 4))
-                    facecolors[highlight_mask] = cc.to_rgba(highlight_color,
-                                                            f_opacity)
+                    facecolors[highlight_mask] = cc.to_rgba(
+                        highlight_color, f_opacity
+                    )
                     # want to achieve red when inverting
-                    facecolors[~highlight_mask] = cc.to_rgba(facecolor,
-                                                             f_opacity)
-                axes[ii, jj].scatter(data[jj], data[ii], picker=5,
-                                     facecolors=facecolors,
-                                     edgecolors=cc.to_rgba(edgecolor,
-                                                           e_opacity),
-                                     **s_kwds)
-# show ticklabels only on the margins
-#                if (jj != 0) or (ii == jj):
-#                    axes[ii, jj].set_yticklabels("")
-#                if ii != n_variables - 1:
-#                    axes[ii, jj].set_xticklabels("")
+                    facecolors[~highlight_mask] = cc.to_rgba(
+                        facecolor, f_opacity
+                    )
+                axes[ii, jj].scatter(
+                    data[jj],
+                    data[ii],
+                    picker=5,
+                    facecolors=facecolors,
+                    edgecolors=cc.to_rgba(edgecolor, e_opacity),
+                    **s_kwds
+                )
+            # show ticklabels only on the margins
+            #                if (jj != 0) or (ii == jj):
+            #                    axes[ii, jj].set_yticklabels("")
+            #                if ii != n_variables - 1:
+            #                    axes[ii, jj].set_xticklabels("")
             if variable_names and jj == 0:
                 axes[ii, jj].set_ylabel(variable_names[ii])
             if variable_names and ii == n_variables - 1:
@@ -752,8 +831,14 @@ def splom(data, variable_names=None, f_kwds=None, h_kwds=None, s_kwds=None,
     return fig
 
 
-def kde_gauss(dataset, evaluation_points=None, kernel_width=None,
-              maxopt=500, return_width=False, verbose=False):
+def kde_gauss(
+    dataset,
+    evaluation_points=None,
+    kernel_width=None,
+    maxopt=500,
+    return_width=False,
+    verbose=False,
+):
     """
 
     Parameter
@@ -779,6 +864,7 @@ def kde_gauss(dataset, evaluation_points=None, kernel_width=None,
         xx = np.linspace(-3,3, 1e3)
         plt.plot(xx,kde_gauss(dataset,xx))
     """
+
     def residual_matrix(x_vec, y_vec):
         """Returns a matrix with residuals (x:horizontal,y:vertical)"""
         x_vec, y_vec = list(map(np.asarray, (x_vec, y_vec)))
@@ -790,16 +876,20 @@ def kde_gauss(dataset, evaluation_points=None, kernel_width=None,
         optMatrix = residual_matrix(dataset, dataset)
         if NE:
             pi = np.pi
-            ne_str = ("1.0 / (sqrt(2 * pi) * kernel_width) / "
-                      "exp(optMatrix ** 2 / (2 * kernel_width ** 2))")
+            ne_str = (
+                "1.0 / (sqrt(2 * pi) * kernel_width) / "
+                "exp(optMatrix ** 2 / (2 * kernel_width ** 2))"
+            )
             optMatrix = ne.evaluate(ne_str)
         else:
             preTerm = old_div(1.0, (np.sqrt(2 * np.pi) * kernel_width))
-            optMatrix = old_div(preTerm, np.exp(old_div(optMatrix ** 2,
-                                         (2 * kernel_width ** 2))))
+            optMatrix = old_div(
+                preTerm,
+                np.exp(old_div(optMatrix**2, (2 * kernel_width**2))),
+            )
         nDataset = np.shape(dataset)[0]
         # sets diagonal to 0, i.e. leave-one-out method
-        optMatrix.ravel()[::nDataset + 1] = 0
+        optMatrix.ravel()[:: nDataset + 1] = 0
         densities = old_div(np.sum(optMatrix, axis=1), float(nDataset - 1))
         # LN if <>0 for MLM
         d_sum = 0
@@ -830,14 +920,21 @@ def kde_gauss(dataset, evaluation_points=None, kernel_width=None,
             fluct = True  # while values fluctuate, repeat iteration
             d_n = []  # list of d's
             d_act, d_old = d_0, 0
-            n_min = 8 + np.sqrt(old_div(len(dataset), maxopt))  # min nr of iterations
+            n_min = 8 + np.sqrt(
+                old_div(len(dataset), maxopt)
+            )  # min nr of iterations
             n_act = 0
 
             while fluct or n_act <= n_min:
                 dataset_sample = random.sample(tuple(dataset), maxopt)
-                d_n.append(optimize.fmin(neglog_likelihood, d_act,
-                                         args=(dataset_sample, verbose),
-                                         disp=verbose)[0])
+                d_n.append(
+                    optimize.fmin(
+                        neglog_likelihood,
+                        d_act,
+                        args=(dataset_sample, verbose),
+                        disp=verbose,
+                    )[0]
+                )
                 d_act = old_div(sum(d_n), float(len(d_n)))
                 # stop if fluct < 1%
                 if old_div(abs(d_act - d_old), float(d_act)) < 0.01:
@@ -850,11 +947,14 @@ def kde_gauss(dataset, evaluation_points=None, kernel_width=None,
 
         else:
             dataset_sample = dataset
-            kernel_width = optimize.fmin(neglog_likelihood, d_0,
-                                         args=(dataset_sample, verbose),
-                                         disp=verbose)
+            kernel_width = optimize.fmin(
+                neglog_likelihood,
+                d_0,
+                args=(dataset_sample, verbose),
+                disp=verbose,
+            )
         if verbose:
-            print('Kernelwidth = %f' % kernel_width)
+            print("Kernelwidth = %f" % kernel_width)
 
     if return_width:
         return kernel_width
@@ -862,22 +962,24 @@ def kde_gauss(dataset, evaluation_points=None, kernel_width=None,
     evaluation_points = np.asarray(evaluation_points)
 
     if len(dataset) < len(evaluation_points):
-        print ('Caution: you get more ev. points than input data\
-        be aware of pseudo exactness')
+        print(
+            "Caution: you get more ev. points than input data\
+        be aware of pseudo exactness"
+        )
 
     # save kernel width, so it can be retrieved if anyone is interested
     kde_gauss.kernel_width = kernel_width
 
     # creating Matrix with residuals
-#    kdeMatrix = residual_matrix(dataset,evaluation_points)
-#    sparse_kde_mask = kdeMatrix < .001
-#    from scipy.sparse import lil_matrix
-#    sparse_kde = lil_matrix(kdeMatrix.shape)
-#    sparse_kde[sparse_kde_mask] = kdeMatrix[sparse_kde_mask]
-#     using Gaussian kernel
-#    import numexpr as ne
-#    preTerm = ne.evaluate("1.0 / ((2 * math.pi)**.5 * kernel_width)")
-#    kdeMatrix = preTerm / np.exp(kdeMatrix ** 2 / (2 * kernel_width ** 2))
+    #    kdeMatrix = residual_matrix(dataset,evaluation_points)
+    #    sparse_kde_mask = kdeMatrix < .001
+    #    from scipy.sparse import lil_matrix
+    #    sparse_kde = lil_matrix(kdeMatrix.shape)
+    #    sparse_kde[sparse_kde_mask] = kdeMatrix[sparse_kde_mask]
+    #     using Gaussian kernel
+    #    import numexpr as ne
+    #    preTerm = ne.evaluate("1.0 / ((2 * math.pi)**.5 * kernel_width)")
+    #    kdeMatrix = preTerm / np.exp(kdeMatrix ** 2 / (2 * kernel_width ** 2))
 
     if len(dataset) * len(evaluation_points) > 1e7:
         parts = int(len(dataset) * len(evaluation_points) / 1e7) + 1
@@ -885,28 +987,45 @@ def kde_gauss(dataset, evaluation_points=None, kernel_width=None,
         densities = np.array([])
         for i in range(parts + 1):
             if verbose:
-                print('part %i of %i' % (i, parts))
-            kdeMatrix = \
-                residual_matrix(dataset,
-                                evaluation_points[i * brIncr:(i + 1) * brIncr])
+                print("part %i of %i" % (i, parts))
+            kdeMatrix = residual_matrix(
+                dataset, evaluation_points[i * brIncr : (i + 1) * brIncr]
+            )
             preTerm = old_div(1.0, (np.sqrt(2 * np.pi) * kernel_width))
-            kdeMatrix = (old_div(preTerm,
-                         np.exp(old_div(kdeMatrix ** 2, (2 * kernel_width ** 2)))))
-            tmp_densities = old_div(np.sum(kdeMatrix, axis=1), float(len(dataset)))
+            kdeMatrix = old_div(
+                preTerm,
+                np.exp(old_div(kdeMatrix**2, (2 * kernel_width**2))),
+            )
+            tmp_densities = old_div(
+                np.sum(kdeMatrix, axis=1), float(len(dataset))
+            )
             densities = np.hstack((densities, tmp_densities))
     else:
         kdeMatrix = residual_matrix(dataset, evaluation_points)
         preTerm = 1.0 / (np.sqrt(2 * np.pi) * kernel_width)
         with np.errstate(all="ignore"):
-            kdeMatrix = preTerm / np.exp(kdeMatrix ** 2 / (2 * kernel_width ** 2))
+            kdeMatrix = preTerm / np.exp(
+                kdeMatrix**2 / (2 * kernel_width**2)
+            )
         # suming lines
         densities = np.sum(kdeMatrix, axis=1) / float(len(dataset))
     return densities
 
 
-def hist(values, n_bins, dist=None, pdf=None, kde=False, fig=None,
-         ax=None, discrete=False, figsize=None, legend=True, *args,
-         **kwds):
+def hist(
+    values,
+    n_bins,
+    dist=None,
+    pdf=None,
+    kde=False,
+    fig=None,
+    ax=None,
+    discrete=False,
+    figsize=None,
+    legend=True,
+    *args,
+    **kwds
+):
     """Plots a histogram and therotical or empirical densities."""
     try:
         if np.any(~np.isfinite(values)):
@@ -923,7 +1042,7 @@ def hist(values, n_bins, dist=None, pdf=None, kde=False, fig=None,
     # the histogram of the data
     if discrete:
         values_2d = np.atleast_2d(values)
-        bin_offset = -.5 * values_2d.shape[0]
+        bin_offset = -0.5 * values_2d.shape[0]
         for i, values in enumerate(values_2d):
             values = np.array(values)
             bins = np.arange(values.min(), values.max() + 1, dtype=int)
@@ -934,13 +1053,20 @@ def hist(values, n_bins, dist=None, pdf=None, kde=False, fig=None,
             ax1.vlines(bins, 0, freqs, linewidth=3)
             ax1.set_xlim(bins[0] - 1, bins[-1] + 1)
     else:
-        bins = ax1.hist(values, n_bins, density=True, facecolor='grey',
-                        alpha=0.75, *args, **kwds)[1]
+        bins = ax1.hist(
+            values,
+            n_bins,
+            density=True,
+            facecolor="grey",
+            alpha=0.75,
+            *args,
+            **kwds
+        )[1]
 
     ax1.set_ylabel("relative frequency")
 
     if not (isinstance(values, list) or values.ndim == 2):
-        values_2d = values,
+        values_2d = (values,)
     else:
         values_2d = values
 
@@ -957,7 +1083,7 @@ def hist(values, n_bins, dist=None, pdf=None, kde=False, fig=None,
             dist[0]
             dists = dist
         except TypeError:
-            dists = dist,
+            dists = (dist,)
 
         # the quantile part
         ax2 = ax1.twinx()
@@ -965,7 +1091,7 @@ def hist(values, n_bins, dist=None, pdf=None, kde=False, fig=None,
         for values in values_2d:
             # empirical cdf
             values_sort = np.sort(values)
-            ranks_emp = old_div((.5 + np.arange(len(values))), len(values))
+            ranks_emp = old_div((0.5 + np.arange(len(values))), len(values))
             ax2.plot(values_sort, ranks_emp)
             pdf = []
             for dist in dists:
@@ -976,21 +1102,27 @@ def hist(values, n_bins, dist=None, pdf=None, kde=False, fig=None,
                 pdf += [fitted_dist.pdf]
                 # theoretical cdf
                 ranks_theory = fitted_dist.cdf(eva_points)
-                p_val = stats.kstest(values, fitted_dist.cdf,
-                                     mode="asymp")[1]
-                ax2.plot(eva_points, ranks_theory, '--',
-                         label=("%s p-value: %.1f%%" %
-                                (dist.name, p_val * 100)))
+                p_val = stats.kstest(values, fitted_dist.cdf, mode="asymp")[1]
+                ax2.plot(
+                    eva_points,
+                    ranks_theory,
+                    "--",
+                    label=("%s p-value: %.1f%%" % (dist.name, p_val * 100)),
+                )
                 ax2.set_ylabel(r"cumulative frequency")
                 ax2.set_ylim(0, 1)
                 ax2.grid()
 
         if len(dists) == 1:
             if hasattr(dist, "parameter_names"):
-                plt.title(" ".join("%s:%.3f" % (par_name, par)
-                                   for par_name, par
-                                   in zip(dist.parameter_names,
-                                          fitted_dist.params)))
+                plt.title(
+                    " ".join(
+                        "%s:%.3f" % (par_name, par)
+                        for par_name, par in zip(
+                            dist.parameter_names, fitted_dist.params
+                        )
+                    )
+                )
             elif hasattr(fitted_dist, "args"):
                 plt.title(" ".join("%.3f" % par for par in fitted_dist.args))
         elif len(dists) > 1 and legend:
@@ -1005,8 +1137,13 @@ def hist(values, n_bins, dist=None, pdf=None, kde=False, fig=None,
             density_th = pdf(eva_points)
             if discrete:
                 density_th *= len(values)
-            ax1.plot(eva_points, density_th, '--o' if discrete else '--',
-                     linewidth=1, label="pdf")
+            ax1.plot(
+                eva_points,
+                density_th,
+                "--o" if discrete else "--",
+                linewidth=1,
+                label="pdf",
+            )
 
     if fig is not None:
         return fig, axes
@@ -1091,10 +1228,14 @@ def yscale_subplots(fig=None, per_type=False, regrid=False):
 
 if __name__ == "__main__":
     import doctest
+
     doctest.testmod()
 
     fig, ax = plt.subplots()
-    line, = ax.plot(np.arange(10))
-    ax.legend([line, None], ("line", "find me"),
-              handler_map={None, LegendSubtitleHandler()})
+    (line,) = ax.plot(np.arange(10))
+    ax.legend(
+        [line, None],
+        ("line", "find me"),
+        handler_map={None, LegendSubtitleHandler()},
+    )
     plt.show()

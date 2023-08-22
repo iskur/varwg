@@ -9,12 +9,14 @@ from numpy.testing import TestCase, run_module_suite
 from past.utils import old_div
 
 from vg import times
-from vg.time_series_analysis import (_kde as kde, distributions, seasonal_kde
-                                     as skde)
+from vg.time_series_analysis import (
+    _kde as kde,
+    distributions,
+    seasonal_kde as skde,
+)
 
 
 class Test(TestCase):
-
     # def setUp(self):
     #     n_years = 2
     #     # construct n_years of hourly data
@@ -101,10 +103,13 @@ class Test(TestCase):
 
     def test_fft2par(self):
         fft_pars = np.array([1 + 0j, 2 + 1j])
-        dtimes = np.array([
-            datetime.datetime(2000, 12, 30) + t * datetime.timedelta(hours=1)
-            for t in np.arange(30 * 24)
-        ])
+        dtimes = np.array(
+            [
+                datetime.datetime(2000, 12, 30)
+                + t * datetime.timedelta(hours=1)
+                for t in np.arange(30 * 24)
+            ]
+        )
         doys = times.datetime2doy(dtimes)
         trans = skde.fft2par(fft_pars, doys)
         npt.assert_equal(len(trans), len(doys))
