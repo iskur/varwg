@@ -372,6 +372,10 @@ class Dist(metaclass=DistMeta):
         result = quad(lambda x: x * self.pdf(x, *args, **kwds), x_min, x_max)
         return result[0]
 
+    @my.asscalar
+    def median(self, *args, **kwds):
+        return self.ppf(0.5, *args, **kwds)
+
     def __call__(self, *params):
         return Frozen(self, *params)
 
