@@ -4,8 +4,7 @@ suggestions for their values in the form of comments
 
 Adjust this file for your needs and rename it to "config.py".
 """
-from __future__ import division
-from builtins import range
+
 import os
 import tempfile
 
@@ -146,6 +145,7 @@ dists_kwds = {
         q_thresh_upper=0.99,
         doy_width=20,
         fft_order=4,
+        tabulate_cdf=True,
     ),
     # "R": dict(threshold=1.5e-4,
     #           doy_width=35, fft_order=4),
@@ -197,8 +197,9 @@ par_known.update(
             # "u": array_gen(hpd * 1.01)
         },
         "R": {
+            "l": array_gen(0.0),
             "u": array_gen(1.0),
-            # "l": array_gen(0.),
+            # "kernel_bounds": array_gen([0.1, None]),
             # "lc": array_gen(.0002),
             # "uc": array_gen(1e12)
         },
