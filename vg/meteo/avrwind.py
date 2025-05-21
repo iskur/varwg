@@ -43,7 +43,7 @@ def angle2component(angle, norm, wind=True):
     >>> angle2component([90,180],[1,1], wind=False)
     (array([  1.00000000e+00,   1.22464680e-16]),
      array([  6.12323400e-17,  -1.00000000e+00]))
-     """
+    """
     try:  # look if single value or vector
         _ = angle[0]
         angle, norm = np.array(angle), np.array(norm)
@@ -108,12 +108,13 @@ def component2angle(u, v, wind=True):
     # normalize to (0,2pi]
     angle_rad = (angle_rad + 2 * np.pi) % (2 * np.pi)
     angle = np.degrees(angle_rad)
-    norm = (u ** 2 + v ** 2) ** .5
+    norm = (u**2 + v**2) ** 0.5
     return angle, norm
 
 
-def avrwind_vec(u, v, sec=16, verbose=True, timeinfo=None,
-                return_secdata=False, wind=True):
+def avrwind_vec(
+    u, v, sec=16, verbose=True, timeinfo=None, return_secdata=False, wind=True
+):
     """
     calculates the average windspeed and direction using vector averaging
 
@@ -156,16 +157,17 @@ def avrwind_vec(u, v, sec=16, verbose=True, timeinfo=None,
     u, v = np.array(u), np.array(v)
     if len(u) != len(v):
         print("ERROR: mismatch -> length of u,v differ!")
-        return(None)
-    norm_uv_direct = np.average(np.sqrt(u ** 2 + v ** 2))
+        return None
+    norm_uv_direct = np.average(np.sqrt(u**2 + v**2))
 
     avr_u, avr_v = np.average(u), np.average(v)
     angle_dir = component2angle(avr_u, avr_v, wind=wind)
     return avr_u, avr_v, angle_dir[0], angle_dir[1], norm_uv_direct
 
 
-def avrwind_sec(u, v, sec=16, verbose=True, timeinfo=None,
-                return_secdata=False, wind=True):
+def avrwind_sec(
+    u, v, sec=16, verbose=True, timeinfo=None, return_secdata=False, wind=True
+):
     """
     function to calculate the average windspeed and directions via sectors
 
@@ -230,8 +232,8 @@ def avrwind_sec(u, v, sec=16, verbose=True, timeinfo=None,
         hits_averages[1][int(sectors[m])] += velocities[m]
 
     max_hits = int(hits_averages.max(axis=1)[0])  # number of most hits
-    max_sec = hits_averages.argmax(axis=1)[0]   # sectornumber of maximum sec
-#     max_speed_sec = hits_averages.argmax(axis=1)[1]  # sectornr max speed
+    max_sec = hits_averages.argmax(axis=1)[0]  # sectornumber of maximum sec
+    #     max_speed_sec = hits_averages.argmax(axis=1)[1]  # sectornr max speed
 
     # test if there is sector with equal hits as maxsec
     test = hits_averages[0].copy()
@@ -379,22 +381,26 @@ def avrwind(
     if len(u) != len(v):
         print("Error: different length in vectors u, v")
         return
-    #if only time span is given: create a time vector beginning 1.1.1900 0:0:0
+    # if only time span is given: create a time vector beginning 1.1.1900 0:0:0
     if type(date_time) == type(1):
-        date_time = [datetime.datetime(1900, 1, 1) +
-                     i * datetime.timedelta(0, date_time)
-                     for i in range(len(u))]
-        format_ = 'datetime'
+        date_time = [
+            datetime.datetime(1900, 1, 1)
+            + i * datetime.timedelta(0, date_time)
+            for i in range(len(u))
+        ]
+        format_ = "datetime"
 
     else:
-        if  type(date_time[0]) == type(''):
+        if type(date_time[0]) == type(""):
             date_time = times.str2datetime(date_time)
             format_ = "string"
         elif type(date_time[0]) == type(datetime.datetime(1900, 1, 1)):
             format_ = "datetime"
         else:
-            print("ERROR: wrong time-info input {arg(3)} only string and \
-                    datetime possible")
+            print(
+                "ERROR: wrong time-info input {arg(3)} only string and \
+                    datetime possible"
+            )
             return
     # test wheater new timestep < old one
     if new_timeres < (date_time[1] - date_time[0]).seconds:
@@ -406,9 +412,9 @@ def avrwind(
         # test if timeinfo and time resolution fit
         return
 
-    if method in ('sector', 'sec'):
+    if method in ("sector", "sec"):
         method = avrwind_sec
-    elif method in ('vector', 'vec'):
+    elif method in ("vector", "vec"):
         method = avrwind_vec
         sec = None
 
@@ -424,7 +430,7 @@ def avrwind(
     time_barrier = date_time[0] + datetime.timedelta(0, new_timeres)
     time_block = [[], []]  # block with vectors u, v which shall be averaged
     return_wind = [[], [], [], []]  # averaged u, v vectors
-    return_time = []   # time-vector with new times: middle of averaging time
+    return_time = []  # time-vector with new times: middle of averaging time
     i = 0
 
     while i < len(date_time):  # loop over time-vector
@@ -433,13 +439,19 @@ def avrwind(
             time_block[1].append(v[i])
             dt_index_high = i
         else:
-#            return_time_act = date_time[dt_index_low] + \
-#                    (date_time[dt_index_high] - date_time[dt_index_low]) / 2
+            #            return_time_act = date_time[dt_index_low] + \
+            #                    (date_time[dt_index_high] - date_time[dt_index_low]) / 2
             return_time_act = date_time[dt_index_high]
 
-            #++++++++++ calling averaging function +++++++++++++++++++++++++++#
-            tmp_wind = method(time_block[0], time_block[1], sec, verbose, \
-                              times.datetime2str(return_time_act), wind=wind_)
+            # ++++++++++ calling averaging function +++++++++++++++++++++++++++#
+            tmp_wind = method(
+                time_block[0],
+                time_block[1],
+                sec,
+                verbose,
+                times.datetime2str(return_time_act),
+                wind=wind_,
+            )
             return_wind[0].append(tmp_wind[0])  # adds averaged date to output
             return_wind[1].append(tmp_wind[1])
             return_wind[2].append(tmp_wind[2])
@@ -447,21 +459,31 @@ def avrwind(
             return_time.append(return_time_act)
 
             dt_index_low = dt_index_high + 1
-            time_barrier = date_time[dt_index_high + 1] + \
-                           datetime.timedelta(0, new_timeres)
+            time_barrier = date_time[dt_index_high + 1] + datetime.timedelta(
+                0, new_timeres
+            )
             time_block = [[], []]
             i = i - 1
         i += 1
-    #testing if last block was complete if yes append last data
+    # testing if last block was complete if yes append last data
     #    if not don't and give out caution sign
-    if date_time[dt_index_low - 1] + datetime.timedelta(0, new_timeres) == \
-                                date_time[dt_index_high] or dt_index_low == 0:
-#        return_time_act = date_time[dt_index_low] + \
-#                    (date_time[dt_index_high] - date_time[dt_index_low]) / 2
+    if (
+        date_time[dt_index_low - 1] + datetime.timedelta(0, new_timeres)
+        == date_time[dt_index_high]
+        or dt_index_low == 0
+    ):
+        #        return_time_act = date_time[dt_index_low] + \
+        #                    (date_time[dt_index_high] - date_time[dt_index_low]) / 2
         return_time_act = date_time[dt_index_high]
 
-        tmp_wind = method(time_block[0], time_block[1], sec, verbose, \
-                          times.datetime2str(return_time_act), wind=wind_)
+        tmp_wind = method(
+            time_block[0],
+            time_block[1],
+            sec,
+            verbose,
+            times.datetime2str(return_time_act),
+            wind=wind_,
+        )
         return_wind[0].append(tmp_wind[0])
         return_wind[1].append(tmp_wind[1])
         return_wind[2].append(tmp_wind[2])
@@ -469,9 +491,11 @@ def avrwind(
         return_time.append(return_time_act)
 
     elif verbose == True:
-        print("  Caution: last value(s) lost, didn't cover a full time span \n")
+        print(
+            "  Caution: last value(s) lost, didn't cover a full time span \n"
+        )
 
-    if format_ == 'string':
+    if format_ == "string":
         return_time = times.datetime2str(return_time)
 
     return_list = return_wind
@@ -479,16 +503,17 @@ def avrwind(
 
     return return_list
 
-#logging if many values of a time span are missing
-#-----------------------------------------------------------------------------#
-#-----------------------------------------------------------------------------#
+
+# logging if many values of a time span are missing
+# -----------------------------------------------------------------------------#
+# -----------------------------------------------------------------------------#
 
 
 def plothist(x, legend):
     import matplotlib.pyplot as plot
 
-    rects1 = plot.bar(color='r')
-    rects2 = plot.bar(color='b')
+    rects1 = plot.bar(color="r")
+    rects2 = plot.bar(color="b")
 
     plot.hist(x, density=True, bins=30)
     plot.legend((rects1[0], rects2[0]), (legend[0], legend[1]))
@@ -505,8 +530,9 @@ def phi_main(u, v):
 
 def turn_uv(u, v, phi):
     uv = np.array([u, v]).T
-    turn_matrix = np.array([[np.cos(phi), -np.sin(phi)],
-                            [np.sin(phi), np.cos(phi)]])
+    turn_matrix = np.array(
+        [[np.cos(phi), -np.sin(phi)], [np.sin(phi), np.cos(phi)]]
+    )
     uv = uv @ turn_matrix
     u, v = uv.T
     return np.squeeze(u), np.squeeze(v)
@@ -514,4 +540,5 @@ def turn_uv(u, v, phi):
 
 if __name__ == "__main__":
     import doctest
+
     doctest.testmod(optionflags=doctest.NORMALIZE_WHITESPACE)
