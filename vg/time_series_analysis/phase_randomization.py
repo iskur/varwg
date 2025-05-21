@@ -1,6 +1,6 @@
 import warnings
 import numpy as np
-from vg import helpers as my
+from vg import helpers as my, ecdf
 import vg
 
 
@@ -98,6 +98,37 @@ def randomize2d(
     # print(f"{np.mean(fft_sim, axis=1)=}")
     # print(f"{A[:, 0]=}")
     # print(f"{A_new[:, 0]=}")
+
+    if qq:
+        data_dists = [ecdf.ECDF(data_row) for data_row in data]
+        sim_dists = [ecdf.ECDF(fft_sim_row) for fft_sim_row in fft_sim]
+        fft_sim = np.array(
+            [
+                data_dist.ppf(sim_dist.cdf())
+                for data_dist, sim_dist in zip(data_dists, sim_dists)
+            ]
+        )
+
+        # import matplotlib.pyplot as plt
+        # fig, axs = plt.subplots(
+        #     nrows=1, ncols=K, subplot_kw=dict(aspect="equal")
+        # )
+        # qq = np.linspace(1e-6, 1 - 1e-6, 500)
+        # for ax, data_dist, sim_dist in zip(axs, data_dists, sim_dists):
+        #     data_sample = data_dist.ppf(qq)
+        #     sim_sample = sim_dist.ppf(qq)
+        #     ax.plot(data_sample, sim_sample)
+        #     min_ = min(data_sample[0], sim_sample[0])
+        #     max_ = max(data_sample[-1], sim_sample[-1])
+        #     ax.plot(
+        #         [min_, max_],
+        #         [min_, max_],
+        #         linestyle="--",
+        #         color="k",
+        #         alpha=0.5,
+        #     )
+        # plt.show()
+
     if return_rphases:
         return fft_sim, rphases
     return fft_sim
