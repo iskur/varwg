@@ -512,8 +512,8 @@ def SVAR_LS_sim(
         u = phase_randomization.randomize2d(
             u,
             T=T,
-            taboo_period_min=taboo_period_min,
-            taboo_period_max=taboo_period_max,
+            # taboo_period_min=taboo_period_min,
+            # taboo_period_max=taboo_period_max,
             return_rphases=return_rphases,
             rphases=rphases,
             **p_kwds
@@ -852,6 +852,11 @@ def VAR_LS_sim(
     prev_data=None,
     transform=None,
     phase_randomize=False,
+    rphases=None,
+    return_rphases=False,
+    p_kwds=None,
+    taboo_period_min=None,
+    taboo_period_max=None,
 ):
     """Based on a least squares estimator, simulate a time-series of the form
     ..math::y(t) = nu + A1*y(t-1) + ... + Ap*y(t-p) + ut
@@ -927,14 +932,22 @@ def VAR_LS_sim(
     if m is None and prev_data is None:
         # setting starting values to the process mean
         Y[:, :p] = VAR_mean(B)
-    Y = np.asarray(Y)
+        Y = np.asarray(Y)
 
     if phase_randomize:
         if u is None:
             raise RuntimeError("u must be passed for phase randomization!")
         u = phase_randomization.randomize2d(
-            u, T=T, taboo_period_min=None, taboo_period_max=None
+            u,
+            T=T,
+            # taboo_period_min=taboo_period_min,
+            # taboo_period_max=taboo_period_max,
+            return_rphases=return_rphases,
+            rphases=rphases,
+            **p_kwds
         )
+        if return_rphases:
+            u, rphases = u
     elif u is None:
         u = vg.rng.multivariate_normal(K * [0], sigma_u, n_sim_steps - p)
         u = u.T
@@ -971,6 +984,8 @@ def VAR_LS_sim(
                 Y[:, t],
                 fixed_data[:, t - start_t],
             )
+    if return_rphases:
+        return Y[:, -T:], rphases
     return Y[:, -T:]
 
 
