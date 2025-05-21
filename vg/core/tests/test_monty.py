@@ -4,9 +4,8 @@ import tempfile
 import warnings
 
 import pandas as pd
-import numpy as np
 from builtins import range
-from numpy.testing import TestCase, assert_almost_equal, dec, run_module_suite
+import numpy.testing as npt
 
 import vg
 from vg.core import monty
@@ -15,14 +14,14 @@ from vg.core import monty
 vg.conf = vg.config_template
 
 
-class Test(TestCase):
+class Test(npt.TestCase):
     def setUp(self):
         self.data_dir = tempfile.mkdtemp("vg_temporary_test")
+        self.refit = True
 
     def tearDown(self):
         shutil.rmtree(self.data_dir)
 
-    @dec.slow
     def test_Monty(self):
         """Do we get the same results sequentially and in parallel?"""
         import sys
@@ -31,7 +30,10 @@ class Test(TestCase):
             warnings.warn("Not supported in Python 2")
             return
         n_realizations = 2
-        vg_kwds = dict(var_names=("theta", "ILWR", "Qsw", "rh", "u", "v"))
+        vg_kwds = dict(
+            var_names=("theta", "ILWR", "Qsw", "rh", "u", "v"),
+            refit=self.refit,
+        )
         fit_kwds = dict(p=3)
         sim_kwds = dict(T=100)
         dis_kwds = {}
@@ -63,9 +65,9 @@ class Test(TestCase):
             par = pd.read_csv(
                 outfilepath_par % ri, parse_dates=True, index_col=0
             )
-            assert_almost_equal(par.as_matrix(), seq.as_matrix())
+            npt.assert_allclose(par, seq)
 
 
 if __name__ == "__main__":
     # import sys;sys.argv = ['', 'Test.testName']
-    run_module_suite()
+    npt.run_module_suite()
