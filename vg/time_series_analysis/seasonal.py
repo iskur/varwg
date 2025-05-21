@@ -1,10 +1,13 @@
 """This provides common ground for seasonal_distributions and seasonal_kde."""
 
 import calendar
+import hashlib
 import numpy as np
+import scipy.optimize as sp_optimize
 from vg import times
 from vg import helpers as my
 from vg.smoothing import smooth
+from vg.time_series_analysis import phase_randomization, distributions
 
 
 def build_doy_mask(doys, doy_width, doys_unique=None):
@@ -51,6 +54,7 @@ class Seasonal(object):
         if kill_leap:
             # get rid off feb 29
             self._feb29()
+        self._qq_shift_cache = None
 
     def _feb29(self):
         # get rid off feb 29
@@ -100,6 +104,57 @@ class Seasonal(object):
         if len(doys_ii) < len(doys):
             doys_ii = [my.val2ind(self.doys_unique, doy) for doy in doys]
         return doys_ii
+
+    def qq_shift(self, theta_incr, trig_pars, x=None, doys=None, **kwds):
+        """Empirical estimation of shift in std-normal for given theta_incr."""
+        # executing this method is expensive and in the context of
+        # weathercop's conditional simulation, might happen often with
+        # the same theta_incr, so do some caching here to return known
+        # results
+        if self._qq_shift_cache is None:
+            self._qq_shift_cache = {}
+        # theta_incr_key = hash(round(theta_incr[0], 6))
+        theta_incr_key = hashlib.md5(
+            str(round(theta_incr[0], 6)).encode()
+        ).hexdigest()
+        if theta_incr_key not in self._qq_shift_cache:
+            qq = self.cdf(trig_pars, x=x, doys=doys, **kwds)
+            zero = 1e-6
+            one = 1 - zero
+            stdn = distributions.norm.ppf(
+                np.minimum(np.maximum(qq, zero), one)
+            )
+            stdn = phase_randomization.randomize2d(np.array([stdn])).squeeze()
+            data = np.atleast_1d(self.data if x is None else x)
+            data_mean = data.mean()
+
+            def c2incr(c):
+                xx_act = self.ppf(
+                    trig_pars,
+                    quantiles=distributions.norm.cdf(stdn + c),
+                    doys=doys,
+                    kwds=kwds,
+                )
+                return (xx_act.mean() - data_mean - theta_incr) ** 2
+
+            # if self.verbose:
+            #     print(f"\tFilling shift-cache for {theta_incr=}")
+            result = sp_optimize.minimize_scalar(c2incr)
+
+            # fig, ax = plt.subplots(nrows=1, ncols=1)
+            # xx_act = self.ppf(trig_pars,
+            #                   quantiles=distributions.norm.cdf(stdn + result.x),
+            #                   doys=doys,
+            #                   kwds=kwds)
+            # ax.axvline(data_mean, label="data_mean", color="k")
+            # ax.axvline(xx_act.mean(), label="xx_act", color="b")
+            # ax.axvline(data_mean + theta_incr, label="data_mean + theta_incr",
+            #            color="k", linestyle="--")
+            # ax.legend()
+            # plt.show()
+
+            self._qq_shift_cache[theta_incr_key] = result.x
+        return self._qq_shift_cache[theta_incr_key]
 
     @property
     def n_years(self):
