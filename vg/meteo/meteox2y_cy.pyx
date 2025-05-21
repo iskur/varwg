@@ -8,14 +8,18 @@ from datetime import datetime
 
 import numpy as np
 from libc.math cimport sin, cos, pow
+# from libc.stdlib cimport malloc
 from cython.parallel import prange, parallel
 from timezonefinder import TimezoneFinder
 import pytz
+import bottleneck
 
 from vg import times
 from vg.ctimes import datetime2doy
 
 cimport numpy as np
+
+ctypedef np.double_t DTYPE_t
 
 tzf = TimezoneFinder()
 
@@ -220,4 +224,71 @@ def sunshine_pot(doys, lat, longt, tz_mer=15.0, wog=-1):
     smax = np.array(smax).reshape(-1, mins_per_day)
     sun_hours = np.sum(smax > 0, axis=1) / 60.
     return sun_hours
+
+
+cdef inline double mean(np.uint8_t[:] array,
+                        unsigned int n) nogil:
+    cdef unsigned int i
+    cdef double sum = array[0]
+    for i in range(1, n):
+        sum += array[i]
+    return sum / n
+
+# cdef inline brunner_compound_(double[:] Ta_ranks,
+#                               double[:] P_ranks,
+#                               int n,
+#                               double[:] bc):
+cdef inline brunner_compound_(np.ndarray[DTYPE_t, ndim=1] Ta_ranks,
+                              np.ndarray[DTYPE_t, ndim=1] P_ranks,
+                              int n,
+                              np.ndarray[DTYPE_t, ndim=1] bc):
+    """Rank-based hot-dry index.
+
+
+    Notes
+    -----
+    Brunner 2021 uses E-GPD for precipitation and a STI index for
+    temperature. This implementation just uses empirical ranks.
+
+    References
+    ----------
+    Brunner, Manuela I., Eric Gilleland, and Andrew W. Wood.
+    “Space–Time Dependence of Compound Hot–Dry Events in the United
+    States: Assessment Using a Multi-Site Multi-Variable Weather
+    Generator.” Earth System Dynamics 12, no. 2 (May 19, 2021):
+    621–34. https://doi.org/10.5194/esd-12-621-2021.
+    """
+    cdef unsigned int i, j
+    cdef double Ta_rank, P_rank
+    with nogil:
+        for i in range(n):
+            Ta_rank = Ta_ranks[i]
+            P_rank = P_ranks[i]
+            # bc[i] = mean((Ta_ranks <= Ta_rank) & (P_ranks <= P_rank),
+            #              n)
+            for j in range(n):
+                # if (Ta_ranks[j] <= Ta_ranks[i]) and (P_ranks[j] <= P_ranks[i]):
+                if (Ta_ranks[j] <= Ta_rank) and (P_ranks[j] <= P_rank):
+                    bc[i] += 1
+            bc[i] /= n
+
+def brunner_compound(Ta, P, progress=False):
+    if progress:
+        from tqdm import tqdm as progress
+    else:
+        def progress(x, *args, **kwds):
+            return x
+    cdef unsigned int row_i
+    Ta_ranks = bottleneck.rankdata(Ta, axis=-1)
+    P_ranks = bottleneck.rankdata(np.negative(P), axis=-1)
+    shape_before = Ta_ranks.shape
+    cdef int T = shape_before[len(shape_before) - 1]
+    Ta_ranks = Ta_ranks.reshape(-1, T)
+    P_ranks = P_ranks.reshape(-1, T)
+    cdef int n_rows = len(Ta_ranks)
+    bc = np.zeros_like(Ta_ranks)
+    for row_i in progress(range(n_rows), total=n_rows):
+        brunner_compound_(Ta_ranks[row_i], P_ranks[row_i], T, bc[row_i])
+    bc = bc.reshape(shape_before)
+    return bc
 
