@@ -1,12 +1,8 @@
-from __future__ import division
-
 import collections
-from builtins import range, zip
 
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy as sp
-from past.utils import old_div
 
 from vg import helpers as my
 from vg.smoothing import smooth
@@ -124,9 +120,9 @@ def auto_cov_(data, k):
                     (dat1[lag_finite_ii] - means)
                     * (dat2[lag_finite_ii] - means)
                 )
-                auto[ii, jj] *= old_div(
-                    (n_data[jj] - lag - nans), (n_data[jj]).astype(float)
-                )
+                auto[ii, jj] *= (n_data[jj] - lag - nans) / (
+                    n_data[jj]
+                ).astype(float)
     return np.squeeze(auto)
 
 
@@ -433,9 +429,7 @@ def partial_corr_(x, y, u, rank_cor=True):
     r_xy = corr_func(x, y)
     r_xu = corr_func(x, u)
     r_yu = corr_func(y, u)
-    return old_div(
-        (r_xy - r_xu * r_yu), ((1 - r_xu**2) * (1 - r_yu**2)) ** 0.5
-    )
+    return (r_xy - r_xu * r_yu) / ((1 - r_xu**2) * (1 - r_yu**2)) ** 0.5
 
 
 def rank_corr_ij(data):
@@ -487,9 +481,7 @@ def partial_corr(data, index, diff=False, rank_cor=True, r_ij=None):
     r_kj = r_ik[:, np.newaxis]
     # to iterate is human and to recurse is divine, but to broadcast is to
     # enter Nirwana
-    partial = old_div(
-        (r_ij - r_ik * r_kj), ((1 - r_ik**2) * (1 - r_kj**2)) ** 0.5
-    )
+    partial = (r_ij - r_ik * r_kj) / ((1 - r_ik**2) * (1 - r_kj**2)) ** 0.5
     if diff:
         partial = r_ij - partial
     return partial
@@ -510,7 +502,7 @@ def hurst_coefficient(values):
     # find n_partitions, so that the minimum number of observations in a
     # sub-time-series is 8
     N = values.size
-    n_partitions = int(np.log2(old_div(float(N), 8)))
+    n_partitions = int(np.log2(float(N) / 8))
     Rn_Sn = np.zeros(n_partitions)
     region_sizes = np.zeros(n_partitions)
     for part_i in range(n_partitions):
@@ -526,7 +518,7 @@ def hurst_coefficient(values):
         Rn = np.max(Zt, axis=1) - np.min(Zt, axis=1)
         # Sn = np.sqrt(np.mean((Xt - Xt.mean(axis=1)[:, np.newaxis]) ** 2))
         Sn = np.std(Xt, axis=1)
-        Rn_Sn[part_i] = np.mean(old_div(Rn, Sn))
+        Rn_Sn[part_i] = np.mean(Rn / Sn)
         region_sizes[part_i] = Xt.shape[1]
 
     # do a regression on x=log(n), y=log(Rn/Sn)
@@ -557,11 +549,11 @@ def mann_kendall(values, sign_niv=0.025):
     Q = 0
     for i in range(0, n - 1):
         Q = Q + np.sum(np.sign(values[i + 1 :] - values[i]))
-    sigma = (old_div((n * (n - 1) * (2 * n + 5)), 18.0)) ** 0.5
-    z = old_div(Q, sigma)
-    if z < sp.stats.norm.ppf(old_div(sign_niv, 2.0)):
+    sigma = ((n * (n - 1) * (2 * n + 5)) / 18.0) ** 0.5
+    z = Q / sigma
+    if z < sp.stats.norm.ppf(sign_niv / 2.0):
         trend = -1  # decreasing trend
-    elif z > sp.stats.norm.ppf(1 - old_div(sign_niv, 2.0)):
+    elif z > sp.stats.norm.ppf(1 - sign_niv / 2.0):
         trend = 1  # increasing trend
     else:
         trend = 0  # no significant trend

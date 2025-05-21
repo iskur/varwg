@@ -1,6 +1,3 @@
-from __future__ import division
-from builtins import range
-from past.utils import old_div
 import datetime
 import numpy as np
 from scipy import integrate
@@ -156,8 +153,8 @@ class Test(npt.TestCase):
         npt.assert_almost_equal(dists, self.dists_exp2)
         dist = kde.doyhour_distance(1.0, 365.0, 1.0, 1.0)
         npt.assert_almost_equal(dist, 1.0)
-        dist = kde.doyhour_distance(1.0, 365.0 + old_div(23.0, 24), 1.0, 1.0)
-        npt.assert_almost_equal(dist, np.sqrt(2 * (old_div(1.0, 24)) ** 2))
+        dist = kde.doyhour_distance(1.0, 365.0 + 23.0 / 24, 1.0, 1.0)
+        npt.assert_almost_equal(dist, np.sqrt(2 * (1.0 / 24) ** 2))
 
 
 if __name__ == "__main__":

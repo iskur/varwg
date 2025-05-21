@@ -21,15 +21,12 @@ Introduction to Multiple Time Series Analysis".
    HQ
    SC
 """
-from __future__ import division, print_function
 
 import itertools
-from builtins import range, str, zip
 from collections import namedtuple
 
 import numpy as np
 import scipy
-from past.utils import old_div
 from scipy import linalg, optimize
 from scipy.linalg import kron
 from scipy.stats import skew, rankdata, distributions as sp_distributions
@@ -762,7 +759,7 @@ def VAR_LS_sim_asy(
         iteration += 1
         accept[m] = True
         if error_new > error_old:
-            p = np.exp(old_div((error_old - error_new), temp))
+            p = np.exp((error_old - error_new) / temp)
             if not vg.rng.rand() < p:
                 accept[m] = False
 
@@ -785,9 +782,9 @@ def VAR_LS_sim_asy(
             print(
                 "sim: %.3f, data: %.3f, temp: %.5f" % (asy(u), data_skew, temp)
             )
-            if old_div(
-                (error_last_best - error_best), error_last_best
-            ) < 1e-6 or (np.all(~accept) and iteration > 5000):
+            if ((error_last_best - error_best) / error_last_best) < 1e-6 or (
+                np.all(~accept) and iteration > 5000
+            ):
                 break
 
     import matplotlib.pyplot as plt

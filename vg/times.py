@@ -46,12 +46,6 @@ for scalar as well as for *array* input.
     timestamp2index
     index2timestamp
 """
-from __future__ import division
-
-from builtins import str
-from builtins import zip
-from past.utils import old_div
-from past.builtins import basestring
 from datetime import datetime, timedelta
 import itertools
 import time
@@ -71,6 +65,7 @@ def cwr2datetime(cwr_string):
     >>> cwr2datetime('1980001')
     datetime.datetime(1980, 1, 1, 0, 0)
     """
+
     def cwr2datetime_single(cwr_string_single):
         year = int(cwr_string_single[:4])
         doy = int(cwr_string_single[4:7]) - 1
@@ -78,7 +73,7 @@ def cwr2datetime(cwr_string):
             decimal_day = float(cwr_string_single[7:])
         except ValueError:
             decimal_day = 0
-        seconds = decimal_day * 24 * 60 ** 2
+        seconds = decimal_day * 24 * 60**2
         return datetime(year, 1, 1) + timedelta(days=doy, seconds=seconds)
 
     try:
@@ -104,8 +99,9 @@ def cwr2unix(cwr_string):
     >>> cwr2unix("2040001.00")
     2208988800.0
     """
+
     def cwr2unix_single(cwr_string_single):
-        cwr_string_single = '%013.5f' % float(cwr_string_single)
+        cwr_string_single = "%013.5f" % float(cwr_string_single)
         yearday = int(float(cwr_string_single[4:]))  # round down to whole days
         # this saves us from calculating the month and day-of-month
         timestamp = str2unix(cwr_string_single[:7], "%Y%j")
@@ -153,45 +149,53 @@ def datetime2cwr(dt):
     >>> datetime2cwr(datetime.datetime(2040, 1, 1, 12, 30, 30, 0))
     2040001.5211805555
     """
+
     def datetime2cwr_single(dt):
         timetuple = dt.timetuple()
         year = timetuple.tm_year
         yearday = timetuple.tm_yday
         seconds_as_days = (
-            old_div(float(timetuple.tm_hour * 3600 +
-                  timetuple.tm_min * 60 +
-                  timetuple.tm_sec),
-            86400))
-        return float(str(year) +
-                     ("%03d" % yearday) +
-                     "." + str(seconds_as_days)[2:])
+            float(
+                timetuple.tm_hour * 3600
+                + timetuple.tm_min * 60
+                + timetuple.tm_sec
+            )
+            / 86400
+        )
+        return float(
+            str(year) + ("%03d" % yearday) + "." + str(seconds_as_days)[2:]
+        )
+
     try:
-        return np.array([datetime2cwr_single(sub_dt)
-                         for sub_dt in dt])
+        return np.array([datetime2cwr_single(sub_dt) for sub_dt in dt])
     except TypeError:
         return datetime2cwr_single(dt)
 
 
 def date2jdn(dates):
-    """Converts date object to julian day number (without hours!)
-    """
+    """Converts date object to julian day number (without hours!)"""
+
     def date2jdn_single(date):
         a = (14 - date.month) // 12
         y = date.year + 4800 - a
         m = date.month + 12 * a - 3
 
-        return (date.day
-           + (153 * m + 2) // 5
-           + 365 * y
-           + y // 4
-           - y // 100
-           + y // 400 - 32045)
+        return (
+            date.day
+            + (153 * m + 2) // 5
+            + 365 * y
+            + y // 4
+            - y // 100
+            + y // 400
+            - 32045
+        )
+
     try:
         return np.array([date2jdn_single(date) for date in dates])
     except TypeError:
         return date2jdn_single(dates)
 
-    
+
 def datetime2cwr_old(dt):
     return unix2cwr(datetime2unix(dt))
 
@@ -204,8 +208,9 @@ def datetime2str(dt, d_format="%d.%m.%Y %H:%M:%S"):
     '01.01.2040 00:00:00'
     """
     try:
-        return np.array([sub_datetime.strftime(d_format)
-                         for sub_datetime in dt])
+        return np.array(
+            [sub_datetime.strftime(d_format) for sub_datetime in dt]
+        )
     except TypeError:
         return dt.strftime(d_format)
 
@@ -226,27 +231,36 @@ def datetime2unix(dt):
         tzinfo = None
     diff = dt - datetime(1970, 1, 1, 0, 0, tzinfo=tzinfo)
     try:
-        return np.array([sub_diff.days * 86400 + sub_diff.seconds +
-                         old_div(sub_diff.microseconds, 1e6)
-                         for sub_diff in diff])
+        return np.array(
+            [
+                sub_diff.days * 86400
+                + sub_diff.seconds
+                + sub_diff.microseconds / 1e6
+                for sub_diff in diff
+            ]
+        )
     except TypeError:
-        return diff.days * 86400 + diff.seconds + old_div(diff.microseconds, 1e6)
+        return diff.days * 86400 + diff.seconds + diff.microseconds / 1e6
 
 
 def datetime2doy(dt):
-    """ Extracts the day of year as a float from the given datetimes.
+    """Extracts the day of year as a float from the given datetimes.
 
     >>> import datetime
     >>> dt = datetime.datetime(2040, 1, 1, 12, 30, 30, 500000)
     >>> datetime2doy(dt)
     1.5211863425925927
     """
+
     def datetime2doy_single(dt):
-        return (dt.timetuple().tm_yday +
-                old_div(dt.hour, 24.) +
-                old_div(dt.minute, (24. * 60)) +
-                old_div(dt.second, (24. * 60 ** 2)) +
-                old_div(dt.microsecond, (24. * 60 ** 2 * 1e6)))
+        return (
+            dt.timetuple().tm_yday
+            + dt.hour / 24.0
+            + dt.minute / (24.0 * 60)
+            + dt.second / (24.0 * 60**2)
+            + dt.microsecond / (24.0 * 60**2 * 1e6)
+        )
+
     try:
         return np.array([datetime2doy_single(sub_dt) for sub_dt in dt])
     except TypeError:
@@ -254,18 +268,22 @@ def datetime2doy(dt):
 
 
 def datetime2hour(dt):
-    """ Extracts the hour of a day as a float from the given datetimes.
+    """Extracts the hour of a day as a float from the given datetimes.
 
     >>> import datetime
     >>> dt = datetime.datetime(2040, 1, 1, 12, 30)
     >>> datetime2hour(dt)
     12.5
     """
+
     def datetime2hour_single(dt):
-        return (dt.hour +
-                old_div(dt.minute, 60.) +
-                old_div(dt.second, (60. ** 2)) +
-                old_div(dt.microsecond, (60. ** 2 * 1e6)))
+        return (
+            dt.hour
+            + dt.minute / 60.0
+            + dt.second / (60.0**2)
+            + dt.microsecond / (60.0**2 * 1e6)
+        )
+
     try:
         return np.array([datetime2hour_single(sub_dt) for sub_dt in dt])
     except TypeError:
@@ -289,17 +307,24 @@ def doy2datetime(doy, year=2000):
     array([datetime.datetime(2000, 1, 1, 0, 0),
            datetime.datetime(2000, 1, 2, 0, 0)], dtype=object)
     """
+
     def doy2datetime_single(doy, year):
-        return (datetime(int(year), month=1, day=1) +
-                timedelta(days=float(doy) - 1))
+        return datetime(int(year), month=1, day=1) + timedelta(
+            days=float(doy) - 1
+        )
+
     # TODO: interpret 365, 0 as a new year
     try:
         if type(year) is int:
             years = itertools.cycle([year])
         else:
             years = year
-        return np.array([doy2datetime_single(sub_doy, sub_year)
-                         for sub_doy, sub_year in zip(doy, years)])
+        return np.array(
+            [
+                doy2datetime_single(sub_doy, sub_year)
+                for sub_doy, sub_year in zip(doy, years)
+            ]
+        )
     except TypeError:
         return doy2datetime_single(doy, year)
 
@@ -313,8 +338,10 @@ def iso2datetime(iso):
         return str2datetime(iso, "%Y-%m-%dT%H:%M:%S")
 
 
-def datetimefromisoformat(ts, fmt='%Y-%m-%dT%H:%M:%S'):
+def datetimefromisoformat(ts, fmt="%Y-%m-%dT%H:%M:%S"):
     return datetime.strptime(ts, fmt)
+
+
 # (same same but different)
 
 
@@ -334,9 +361,15 @@ def ordinal2datetime(ord_):
     datetime.datetime(2040, 1, 1, 0, 0)
     """
     try:
-        return np.array([(datetime.fromordinal(int(sub_ord)) +
-                          timedelta(sub_ord - int(sub_ord)))
-                         for sub_ord in ord_])
+        return np.array(
+            [
+                (
+                    datetime.fromordinal(int(sub_ord))
+                    + timedelta(sub_ord - int(sub_ord))
+                )
+                for sub_ord in ord_
+            ]
+        )
     except TypeError:
         return datetime.fromordinal(int(ord_)) + timedelta(ord_ - int(ord_))
 
@@ -348,11 +381,13 @@ def str2datetime(str_, d_format="%d.%m.%Y %H:%M:%S"):
     datetime.datetime(2040, 1, 1, 0, 0)
     """
     try:
-        if not isinstance(str_[0], basestring):
-            raise TypeError("Sequence is of type %s, not str" %
-                            type(str_[0]))
-        pd_series = pd.to_datetime(str_, format=d_format,
-                                   infer_datetime_format=True)
+        if not isinstance(str_[0], str):
+            raise TypeError("Sequence is of type %s, not str" % type(str_[0]))
+        pd_series = pd.to_datetime(
+            str_,
+            format=d_format,
+            # infer_datetime_format=True
+        )
         return pd_series.to_pydatetime()
     except (ValueError, AttributeError):
         return datetime.strptime(str_, d_format)
@@ -387,6 +422,7 @@ def unix2cwr(timestamp):
     >>> unix2cwr(2208988800.0)
     2040001.0
     """
+
     def unix2cwr_single(timestamp_single):
         src_tuple = time.gmtime(timestamp_single)
         # we are looking for "{year}{yearday}.{seconds expressed in days}
@@ -394,9 +430,12 @@ def unix2cwr(timestamp):
         yearday = time.strftime("%j", src_tuple)
         year_yearday_tuple = time.strptime(year + yearday, "%Y%j")
         diff_seconds = timestamp_single - calendar.timegm(year_yearday_tuple)
-        seconds_as_days = old_div(float(diff_seconds), 86400)
-        return "%s%03d%s" % (year, int(yearday),
-                             str("%f" % seconds_as_days)[1:])
+        seconds_as_days = float(diff_seconds) / 86400
+        return "%s%03d%s" % (
+            year,
+            int(yearday),
+            str("%f" % seconds_as_days)[1:],
+        )
 
     try:
         return float(unix2cwr_single(timestamp))
@@ -414,8 +453,12 @@ def unix2datetime(timestamp):
     datetime.datetime(1970, 1, 1, 0, 0)
     """
     try:
-        return np.array([datetime(1970, 1, 1) + timedelta(seconds=float(stamp))
-                         for stamp in timestamp])
+        return np.array(
+            [
+                datetime(1970, 1, 1) + timedelta(seconds=float(stamp))
+                for stamp in timestamp
+            ]
+        )
     except TypeError:
         return datetime(1970, 1, 1) + timedelta(seconds=float(timestamp))
 
@@ -427,8 +470,9 @@ def unix2ordinal(timestamp):
     744730
     """
     try:
-        np.array([datetime2ordinal(unix2datetime(stamp))
-                  for stamp in timestamp])
+        np.array(
+            [datetime2ordinal(unix2datetime(stamp)) for stamp in timestamp]
+        )
     except TypeError:
         return datetime2ordinal(unix2datetime(timestamp))
 
@@ -446,16 +490,19 @@ def unix2str(timestamp, d_format="%d.%m.%Y %H:%M:%S"):
 
 
 def xls2datetime(xldate, datemode=0):
-    """ Here's the bare-knuckle no-seat-belts use-at-own-risk version
+    """Here's the bare-knuckle no-seat-belts use-at-own-risk version
     posted by John Machin in http://stackoverflow.com
     datemode: 0 for 1900-based, 1 for 1904-based
     """
+
     def xls2datetime_single(xldate, datemode):
         return (
             # 30.Dez, weil 1900 in Excel ein Schaltjahr ist --> ab dem 1. Maerz
             # stimmts
             datetime(1899, 12, 30)
-            + timedelta(days=xldate + 1462 * datemode))
+            + timedelta(days=xldate + 1462 * datemode)
+        )
+
     try:
         return xls2datetime_single(xldate, datemode)
     except (ValueError, TypeError):
@@ -468,8 +515,11 @@ def timedelta2seconds(dt):
 
 def timedelta2slice(delta, dt, offset=0, step=None):
     start = offset
-    stop = None if delta is None else offset + int(old_div(timedelta2seconds(delta),
-                                                   timedelta2seconds(dt)))
+    stop = (
+        None
+        if delta is None
+        else offset + int(timedelta2seconds(delta) / timedelta2seconds(dt))
+    )
     return slice(start, stop, step)
 
 
@@ -487,8 +537,8 @@ def timestamps2slice(startts=None, endts=None, dt=None, refts=None, step=None):
     slice(56, 61, None)
     """
     # Dirk: Ist das Kunst oder kann das weg?
-#    if dt is None:
-#        tdelta = timedelta(seconds=1)
+    #    if dt is None:
+    #        tdelta = timedelta(seconds=1)
 
     if startts is None:
         tstart = None
@@ -514,11 +564,16 @@ def timestamps2slice(startts=None, endts=None, dt=None, refts=None, step=None):
     if (tstart is None) or (tref is None):
         slicestart = None
     else:
-        slicestart = int(old_div(timedelta2seconds(tstart - tref),
-                         timedelta2seconds(dt)))
+        slicestart = int(
+            timedelta2seconds(tstart - tref) / timedelta2seconds(dt)
+        )
 
-    return timedelta2slice(None if ((tend is None)or(tstart is None))
-                           else tend - tstart, dt, slicestart, step)
+    return timedelta2slice(
+        None if ((tend is None) or (tstart is None)) else tend - tstart,
+        dt,
+        slicestart,
+        step,
+    )
 
 
 def timestamp2index(ts, dt, refts, **kwargs):
@@ -575,17 +630,21 @@ def timestamp2index(ts, dt, refts, **kwargs):
     else:
         _refts = refts
     if not isinstance(dt, timedelta):
-        kwargs = dict([(sp[0], int(sp[1]))
-                       for sp in [item.split('=') for item in dt.split(',')]])
+        kwargs = dict(
+            [
+                (sp[0], int(sp[1]))
+                for sp in [item.split("=") for item in dt.split(",")]
+            ]
+        )
         _dt = timedelta(**kwargs)
     else:
         _dt = dt
-    return int(old_div(timedelta2seconds(_ts - _refts), timedelta2seconds(_dt)))
+    return int(timedelta2seconds(_ts - _refts) / timedelta2seconds(_dt))
 
 
 def isoformat2unix(ts):
     dt = timedelta(seconds=1)
-    tstart = datetimefromisoformat('1970-01-01T00:00:00')
+    tstart = datetimefromisoformat("1970-01-01T00:00:00")
     return timestamp2index(datetimefromisoformat(ts), dt, tstart)
 
 
@@ -636,8 +695,12 @@ def index2timestamp(idx, dt, refts, **kwargs):
     else:
         _refts = refts
     if not isinstance(dt, timedelta):
-        kwargs = dict([(sp[0], int(sp[1]))
-                       for sp in [item.split('=') for item in dt.split(',')]])
+        kwargs = dict(
+            [
+                (sp[0], int(sp[1]))
+                for sp in [item.split("=") for item in dt.split(",")]
+            ]
+        )
         _dt = timedelta(**kwargs)
     else:
         _dt = dt
@@ -679,23 +742,35 @@ def time_part(timestamps_or_datetimes, sub_format_str):
     The time_part has to be convertible into an integer.
     This is useful to group values according to months, weeks and so on.
     """
+
     def single_time_part_unix(stamp, d_format):
-        return (int(unix2str(stamp, d_format))
-                if np.isfinite(stamp) else None)
+        return int(unix2str(stamp, d_format)) if np.isfinite(stamp) else None
 
     def single_time_part_date(time_, d_format):
         return int(time_.strftime(d_format))
+
+    def single_time_part_np(time_, d_format):
+        # this feels over-complicated
+        return int(
+            iso2datetime(np.datetime_as_string(time_)).strftime(d_format)
+        )
 
     times_ = np.asarray(timestamps_or_datetimes)
 
     if times_.dtype == object:
         single_time_part = single_time_part_date
+    elif np.issubdtype(times_.dtype, np.datetime64):
+        single_time_part = single_time_part_np
     else:
         single_time_part = single_time_part_unix
 
     try:
-        return np.array([single_time_part(timestamp, sub_format_str)
-                         for timestamp in times_])
+        return np.array(
+            [
+                single_time_part(timestamp, sub_format_str)
+                for timestamp in times_
+            ]
+        )
     except TypeError:
         return single_time_part(np.asscalar(times_), sub_format_str)
 
@@ -713,8 +788,7 @@ def time_part_sort_(datetimes, values, date_part):
     grouped_values = []
     times = sorted(set(time_of_values))
     for time_key in times:
-        grouped_values += \
-            [values[np.where(time_of_values == time_key)[0]]]
+        grouped_values += [values[np.where(time_of_values == time_key)[0]]]
     return times, grouped_values
 
 
@@ -732,8 +806,7 @@ def time_part_sort(timestamps, values, sub_format_str):
     grouped_values = []
     times = sorted(set(time_of_values))
     for time_key in times:
-        grouped_values += \
-            [values[np.where(time_of_values == time_key)[0]]]
+        grouped_values += [values[np.where(time_of_values == time_key)[0]]]
     return times, grouped_values
 
 
@@ -773,7 +846,7 @@ def regularize(values, dtimes, nan=False, main_diff=None):
     else:
         main_diff_seconds = main_diff
         main_diff = timedelta(seconds=main_diff_seconds)
-    n_diff = int(np.ceil(old_div((in_unix[-1] - in_unix[0]), main_diff_seconds))) + 1
+    n_diff = int(np.ceil((in_unix[-1] - in_unix[0]) / main_diff_seconds)) + 1
     out_dtimes = dtimes[0] + main_diff * np.arange(n_diff)
     out_unix = datetime2unix(out_dtimes)
     out_values = np.interp(out_unix, in_unix, values)
@@ -783,7 +856,7 @@ def regularize(values, dtimes, nan=False, main_diff=None):
         if len(missing) > 1:
             mask = np.zeros_like(out_values, dtype=bool)
             for ii in missing:
-                start_dt, end_dt = dtimes[ii:ii + 2]
+                start_dt, end_dt = dtimes[ii : ii + 2]
                 mask |= (out_dtimes > start_dt) & (out_dtimes < end_dt)
             out_values[mask] = np.nan
     return out_values, out_dtimes
@@ -803,7 +876,7 @@ def expand_timeseries(timestamps, repeats=4, values=None):
     ['01.01.1980 00:00:00' '01.01.1980 12:00:00' '02.01.1980 00:00:00'
      '02.01.1980 12:00:00'] [1 1 2 2]
     """
-    dt = old_div((timestamps[1] - timestamps[0]), repeats)
+    dt = (timestamps[1] - timestamps[0]) / repeats
     dts = np.arange(0, repeats * dt, dt)
     old_len = len(timestamps)
     timestamps = timestamps.repeat(repeats).reshape((old_len, repeats))
@@ -858,7 +931,7 @@ def daily_ranges(dtimes, data):
         length is number of days in dtimes.
     """
     step_length = (dtimes[1] - dtimes[0]).total_seconds()
-    steps_per_day = 60 ** 2 * 24 / step_length
+    steps_per_day = 60**2 * 24 / step_length
     data_2d = data.reshape(-1, steps_per_day)
     maxs = np.nanmax(data_2d, axis=1)
     mins = np.nanmin(data_2d, axis=1)
@@ -883,6 +956,8 @@ def feb29_mask(dtimes):
     days = time_part(dtimes, "%d")
     return (months == 2) & (days == 29)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     import doctest
+
     doctest.testmod()

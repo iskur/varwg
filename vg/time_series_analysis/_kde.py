@@ -7,7 +7,6 @@ KDE (distributions, seasonal_kde).
 import warnings
 
 import numpy as np
-from past.utils import old_div
 from scipy import optimize, sparse
 
 from vg import helpers as my, times
@@ -176,7 +175,7 @@ def apply_2d_kernel_(
     else:
         kernel = lambda dist, width: (
             (np.sqrt(2 * np.pi) * width) ** -1
-            * np.exp(old_div(-(dist**2), (2 * width**2)))
+            * np.exp(-(dist**2) / (2 * width**2))
         )
     distances = distance_array(data, eval_points)
     densities = kernel(distances, abs(kernel_width))
@@ -208,7 +207,7 @@ def apply_2d_kernel(
     else:
         kernel = lambda dist, width: (
             (np.sqrt(2 * np.pi) * width) ** -1
-            * np.exp(old_div(-(dist**2), (2 * width**2)))
+            * np.exp(-(dist**2) / (2 * width**2))
         )
     # distance in data dimension
     distances = distance_array(data.ravel(), eval_points.ravel())
@@ -235,9 +234,7 @@ def apply_2d_kernel(
 
 def gaussian_kernel(x, width):
     return (
-        1.0
-        / (np.sqrt(2 * np.pi) * width)
-        * np.exp(old_div(-(x**2), (2 * width**2)))
+        1.0 / (np.sqrt(2 * np.pi) * width) * np.exp(-(x**2) / (2 * width**2))
     )
 
 

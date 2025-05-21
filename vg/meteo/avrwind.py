@@ -1,10 +1,6 @@
 """ written by Raphael Lutz 2010
 """
-from __future__ import print_function
-from __future__ import division
 
-from builtins import range
-from past.utils import old_div
 import numpy as np
 import datetime
 from vg import times
@@ -247,42 +243,69 @@ def avrwind_sec(u, v, sec=16, verbose=True, timeinfo=None,
         except:
             pass  # if no timeinfo?
 
-    elif old_div(test[-2], test[-1]) > 0.75 and verbose == True:
+    elif test[-2] / test[-1] > 0.75 and verbose:
         try:
             print(timeinfo + "  2nd most direction alike numerous as first \n")
             return_secdata = True
         except:
             pass
 
-    average_speed_maxsector = old_div(hits_averages[1][max_sec], float(max_hits))
+    average_speed_maxsector = hits_averages[1][max_sec] / float(max_hits)
 
     avr_wind_direction = sector_means[max_sec]
-    rel_freq_mainsector = (old_div(max_hits, float(len(u))))
+    rel_freq_mainsector = max_hits / float(len(u))
 
-    #nullabfrage? kein error
-    if (old_div(average_speed_maxsector, norm_uv_direct) < 0.5 or
-        old_div(average_speed_maxsector, norm_uv_direct) > 2) and verbose == True:
-        print(timeinfo + "  Caution average windspeed in main sector and " + \
-              "overall windspeeds differ extreme \n ")
+    # nullabfrage? kein error
+    if (
+        (average_speed_maxsector / norm_uv_direct) < 0.5
+        or (average_speed_maxsector / norm_uv_direct) > 2
+    ) and verbose:
+        print(
+            timeinfo
+            + "  Caution average windspeed in main sector and "
+            + "overall windspeeds differ extreme \n "
+        )
         # what would be a good value?
 
     if return_secdata:
         # print sectors, counts, and sum of wind speed in sectors
-        print((sector_means[:-1], '\n', list(hits_averages[0]),
-               '\n', list(hits_averages[1])))
+        print(
+            (
+                sector_means[:-1],
+                "\n",
+                list(hits_averages[0]),
+                "\n",
+                list(hits_averages[1]),
+            )
+        )
 
-    u_v = angle2component(avr_wind_direction, average_speed_maxsector,
-                          wind=wind)
+    u_v = angle2component(
+        avr_wind_direction, average_speed_maxsector, wind=wind
+    )
 
-    return (u_v[0], u_v[1], avr_wind_direction, average_speed_maxsector,
-            rel_freq_mainsector, norm_uv_direct)
+    return (
+        u_v[0],
+        u_v[1],
+        avr_wind_direction,
+        average_speed_maxsector,
+        rel_freq_mainsector,
+        norm_uv_direct,
+    )
 
 
-#-----------------------------------------------------------------------------#
+# -----------------------------------------------------------------------------#
 #   main function                                                             #
-#-----------------------------------------------------------------------------#
-def avrwind(u, v, date_time, new_timeres, method='vector', verbose=True,
-            sec=16, wind_=True):
+# -----------------------------------------------------------------------------#
+def avrwind(
+    u,
+    v,
+    date_time,
+    new_timeres,
+    method="vector",
+    verbose=True,
+    sec=16,
+    wind_=True,
+):
     """
     function to convert measured data from one time resolution to another
     you can decide which method you will use, sector=sector-wise or

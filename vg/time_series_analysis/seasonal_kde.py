@@ -1,11 +1,8 @@
-from __future__ import division, print_function
-
 import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
-from builtins import range, zip
-from past.utils import old_div
+
 from scipy import interpolate, optimize, stats
 from scipy.integrate import cumtrapz
 from tqdm import tqdm
@@ -148,9 +145,8 @@ class SeasonalKDE(seasonal.Seasonal):
             # we have to lower the smoothed mins below the actual data mins
             diffs = data_mins_smooth - data_mins
             # ideal would be a kernel width, but we do not have those yet
-            diff_thresh = old_div(
-                (data_maxs.mean() - data_mins.mean()),
-                (old_div(len(self.data), len(self.doys_unique))),
+            diff_thresh = (data_maxs.mean() - data_mins.mean()) / (
+                len(self.data) / len(self.doys_unique)
             )
             while np.any(diffs > -diff_thresh):
                 sub = np.zeros_like(diffs)
@@ -161,8 +157,8 @@ class SeasonalKDE(seasonal.Seasonal):
                 sub *= (1 + diff_thresh) * self.smooth_len / diff_max
                 data_mins_smooth -= sub
                 diffs = data_mins_smooth - data_mins
-            self._lower_bound = data_mins_smooth
-        doy = np.rint(old_div((doy - 1), self.timestep)).astype(int)
+            self._lower_bound = data_mins_smooth - self.freibord
+        doy = np.rint((doy - 1) / self.timestep).astype(int)
         return self._lower_bound[doy]
 
     def upper_bound(self, doy):
@@ -189,7 +185,7 @@ class SeasonalKDE(seasonal.Seasonal):
                 data_maxs_smooth += add
                 diffs = data_maxs - data_maxs_smooth
             self._upper_bound = data_maxs_smooth + self.freibord
-        doy = np.rint(old_div((doy - 1), self.timestep)).astype(int)
+        doy = np.rint((doy - 1) / self.timestep).astype(int)
         return self._upper_bound[doy]
 
     @property
@@ -400,8 +396,8 @@ class SeasonalKDE(seasonal.Seasonal):
         quantiles = self.cdf(self.solution)
         n = len(quantiles)
         observed = np.histogram(quantiles, k)[0]
-        expected = old_div(float(n), k)
-        chi_test = np.sum(old_div((observed - expected) ** 2, expected))
+        expected = float(n) / k
+        chi_test = np.sum((observed - expected) ** 2 / expected)
         # degrees of freedom:
         dof = k - 1
         return stats.chi2.sf(chi_test, dof)
@@ -534,7 +530,7 @@ class SeasonalKDE(seasonal.Seasonal):
         plt.colorbar(co)
         plt.scatter(
             self.doys,
-            old_div(self.data, n_sumup),
+            self.data / n_sumup,
             marker="o",
             facecolors=(0, 0, 0, 0),
             edgecolors=(0, 0, 0, 0.5),
@@ -614,7 +610,7 @@ def fft2par(
     if ifft_func is None:
         ifft_func = np.fft.irfft
     if period_length is None:
-        period_length = int(round(old_div(365.0, (doys[1] - doys[0]))))
+        period_length = int(round(365.0 / (doys[1] - doys[0])))
 
     # the parameters do not only be as big as doys, they also have to
     # have the right number of periods!
@@ -625,15 +621,15 @@ def fft2par(
         order = fft_pars.size
         fft_pars_pad[:order] = fft_pars
     else:
-        order = old_div(len(fft_pars), 2)
+        order = len(fft_pars) / 2
         fft_pars_pad[:order].real = fft_pars[:order]
         fft_pars_pad[:order].imag = fft_pars[order:]
 
-    n_periods = int(np.ceil(old_div((len(doys) + doys[0]), 365.0)))
+    n_periods = int(np.ceil((len(doys) + doys[0]) / 365.0))
     trans = np.array(
         n_periods * [ifft_func(fft_pars_pad, period_length)]
     ).ravel()
-    start_i = int(old_div(doys[0], period_length))
+    start_i = int((doys[0] / period_length))
     trans = trans[start_i : start_i + len(doys)]
     if lower_bound is not None:
         trans[trans < lower_bound] = lower_bound
@@ -641,7 +637,6 @@ def fft2par(
 
 
 class SeasonalHourlyKDE(SeasonalKDE, seasonal.Torus):
-
     """Estimates kernel densities for time series exhibiting seasonalities
     in daily cycles."""
 
@@ -696,7 +691,7 @@ class SeasonalHourlyKDE(SeasonalKDE, seasonal.Torus):
             # sets main diagonal to 0 (exploiting the fact that ravel returns
             # a view)
             densities.ravel()[:: len(data) + 1] = 0
-        dens = old_div(np.nansum(densities, axis=1), float(len(densities) - 1))
+        dens = np.nansum(densities, axis=1) / float(len(densities) - 1)
         return dens
 
     @property
