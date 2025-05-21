@@ -1475,12 +1475,17 @@ class VGBase(object):
             )
             return my.rel_ranks(data_infilled[-1, dry_mask])
 
-        if method == "distance":
-            dist_ranks = calc_dist_ranks_distance()
-        elif method == "regression":
-            dist_ranks = calc_dist_ranks_regression()
-        elif method == "simulation":
-            dist_ranks = calc_dist_ranks_simulation()
+        match method:
+            case "distance":
+                dist_ranks = calc_dist_ranks_distance(**kwds)
+            case "regression":
+                dist_ranks = calc_dist_ranks_regression(**kwds)
+            case "simulation":
+                dist_ranks = calc_dist_ranks_simulation(**kwds)
+            case _:
+                raise RuntimeError(
+                    "method must be one of: 'distance', 'regression', 'simulation'"
+                )
 
         # import matplotlib.pyplot as plt
         # fig, axs = plt.subplots(nrows=2, ncols=1)
