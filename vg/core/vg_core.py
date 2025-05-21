@@ -614,6 +614,7 @@ class VG(vg_plotting.VGPlotting):
         p_kwds=None,
         taboo_period_min=None,
         taboo_period_max=None,
+        conversions=None,
     ):
         """Simulate based on data from __init__ and the fit from calling
         self.fit().
@@ -686,6 +687,7 @@ class VG(vg_plotting.VGPlotting):
             Callback to replace the time series model.
         sim_func_kwds : None or dict
             Extra keyword arguments for sim_func
+        conversions : iterable of callables
 
         Returns
         -------
@@ -1036,6 +1038,11 @@ class VG(vg_plotting.VGPlotting):
 
         if loc_shift:
             sim_sea = self._location_shift_back(sim_sea)
+        if conversions:
+            for conversion in list(conversions):
+                self.sim_times, sim_sea, self.var_names_conv = conversion(
+                    self.sim_times, np.copy(sim_sea), self.var_names
+                )
 
         # lets store this so we can play with it from the outside
         self.sim, self.sim_sea = sim, sim_sea
@@ -1054,7 +1061,7 @@ class VG(vg_plotting.VGPlotting):
                 extra=extra,
                 random_state=pre_sim_random_state,
                 out_dir=self.data_dir,
-                conversions=conf.conversions,
+                conversions=conversions if conversions else conf.conversions,
             )
 
         if return_rphases:

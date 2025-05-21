@@ -179,6 +179,7 @@ def read_met(
     delimiter="\t",
     verbose=True,
     main_diff=None,
+    with_conversions=False,
     **kwds,
 ):
     if filepath is None:
@@ -287,11 +288,22 @@ def read_met(
                     )
                 met[var_name][too_cold_ii] = minimum_water_temp
 
+    if with_conversions:
+        var_names = list(met.keys())
+        for conversion in list(conf.conversions):
+            times, data, var_names = conversion(
+                datetimes,
+                np.array([met[var_name] for var_name in var_names]),
+                var_names,
+                inverse=True,
+            )
+        met = {
+            var_name: data[var_names.index(var_name)] for var_name in var_names
+        }
     return datetimes, met
 
 
 class VGBase(object):
-
     """Handle everything except plotting."""
 
     def __init__(
