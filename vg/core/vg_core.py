@@ -734,14 +734,29 @@ class VG(vg_plotting.VGPlotting):
             # self.climate_signal = np.atleast_2d(climate_signal)
         else:
             self.primary_var = primary_var
-            if climate_signal is None:
-                self.climate_signal = np.array([None] * len(primary_var))
+            self.climate_signal = (
+                np.array([None] * len(primary_var))
+                if climate_signal is None
+                else climate_signal
+            )
         # if self.climate_signal.dtype == object:
         #     # we have to back up, this has not worked
         #     self.climate_signal = tuple(self.climate_signal[0])
         for var_name in self.primary_var:
             if var_name not in self.var_names:
                 raise ValueError(f"{primary_var=} not in {self.var_names=}")
+        if return_rphases and not phase_randomize:
+            warnings.warn(
+                "Phases were requested, yet phase randomization is not enabled.\n"
+                "Setting phase_randomize=True now"
+            )
+            phase_randomize = True
+        if rphases and not phase_randomize:
+            warnings.warn(
+                "Phases were supplied, yet phase randomization is not enabled.\n"
+                "Setting phase_randomize=True now"
+            )
+            phase_randomize = True
         self.phase_randomize = phase_randomize
         self.phase_randomize_vary_mean = phase_randomize_vary_mean
 
@@ -916,7 +931,14 @@ class VG(vg_plotting.VGPlotting):
                         transform=transform,
                         u=residuals,
                         phase_randomize=phase_randomize,
+                        rphases=rphases,
+                        return_rphases=return_rphases,
+                        p_kwds=p_kwds,
+                        taboo_period_min=taboo_period_min,
+                        taboo_period_max=taboo_period_max,
                     )
+                    if return_rphases:
+                        sim, rphases = sim
                 else:
                     sim, self.ex_out = models.VAREX_LS_sim(
                         self.AM,
