@@ -1,5 +1,6 @@
 """Tools to fit seasonal distributions by describing the yearly cycle of
 distribution parameters with triangular functions."""
+
 from collections import abc
 import hashlib
 import warnings
@@ -80,16 +81,23 @@ class SeasonalDist(seasonal.Seasonal):
         self.pre_start = []
         self._supplements = self._params = self._medians_per_doy = None
 
+    def __getstate__(self):
+        dict_ = dict(self.__dict__)
+        if "_scipy_setup" in dict_:
+            del dict_["_scipy_setup"]
+        return dict_
+
     def _scipy_setup(self):
         self.dist.isscipy = True
         self.dist.supplements_names = None
         self.dist.parameter_names = ["loc", "scale"]
         if self.dist.shapes is not None:
             self.dist.parameter_names = (
-                self.dist.shapes.split(",") + self.dist.parameter_names
+                self.dist.shapes.split(", ") + self.dist.parameter_names
             )
         self.dist.n_pars = len(self.dist.parameter_names)
         self.dist.__bases__ = distributions.Dist
+        self.dist._fix_x = lambda x: x
 
         def _clean_kwds(kwds):
             return {
@@ -102,6 +110,21 @@ class SeasonalDist(seasonal.Seasonal):
 
         def _constraints(x, **params):
             args = [params[name] for name in self.dist.parameter_names]
+            if hasattr(self.dist, "_shape_info"):
+                mask = np.full_like(args[0], False, dtype=bool)
+                for shape_info in self.dist._shape_info():
+                    param = params[shape_info.name]
+                    lower, upper = shape_info.domain
+                    if np.isclose(lower, 0):
+                        lower = 1e-6
+                    elif np.isneginf(lower):
+                        lower = -1e3
+                    mask[param <= lower] = True
+                    upper = min(upper, 1e3)
+                    mask[param >= upper] = True
+                    # if np.any(mask):
+                    #     __import__("pdb").set_trace()
+                return mask
             return ~self.dist._argcheck(*args)
 
         self.dist._constraints = _constraints
@@ -157,10 +180,14 @@ class SeasonalDist(seasonal.Seasonal):
         else:
             _T = np.copy(doys) * 2 * np.pi / 365
             x = np.full_like(_T, np.nan)
-        if isinstance(self, SlidingDist) and self._sliding_pars is not None:
-            params_array = self._sliding_pars[self.doys2doys_ii(doys)].T
-        else:
-            params_array = self.trig2pars(trig_pars, _T=_T)
+
+        # if isinstance(self, SlidingDist) and self._sliding_pars is not None:
+        #     params_array = self._sliding_pars[self.doys2doys_ii(doys)].T
+        # else:
+        #     params_array = self.trig2pars(trig_pars, _T=_T)
+
+        params_array = self.trig2pars(trig_pars, _T=_T)
+
         params.update(
             {
                 param_name: values
@@ -187,6 +214,9 @@ class SeasonalDist(seasonal.Seasonal):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             invalid_mask = self.dist._constraints(x, **params)
+            if np.all(invalid_mask):
+                __import__("pdb").set_trace()
+                self.dist._constraints(x, **params)
 
         # if np.all(invalid_mask):
         #     doys = np.atleast_1d(doys)
@@ -199,6 +229,21 @@ class SeasonalDist(seasonal.Seasonal):
         #     return {name: np.squeeze(par[self.doy_width:-self.doy_width])
         #        for name, par
         #        in self.all_parameters_dict(trig_pars, doys_wide).items()}
+
+        # fill up with raw, un-smoothed parameter values
+        if np.any(invalid_mask):
+            for name in self.non_fixed_names:
+                if (
+                    isinstance(self, SlidingDist)
+                    and self._sliding_pars is not None
+                ):
+                    params[name][invalid_mask] = self._sliding_pars[
+                        doys.astype(int) - 1
+                    ][invalid_mask, self.non_fixed_names.index(name)]
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            invalid_mask = self.dist._constraints(x, **params)
 
         # interpolate over invalid values
         if np.any(invalid_mask):
@@ -230,6 +275,8 @@ class SeasonalDist(seasonal.Seasonal):
                     # value = np.array(value)
                     value = np.asarray(value)
                 except Warning:
+                    pass
+                except ValueError:
                     pass
             sup_dict[name] = value
         return sup_dict
@@ -390,10 +437,12 @@ class SeasonalDist(seasonal.Seasonal):
             self._params = None
         if self._params is not None:
             # check if it has the right length
-            param = np.atleast_1d(self._params[list(self._params.keys())[0]])
-            if (data is not None) and (len(data) != len(param)):
+            param_len = len(
+                np.atleast_1d(self._params[list(self._params.keys())[0]])
+            )
+            if (data is not None) and (len(data) != param_len):
                 self._params = None
-            elif (doys is not None) and (len(doys) != len(param)):
+            elif (doys is not None) and (len(doys) != param_len):
                 self._params = None
             elif data is None and doys is None:
                 self._params = None
@@ -447,6 +496,8 @@ class SeasonalDist(seasonal.Seasonal):
         doys_ii = self.doys2doys_ii(doys)
         xx, yy = xx[doys_ii], yy[doys_ii]
         right_i = (data[:, None] < xx).argmax(axis=1)
+        # for not wrapping around left_i
+        right_i[right_i == 0] = 1
         left_i = right_i - 1
         ii = np.arange(xx.shape[0])
         x_left, x_right = xx[ii, left_i], xx[ii, right_i]
@@ -474,7 +525,10 @@ class SeasonalDist(seasonal.Seasonal):
             # normalize quantiles and shift the target distribution
             # normalize quantiles
             stdn = distributions.norm.ppf(quantiles)
-            quantiles = distributions.norm.cdf(stdn - stdn.mean())
+            bias = distributions.norm.ppf(self.cdf(trig_pars).mean())
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", RuntimeWarning)
+                quantiles = distributions.norm.cdf(stdn - stdn.mean() + bias)
             # TODO: neither "loc" nor "mu" have to be the mean of the
             # distribution directly! This needs to be more
             # sophisticated for a lot of distributions.
@@ -485,6 +539,8 @@ class SeasonalDist(seasonal.Seasonal):
             # xx = self._dist_method(
             #     self.dist.ppf, trig_pars, quantiles, doys, **kwds
             # )
+            # if mean_shift > 0:
+            #     __import__("pdb").set_trace()
             return (
                 self._dist_method(
                     self.dist.ppf, trig_pars, quantiles, doys, **kwds
@@ -572,57 +628,6 @@ class SeasonalDist(seasonal.Seasonal):
     #     # plt.show()
 
     #     return result.x
-
-    def qq_shift(self, theta_incr, trig_pars, x=None, doys=None, **kwds):
-        """Empirical estimation of shift in std-normal for given theta_incr."""
-        # executing this method is expensive and in the context of
-        # weathercop's conditional simulation, might happen often with
-        # the same theta_incr, so do some caching here to return known
-        # results
-        if self._qq_shift_cache is None:
-            self._qq_shift_cache = {}
-        # theta_incr_key = hash(round(theta_incr[0], 6))
-        theta_incr_key = hashlib.md5(
-            str(round(theta_incr[0], 6)).encode()
-        ).hexdigest()
-        if theta_incr_key not in self._qq_shift_cache:
-            qq = self.cdf(trig_pars, x=x, doys=doys, **kwds)
-            zero = 1e-6
-            one = 1 - zero
-            stdn = distributions.norm.ppf(
-                np.minimum(np.maximum(qq, zero), one)
-            )
-            stdn = phase_randomization.randomize2d(np.array([stdn])).squeeze()
-            data = np.atleast_1d(self.data if x is None else x)
-            data_mean = data.mean()
-
-            def c2incr(c):
-                xx_act = self.ppf(
-                    trig_pars,
-                    quantiles=distributions.norm.cdf(stdn + c),
-                    doys=doys,
-                    kwds=kwds,
-                )
-                return (xx_act.mean() - data_mean - theta_incr) ** 2
-
-            if self.verbose:
-                print(f"\tFilling shift-cache for {theta_incr=}")
-            result = sp_optimize.minimize_scalar(c2incr)
-
-            # fig, ax = plt.subplots(nrows=1, ncols=1)
-            # xx_act = self.ppf(trig_pars,
-            #                   quantiles=distributions.norm.cdf(stdn + result.x),
-            #                   doys=doys,
-            #                   kwds=kwds)
-            # ax.axvline(data_mean, label="data_mean", color="k")
-            # ax.axvline(xx_act.mean(), label="xx_act", color="b")
-            # ax.axvline(data_mean + theta_incr, label="data_mean + theta_incr",
-            #            color="k", linestyle="--")
-            # ax.legend()
-            # plt.show()
-
-            self._qq_shift_cache[theta_incr_key] = result.x
-        return self._qq_shift_cache[theta_incr_key]
 
     def _clear_qq_shift_cache(self):
         self._qq_shift_cache = None
@@ -937,7 +942,10 @@ class SeasonalDist(seasonal.Seasonal):
         fig, axs = plt.subplots(nrows=3, ncols=4, figsize=figsize, sharex=True)
         axs = axs.ravel()
         fig.suptitle(self.dist.name)
-        fig.canvas.set_window_title(self.dist.name)
+        try:
+            fig.canvas.set_window_title(self.dist.name)
+        except AttributeError:
+            pass
         for ii, values in enumerate(self.monthly_grouped_x):
             ax1 = axs[ii]
 
@@ -1146,13 +1154,35 @@ class SlidingDist(SeasonalDist):
                 if self.dist.isscipy or isinstance(
                     self.dist, distributions.Rain
                 ):
-                    self._sliding_pars[doy_i] = self.dist.fit(data, **fixed)
+                    if doy_i > 0:
+                        loc = self._sliding_pars[doy_i - 1, -2]
+                        scale = self._sliding_pars[doy_i - 1, -1]
+                        initial = self._sliding_pars[doy_i - 1, :-2]
+                        try:
+                            sol = self.dist.fit(
+                                data, *initial, loc=loc, scale=scale
+                            )
+                        except stats.FitError:
+                            sol = self.dist.fit(data)
+                    else:
+                        sol = self.dist.fit(data, **fixed)
+                    sol_dict = {
+                        name: value
+                        for name, value in zip(self.dist.parameter_names, sol)
+                    }
+                    if self.dist._constraints(
+                        data,
+                        **sol_dict,
+                    ):
+                        sol = np.full_like(sol, np.nan)
+                    self._sliding_pars[doy_i] = sol
                 else:
-                    x0 = (
-                        self._sliding_pars[doy_i - 1]
-                        if doy_i > 0
-                        else self.dist.fit(data, **fixed)
-                    )
+                    if doy_i > 0:
+                        x0 = self._sliding_pars[doy_i - 1]
+                    else:
+                        x0 = [np.nan] * n_pars
+                    if np.any(np.isnan(x0)):
+                        x0 = self.dist.fit(data, **fixed)
                     result = self.dist.fit_ml(
                         data, weights=weights, x0=x0, method="Powell", **fixed
                     )
@@ -1164,7 +1194,14 @@ class SlidingDist(SeasonalDist):
                         sol = [np.nan] * n_pars
                     else:
                         sol = result.x
-                    self._sliding_pars[doy_i] = sol
+                    try:
+                        self._sliding_pars[doy_i] = sol
+                    except ValueError:
+                        print(
+                            "Could not fit seasonal distribution. "
+                            "Check your conf-file!"
+                        )
+                        raise
 
                     if result.supplements:
                         self._supplements += [result.supplements]
@@ -1176,7 +1213,7 @@ class SlidingDist(SeasonalDist):
         if isinstance(self.dist, stats._continuous_distns.exponnorm_gen):
             # there are sometimes K values that cause problems
             pars[pars[:, 0] < 1e-6, 0] = 1e-6
-        pars[pars > 1e9] = np.nan
+        # pars[pars > 1e9] = np.nan
         nan_cols = np.where(np.isnan(pars).sum(axis=1) > 0)[0]
         # i don't trust the nan-adjacent!
         if len(nan_cols):
@@ -1245,6 +1282,11 @@ class SlidingDist(SeasonalDist):
     def solution(self, trans):
         self._solution = trans
 
+    @solution.deleter
+    def solution(self):
+        self._solution = None
+        self._sliding_pars = None
+
     def fourier_approx(self, fft_order=4, trig_pars=None):
         if trig_pars is None:
             trig_pars = self.solution
@@ -1256,6 +1298,30 @@ class SlidingDist(SeasonalDist):
             _fourier_approx[ii] = np.fft.irfft(
                 trans_par[: fft_order + 1], self.n_doys
             )
+        # enforce domain restrictions, which can be violated because
+        # of fourier approximation
+        if (bounds := getattr(self.dist, "_bounds", None)) is not None:
+            for par_i, (par, (lower, upper)) in enumerate(
+                zip(_fourier_approx, bounds)
+            ):
+                par[par <= lower] = lower
+                par[par >= upper] = upper
+                _fourier_approx[par_i] = par
+        elif hasattr(self.dist, "_shape_info"):
+            for par_i, (shape_info, par) in enumerate(
+                zip(self.dist._shape_info(), _fourier_approx)
+            ):
+                lower, upper = shape_info.domain
+                # unfortunately, being within the domain does not
+                # necessarily mean that numpy can handle it
+                if np.isclose(lower, 0):
+                    lower = 1e-6
+                elif np.isneginf(lower):
+                    lower = -1e6
+                par[par <= lower] = lower
+                upper = min(upper, 1e6)
+                par[par >= upper] = upper
+                _fourier_approx[par_i] = par
         return _fourier_approx
 
     def fit(self, x=None, **kwds):
@@ -1282,7 +1348,7 @@ class SlidingDist(SeasonalDist):
                 solution, xx, doys=np.full(n_points, doy), build_table=True
             )
             table[doy_i, :, 0] = qq
-            table[doy_i, :, 1] = xx
+            table[doy_i, :, 1] = self.dist._fix_x(xx)
         return table
 
     def trig2pars(self, trig_pars, _T=None, fft_order=None):
@@ -1343,7 +1409,6 @@ class SlidingDist(SeasonalDist):
 
 
 class SlidingDistHourly(SlidingDist, seasonal.Torus):
-
     """Estimates parametric distributions for time series exhibiting
     seasonalities in daily cycles."""
 
