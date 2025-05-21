@@ -34,10 +34,8 @@ variables from measured meteorological values.
    slope_sat_p
 
 """
-from __future__ import division
 
 from builtins import range
-from past.utils import old_div
 from datetime import datetime, timedelta
 import warnings
 import numpy as np
@@ -51,7 +49,7 @@ tzf = TimezoneFinder()
 
 
 def sat_vap_p(at):
-    """ saturation vapour pressure from air temperature
+    """saturation vapour pressure from air temperature
 
     Parameters
     ----------
@@ -87,7 +85,7 @@ def sat_vap_p(at):
 
 
 def rel2vap_p(rh, at):
-    """ vapour pressure from relative humidity and air temperature
+    """vapour pressure from relative humidity and air temperature
 
     Parameters
     ----------
@@ -116,6 +114,7 @@ def rel2vap_p(rh, at):
     c_e = sat_vap_p(at)
     e = rh * c_e
     return e
+
 
 def rel2abs_hum(rh, at):
     """Absolute humidity from relative humidity and air temperature.
@@ -166,8 +165,9 @@ def abs_hum2rel(abs_hum, at):
     e = abs_hum / 2.16679 * (273.15 + at)
     return vap_p2rel(e / 100, at)
 
+
 def vap_p2rel(e, at):
-    """ relative humidity from vapour pressure and air temperature
+    """relative humidity from vapour pressure and air temperature
 
     Parameters
     ----------
@@ -198,7 +198,7 @@ def vap_p2rel(e, at):
 
 
 def dewpoint(at, rh=None, e=None):
-    """  dewpoint from air temperature and humidity
+    """dewpoint from air temperature and humidity
 
     As input is required: air temperature (`at`) and EITHER relative humidity
     (`rh`) OR vapour pressure (`e`).
@@ -255,7 +255,7 @@ def dewpoint(at, rh=None, e=None):
 
 
 def dew2rel(dew, at):
-    """ relative humidity from dewpoint and air temperature
+    """relative humidity from dewpoint and air temperature
 
     Parameters
     ----------
@@ -282,12 +282,12 @@ def dew2rel(dew, at):
     dew, at = np.array(dew), np.array(at)
     e = sat_vap_p(dew)
     c_e = sat_vap_p(at)
-    rh = old_div(e, c_e)
+    rh = e / c_e
     return rh
 
 
 def norm_pressure(p, at, h=454.0):
-    """ normalize pressure to sealevel
+    """normalize pressure to sealevel
 
     formula from wikipedia.de for linear temperature gradient 0.0065K/m
 
@@ -328,8 +328,8 @@ def norm_pressure(p, at, h=454.0):
     return p_nn
 
 
-def iziomon(temp, clouds, rh=None, dew=None, e=None, site='low'):
-    """ incident long wave radiation following Iziomon et al (2003)[1]_
+def iziomon(temp, clouds, rh=None, dew=None, e=None, site="low"):
+    """incident long wave radiation following Iziomon et al (2003)[1]_
 
     As input is required: air temperature (`temp`), cloud cover (`clouds`) and
     EITHER relative humidity (`rh`) OR dewpoint (`dew`) OR vapour pressure
@@ -387,11 +387,10 @@ def iziomon(temp, clouds, rh=None, dew=None, e=None, site='low'):
             321.15448959])
     """
     # iziomon-parameter lowland site:
-    if site == 'low':
+    if site == "low":
         Xs, Ys, Zs = 0.35, 10.0, 0.0035
-##    if site == 'low': Xs, Ys, Zs = 0.35, 1.5, 0.009
     # mountain site:
-    elif site == 'high':
+    elif site == "high":
         Xs, Ys, Zs = 0.43, 11.5, 0.005
     # temp in Kelvin:
     tk = temp + 273.16
@@ -404,7 +403,7 @@ def iziomon(temp, clouds, rh=None, dew=None, e=None, site='low'):
     clouds = clouds * 8
     # iziomon:
     lw_clear = blackbody_rad(temp=temp) * (1 - Xs * np.exp(-Ys * e / tk))
-    lw = lw_clear * (1 + Zs * clouds ** 2)
+    lw = lw_clear * (1 + Zs * clouds**2)
     return lw
 
 
@@ -422,21 +421,21 @@ def temp2lw(temp):
         incident longwave radiation [W/m**2]
     """
     from scipy import constants
+
     try:
         theta_kelvin = constants.C2K(temp)
     except AttributeError:
-        theta_kelvin = constants.convert_temperature(temp, 'Celsius',
-                                                     'Kelvin')
+        theta_kelvin = constants.convert_temperature(temp, "Celsius", "Kelvin")
     e = 6.2 * np.exp(17.26 * temp / (theta_kelvin - 35.8))
     boltz = 0.0000000567  # ask gideon
-    alpha, beta = .42, .065
-    return boltz * theta_kelvin ** 4 * (alpha + beta * np.sqrt(e))
+    alpha, beta = 0.42, 0.065
+    return boltz * theta_kelvin**4 * (alpha + beta * np.sqrt(e))
 
 
 # dirk: using np.atleast_1d and as scalar here, to make indexing on scalar
 # input and the doctests work
 @my.asscalar
-def lw2clouds(lw, temp, rh=None, dew=None, e=None, site='low'):
+def lw2clouds(lw, temp, rh=None, dew=None, e=None, site="low"):
     """Cloud cover from incident long wave radiation (Iziomon et al (2003)[1]_)
 
     As input is required: incident long wave radiation (`lw`),
@@ -493,10 +492,10 @@ def lw2clouds(lw, temp, rh=None, dew=None, e=None, site='low'):
     """
     lw, temp = np.atleast_1d(lw, temp)
     # iziomon-parameter lowland site:
-    if site == 'low':
+    if site == "low":
         Xs, Ys, Zs = 0.35, 10.0, 0.0035
     # mountain site:
-    elif site == 'high':
+    elif site == "high":
         Xs, Ys, Zs = 0.43, 11.5, 0.005
     # temp in Kelvin:
     tk = temp + 273.16
@@ -511,15 +510,15 @@ def lw2clouds(lw, temp, rh=None, dew=None, e=None, site='low'):
     lw_clear = blackbody_rad(temp=temp) * (1 - Xs * np.exp(-Ys * e / tk))
     lw_valid = lw > lw_clear
     n = np.zeros_like(lw)
-    n[lw_valid] = (old_div((old_div(lw[lw_valid], lw_clear[lw_valid]) - 1), Zs)) ** 0.5
-    clouds = old_div(n, 8.)
+    n[lw_valid] = ((lw[lw_valid] / lw_clear[lw_valid] - 1) / Zs) ** 0.5
+    clouds = n / 8.0
     clouds[np.isnan(clouds)] = 0
     clouds[clouds > 1] = 1
     return clouds
 
 
 def lw_tennessee(temp, clouds):
-    """ incident long wave radiation
+    """incident long wave radiation
 
     Parameters
     ----------
@@ -546,9 +545,9 @@ def lw_tennessee(temp, clouds):
     """
     # temp in Kelvin:
     tk = temp + 273.16
-    c_e = 9.37 * 10 ** -6  # K**-2
-    eps_a = c_e * tk ** 2
-    lw = (1 + 0.17 * clouds ** 2) * eps_a * blackbody_rad(temp=temp)
+    c_e = 9.37 * 10**-6  # K**-2
+    eps_a = c_e * tk**2
+    lw = (1 + 0.17 * clouds**2) * eps_a * blackbody_rad(temp=temp)
     return lw
 
 
@@ -602,8 +601,20 @@ def haude(svp, vp, mon):
     array([0.73169056,  0.75667266,  1.03134771])
     """
     mon = mon - 1
-    hfs = (0.0022, 0.0022, 0.0022, 0.0029, 0.0029, 0.0028, 0.0026, 0.0029,
-           0.0023, 0.0022, 0.0022, 0.0022)  # monthly Haude factor
+    hfs = (
+        0.0022,
+        0.0022,
+        0.0022,
+        0.0029,
+        0.0029,
+        0.0028,
+        0.0026,
+        0.0029,
+        0.0023,
+        0.0022,
+        0.0022,
+        0.0022,
+    )  # monthly Haude factor
     try:
         hf = hfs[mon]
     except TypeError:
@@ -654,9 +665,20 @@ def turc(at, ts, mon):
     mon = mon - 1
     # Konstanten C1, C2 fuer etwa 53 deg N in Mitteleuropa
     # warum auch immer
-    cs = ((1.09, 0.18), (1.4, 0.259), (1.86, 0.35), (2.36, 0.429),
-          (2.76, 0.476), (3, 0.489), (2.93, 0.484), (2.58, 0.448),
-          (2.1, 0.39), (1.57, 0.21), (1.19, 0.21), (1.02, 0.158))
+    cs = (
+        (1.09, 0.18),
+        (1.4, 0.259),
+        (1.86, 0.35),
+        (2.36, 0.429),
+        (2.76, 0.476),
+        (3, 0.489),
+        (2.93, 0.484),
+        (2.58, 0.448),
+        (2.1, 0.39),
+        (1.57, 0.21),
+        (1.19, 0.21),
+        (1.02, 0.158),
+    )
     try:
         c1, c2 = cs[mon]
     except TypeError:
@@ -696,21 +718,21 @@ def turc_rad(at, rh, G):
 
     rh = np.array(rh, float)
     C = np.ones_like(rh)
-    ii = np.where(rh < 50.)
-    C[ii] = 1. + (old_div((50. - rh[ii]), 70.))
+    ii = np.where(rh < 50.0)
+    C[ii] = 1.0 + ((50.0 - rh[ii]) / 70.0)
 
-    G = G * 86400. / 10000.  # W/m^2 in J/(cm^2*d)
+    G = G * 86400.0 / 10000.0  # W/m^2 in J/(cm^2*d)
 
-    etp = 0.0031 * C * (G + 209.) * (old_div(at, (at + 15.)))
-    ii = np.where(etp > 7.)
-    etp[ii] = 7.
+    etp = 0.0031 * C * (G + 209.0) * (at / (at + 15.0))
+    ii = np.where(etp > 7.0)
+    etp[ii] = 7.0
     jj = np.where(etp < 0.1)
     etp[jj] = 0.1
 
     return etp
 
 
-def hargreaves(tmax, tmin, date, in_format='%Y-%m-%dT%H:%M:%S'):
+def hargreaves(tmax, tmin, date, in_format="%Y-%m-%dT%H:%M:%S"):
     """calculates the potential evapotranspiration rate [mm/d] following
     Hargreaves & Samani 1985 according to THE ASCE STANDARDIZED REFERENCE
     EVAPOTRANSPIRATION EQUATION
@@ -751,24 +773,37 @@ def hargreaves(tmax, tmin, date, in_format='%Y-%m-%dT%H:%M:%S'):
     j = []
     for dat in date:
         t = datetime.strptime(dat, in_format)
-        doy = float(datetime.strftime(t, format='%j'))  # day of year
+        doy = float(datetime.strftime(t, format="%j"))  # day of year
         j.append(doy)
 
     # inverse relative distance factor for the earth-sun []
-    dr = 1. + 0.033 * np.cos(np.multiply((2 * np.pi / 365.), j))
+    dr = 1.0 + 0.033 * np.cos(np.multiply((2 * np.pi / 365.0), j))
     # solar declination [rad]
-    delta = 0.409 * np.sin(np.multiply((2 * np.pi / 365.), j) - 1.39)
+    delta = 0.409 * np.sin(np.multiply((2 * np.pi / 365.0), j) - 1.39)
     # sunset hour angle [rad]
     omega_s = np.arccos(-np.tan(0.8506) * np.tan(delta))
     # extraterrestrial radiation [MJ m^-2 d^-1]
-    Ra = (24. / np.pi * 4.92 * dr * (omega_s * np.sin(0.8506)
-        * np.sin(delta) + np.cos(0.8506) * np.cos(delta) * np.sin(omega_s)))
+    Ra = (
+        24.0
+        / np.pi
+        * 4.92
+        * dr
+        * (
+            omega_s * np.sin(0.8506) * np.sin(delta)
+            + np.cos(0.8506) * np.cos(delta) * np.sin(omega_s)
+        )
+    )
     # [MJ m^-2 d^-1]
-    etp = (0.0023 * (tmax - tmin) ** (0.5) * (old_div((tmax + tmin), 2.) + 17.8)
-           * Ra / 2.45)  # 2.45: factor for calculating mm/d
+    etp = (
+        0.0023
+        * (tmax - tmin) ** (0.5)
+        * ((tmax + tmin) / 2.0 + 17.8)
+        * Ra
+        / 2.45
+    )  # 2.45: factor for calculating mm/d
 
-    ii = np.where(etp > 7.)
-    etp[ii] = 7.
+    ii = np.where(etp > 7.0)
+    etp[ii] = 7.0
 
     return etp
 
@@ -809,8 +844,8 @@ def penman_monteith(at, u, Rn, rh):
     - in relationship to the net radiation, the soil heat flux is very small
       and is fixed with G = 0.1*Rn
     """
-    rh = old_div(rh, 100.)  # relative humidity in decimal[0,1]
-    y = 0.000665 * 101.3 * (old_div((293. - 0.0065 * 453.), 293.)) ** 5.26
+    rh = rh / 100.0  # relative humidity in decimal[0,1]
+    y = 0.000665 * 101.3 * ((293.0 - 0.0065 * 453.0) / 293.0) ** 5.26
 
     G = 0.1 * Rn
     S = slope_sat_p(at)
@@ -819,18 +854,26 @@ def penman_monteith(at, u, Rn, rh):
     es = sat_vap_p(at)
     ea = rel2vap_p(rh, at)
 
-    eto = old_div((0.408 * S * (Rn - G) + y * (old_div(Cn, (at + 273.15))) * u *
-           (old_div((es - ea), 10.))), (S + y * (1 + Cd * u)))
+    eto = (
+        0.408 * S * (Rn - G)
+        + y * (Cn / (at + 273.15)) * u * ((es - ea) / 10.0)
+    ) / (S + y * (1 + Cd * u))
 
-    ii = np.where(eto > 7.)
-    eto[ii] = 7.
+    ii = np.where(eto > 7.0)
+    eto[ii] = 7.0
 
     return eto
 
 
-def pot_s_rad(date, lat=48.738, longt=9.099, in_format='%Y-%m-%dT%H:%M',
-              tz_mer=15.0, wog=-1):
-    """ theoretical maximal potential solar radiation outside of atmosphere
+def pot_s_rad(
+    date,
+    lat=48.738,
+    longt=9.099,
+    in_format="%Y-%m-%dT%H:%M",
+    tz_mer=15.0,
+    wog=-1,
+):
+    """theoretical maximal potential solar radiation outside of atmosphere
 
     Parameters
     ----------
@@ -881,12 +924,12 @@ def pot_s_rad(date, lat=48.738, longt=9.099, in_format='%Y-%m-%dT%H:%M',
     array([855.35624182])
     """
     if tz_mer is None:
-        timezone_str = tzf.timezone_at(lat=float(lat),
-                                       lng=float(longt))
+        timezone_str = tzf.timezone_at(lat=float(lat), lng=float(longt))
         timezone = pytz.timezone(timezone_str)
         dt = datetime(2020, 6, 1)
-        tz_offset = ((timezone.utcoffset(dt, is_dst=False).total_seconds())
-                     / 3600)
+        tz_offset = (
+            timezone.utcoffset(dt, is_dst=False).total_seconds()
+        ) / 3600
         tz_mer = 15 * tz_offset
     s0 = 1373  # Solarkonstante W/m^2
     # once upon a time there was a latitude
@@ -895,8 +938,13 @@ def pot_s_rad(date, lat=48.738, longt=9.099, in_format='%Y-%m-%dT%H:%M',
     try:
         # where we used to raise an exception
         doys = times.datetime2doy(date)  # if date is datetime
-    except (TypeError, AttributeError, ValueError, NotImplementedError,
-            IndexError):
+    except (
+        TypeError,
+        AttributeError,
+        ValueError,
+        NotImplementedError,
+        IndexError,
+    ):
         try:
             # ...or two
             # if date is string
@@ -907,45 +955,66 @@ def pot_s_rad(date, lat=48.738, longt=9.099, in_format='%Y-%m-%dT%H:%M',
     hours = (doys - doys.astype(int)) * 24
     # remember how we typecasted away the hours
     doys = doys.astype(int)
-    j1 = old_div(doys, 100.)
-    j2 = old_div((doys - 180), 100.)
-    Et = np.where(doys > 180,
-                  (-0.05039 - 0.33954 * j2 + 0.04084 * j2 ** 2 +
-                   1.8928 * j2 ** 3 - 1.7619 * j2 ** 4 + 0.4224 * j2 ** 5),
-                  (-0.04056 - 0.74503 * j1 + 0.08823 * j1 ** 2 +
-                   2.0516 * j1 ** 3 - 1.8111 * j1 ** 4 + 0.42832 * j1 ** 5))
+    j1 = doys / 100.0
+    j2 = (doys - 180) / 100.0
+    Et = np.where(
+        doys > 180,
+        (
+            -0.05039
+            - 0.33954 * j2
+            + 0.04084 * j2**2
+            + 1.8928 * j2**3
+            - 1.7619 * j2**4
+            + 0.4224 * j2**5
+        ),
+        (
+            -0.04056
+            - 0.74503 * j1
+            + 0.08823 * j1**2
+            + 2.0516 * j1**3
+            - 1.8111 * j1**4
+            + 0.42832 * j1**5
+        ),
+    )
     t0 = 12 - Lc - Et
     # we sang and dance forever and a doy (less)
     # la la la la lala lala lala lala
     la = 2 * np.pi / 365 * (doys - 1)
-    d = (0.006918 - 0.399912 * np.cos(la) + 0.070257 * np.sin(la) -
-         0.006758 * np.cos(2 * la) + 0.000907 * np.sin(2 * la) -
-         0.002697 * np.cos(3 * la) + 0.00148 * np.sin(3 * la))
+    d = (
+        0.006918
+        - 0.399912 * np.cos(la)
+        + 0.070257 * np.sin(la)
+        - 0.006758 * np.cos(2 * la)
+        + 0.000907 * np.sin(2 * la)
+        - 0.002697 * np.cos(3 * la)
+        + 0.00148 * np.sin(3 * la)
+    )
     sind = np.sin(d)
-    sinphi = np.atleast_1d(sind * np.sin(lat) +
-                           np.cos(d) * np.cos(lat) *
-                           np.cos(15 * np.pi / 180.0 * (hours - t0)))
+    sinphi = np.atleast_1d(
+        sind * np.sin(lat)
+        + np.cos(d) * np.cos(lat) * np.cos(15 * np.pi / 180.0 * (hours - t0))
+    )
     sinphi[sinphi < 0] = 0
     smax = s0 * sinphi
     return smax
 
 
-def pot_s_rad_daily(date, lat=48.738, longt=9.099, in_format='%Y-%m-%d',
-                    tz_mer=15.0, wog=-1):
-    """ daily average values of --> pot_s_rad
-    """
+def pot_s_rad_daily(
+    date, lat=48.738, longt=9.099, in_format="%Y-%m-%d", tz_mer=15.0, wog=-1
+):
+    """daily average values of --> pot_s_rad"""
     # machen wir mal stundenweise:
-    if type(date[0]) != datetime:
+    if not isinstance(date[0], datetime):
         date = times.str2datetime(date, in_format)
-    date_h = np.array([dt__ + timedelta(hours=i) for dt__ in date
-                       for i in range(24)])
+    date_h = np.array(
+        [dt__ + timedelta(hours=i) for dt__ in date for i in range(24)]
+    )
     pot_h = pot_s_rad(date_h, lat, longt, tz_mer=tz_mer, wog=wog)
     return np.average(pot_h.reshape(-1, 24), axis=1)
 
 
 def sunshine_pot(doys, lat=48.738, longt=9.099, tz_mer=15.0, wog=-1):
-    """Maximum daily sunshine hours based on evaluating pot_s_rad per minute.
-    """
+    """Maximum daily sunshine hours based on evaluating pot_s_rad per minute."""
     mins_per_day = 24 * 60
     # doys = doys.astype(float)
     doys = doys[doys == doys.astype(int)]
@@ -954,12 +1023,19 @@ def sunshine_pot(doys, lat=48.738, longt=9.099, tz_mer=15.0, wog=-1):
     doys_minutes = doys_minutes.ravel()
     smax = pot_s_rad(doys_minutes, lat, longt, tz_mer=tz_mer, wog=wog)
     smax = smax.reshape(-1, mins_per_day)
-    sun_hours = np.sum(smax > 0, axis=1) / 60.
+    sun_hours = np.sum(smax > 0, axis=1) / 60.0
     return sun_hours
 
 
-def sunshine(sw, date, lat=48.738, longt=9.099, in_format='%Y-%m-%dT%H:%M',
-             tz_mer=15.0, wog=-1):
+def sunshine(
+    sw,
+    date,
+    lat=48.738,
+    longt=9.099,
+    in_format="%Y-%m-%dT%H:%M",
+    tz_mer=15.0,
+    wog=-1,
+):
     """sunshine or not?
 
     calculates maximum potential solar radiation depending on latitude,
@@ -998,8 +1074,9 @@ def sunshine(sw, date, lat=48.738, longt=9.099, in_format='%Y-%m-%dT%H:%M',
     array([0])
     """
     shining = np.zeros_like(sw)
-    smax = pot_s_rad(date, lat, longt, in_format=in_format, tz_mer=tz_mer,
-                     wog=wog)
+    smax = pot_s_rad(
+        date, lat, longt, in_format=in_format, tz_mer=tz_mer, wog=wog
+    )
     shining[np.where(sw > 0.4 * smax)] = 1
     return shining
 
@@ -1120,7 +1197,7 @@ def sunshine_riseset(dates, longitude, latitude, tz_offset=0):
 
 
 def blackbody_rad(rad=None, temp=None, eps=1.0):
-    """ Stefan-Boltzmann law
+    """Stefan-Boltzmann law
 
     There are two ways to use this funtion:
 
@@ -1156,10 +1233,10 @@ def blackbody_rad(rad=None, temp=None, eps=1.0):
     >>> "%.9f" % blackbody_rad(temp=0)
     '315.683203500'
     """
-    sigma = 5.67 * 10 ** -8
+    sigma = 5.67 * 10**-8
     tk0 = 273.16
     if rad is not None:
-        return (old_div(rad, (eps * sigma))) ** 0.25 - tk0
+        return (rad / (eps * sigma)) ** 0.25 - tk0
     elif temp is not None:
         return eps * sigma * (temp + tk0) ** 4
 
@@ -1213,8 +1290,9 @@ def altitude(temp1, temp0, pres1, pres0, alt0):
     tk0 = 273.16
     g = 9.81
 
-    altitude = ((np.log(old_div(pres0, pres1))) * 287 *
-                (old_div(((old_div((temp0 + temp1), 2)) + tk0), g))) + alt0
+    altitude = (
+        (np.log(pres0 / pres1)) * 287 * ((((temp0 + temp1) / 2) + tk0) / g)
+    ) + alt0
     # ;print 'altitude: ',self.altitude
 
     return altitude
@@ -1242,7 +1320,7 @@ def spec_hum(e, p):
     where M_w/M_tL=0.622
     and 0.378 = 1-0.622"""
 
-    spec_hum = old_div((0.622 * e * 1000), (p - 0.378 * e))
+    spec_hum = (0.622 * e * 1000) / (p - 0.378 * e)
 
     return spec_hum
 
@@ -1291,8 +1369,12 @@ def psychro2e(t_dry, t_wet, p=None):
         cp = 1005.4  # specific heat capacity of air J/(kg*K)
         mu = 0.622  # molar mass ratio water/air
         # latent heat of vaporization of water [J/kg]
-        lam = (-0.0000614342 * t_dry ** 3 + 0.00158927 * t_dry ** 2 -
-               2.36418 * t_dry + 2500.79) * 1000
+        lam = (
+            -0.0000614342 * t_dry**3
+            + 0.00158927 * t_dry**2
+            - 2.36418 * t_dry
+            + 2500.79
+        ) * 1000
         gamma = p * cp / (mu * lam)  # hPa/K
     else:
         gamma = 0.67  # hPa/K, simplification, can be used below 500m asl
@@ -1325,7 +1407,7 @@ def slope_sat_p(at):
         Scientific Automated Weather Station
     """
 
-    slope = old_div((45.3 + 2.97 * at + 0.0549 * at ** 2 + 0.00223 * at ** 3), 1000)
+    slope = (45.3 + 2.97 * at + 0.0549 * at**2 + 0.00223 * at**3) / 1000
 
     return slope
 

@@ -1,7 +1,3 @@
-from __future__ import division
-from builtins import range
-from past.utils import old_div
-from past.types import basestring
 import warnings
 import numpy as np
 import matplotlib.pyplot as plt
@@ -270,6 +266,6 @@ if __name__ == "__main__":
 
     vg.conf = vg.config_konstanz
     met_vg = vg.VG(("R", "theta"))
-    rain = old_div(met_vg.data_raw[0], 24)
+    rain = met_vg.data_raw[0] / 24
     plot_exceedance(rain, kind="all")
     plt.show()

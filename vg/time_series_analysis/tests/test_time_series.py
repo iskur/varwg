@@ -3,11 +3,10 @@ Created on 06.09.2012
 
 @author: dirk
 """
+
 import matplotlib.pyplot as plt
 import numpy as np
-from builtins import range, zip
 from numpy.testing import TestCase, assert_almost_equal, run_module_suite
-from past.utils import old_div
 
 import vg
 from vg.time_series_analysis import time_series
@@ -114,8 +113,8 @@ class Test(TestCase):
     def test_autocorr_ar_nans(self):
         """compare calculated autocorr on series with known autocorr with nans."""
         sim = np.copy(self.sim)
-        sim[:: old_div(self.T, 5)] = np.nan
-        sim[1 :: old_div(self.T, 5)] = np.nan
+        sim[:: int(self.T / 5)] = np.nan
+        sim[1 :: int(self.T / 5)] = np.nan
         phi = time_series.auto_corr(sim, 1)
         assert_almost_equal(0.9, phi, decimal=2)
 
@@ -124,8 +123,8 @@ class Test(TestCase):
         2dim.
         """
         sim = np.copy([self.sim, self.gen_time_series(0.6)])
-        sim[0, :: old_div(self.T, 3)] = np.nan
-        sim[:, 1 :: old_div(self.T, 5)] = np.nan
+        sim[0, :: int(self.T / 3)] = np.nan
+        sim[:, 1 :: int(self.T / 5)] = np.nan
         phi = time_series.auto_corr(sim, 1)
         assert_almost_equal([0.9, 0.6], phi, decimal=2)
 

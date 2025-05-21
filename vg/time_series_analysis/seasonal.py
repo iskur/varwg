@@ -1,8 +1,5 @@
 """This provides common ground for seasonal_distributions and seasonal_kde."""
-from __future__ import division
 
-from builtins import range
-from builtins import object
 import calendar
 import numpy as np
 from vg import times

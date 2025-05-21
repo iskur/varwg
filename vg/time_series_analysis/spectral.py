@@ -1,8 +1,3 @@
-from __future__ import division
-from builtins import zip
-from builtins import range
-from builtins import object
-from past.utils import old_div
 import warnings
 
 import numpy as np
@@ -82,7 +77,7 @@ class Spectral(object):
             # covariances (in fourier space??)
             covs = autocov(dists)
             try:
-                cutoff = np.min(np.where(old_div(covs, covs[0]) < cthresh)[0])
+                cutoff = np.min(np.where((covs / covs[0]) < cthresh)[0])
             except ValueError:
                 # meaning, T < crange
                 cutoff = T
@@ -108,10 +103,8 @@ class Spectral(object):
         # note that size != npoints in SpectralND
         self.size = self.npoints = size
         # eigenvalues of decomposition (??)
-        self.sqrt_fft_covs = np.sqrt(old_div(fft_covs, self.npoints))
-        self.mslice = (
-            slice(int(old_div((size - T), 2)), int(old_div((size + T), 2))),
-        )
+        self.sqrt_fft_covs = np.sqrt(fft_covs / self.npoints)
+        self.mslice = (slice(int((size - T) / 2), int((size + T) / 2)),)
         if pool_size:
             self.pool = self.sim_n(pool_size)
 
@@ -184,7 +177,6 @@ class Spectral(object):
 
 
 class SpectralND(Spectral):
-
     """A clean-up re-write of philips old code."""
 
     def __init__(
@@ -254,7 +246,7 @@ class SpectralND(Spectral):
                     "Cannot determine correlation length. "
                     "I will use %.3f" % crange
                 )
-            cutoff = int(np.ceil(old_div(crange, np.max(scale))))
+            cutoff = int(np.ceil(crange / np.max(scale)))
         else:
             cutoff = crange
 
@@ -282,7 +274,7 @@ class SpectralND(Spectral):
             fft_covs = np.abs(np.fft.fftn(covs))
         # eigenvalues of decomposition
         self.npoints = np.prod(domainshape_larger)
-        self.sqrt_fft_covs = np.sqrt(old_div(fft_covs, self.npoints))
+        self.sqrt_fft_covs = np.sqrt(fft_covs / self.npoints)
         # needed in self.sim to cut a piece of domainshape size out of
         # the generated, larger field
         self.mslice = tuple([slice(dim) for dim in domainshape])
@@ -298,7 +290,6 @@ class SpectralND(Spectral):
 
 
 class MultiSpectral(Spectral):
-
     """Simulate multivariate time series."""
 
     def __init__(

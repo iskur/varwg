@@ -1,12 +1,7 @@
-from __future__ import print_function
-from __future__ import division
-from future import standard_library
-standard_library.install_aliases()
-from builtins import range
-from past.builtins import basestring
-from past.utils import old_div
 import collections
-from future.moves.dbm import dumb
+
+# from future.moves.dbm import dumb
+from dbm import dumb
 import os
 from tempfile import mkstemp
 import warnings
@@ -28,6 +23,7 @@ try:
     from vg import config as conf
 except ImportError:
     from vg import config_template as conf
+
     conf_filepath = conf.__file__
     if conf_filepath.endswith(".pyc"):
         conf_filepath = conf_filepath[:-1]
@@ -50,46 +46,64 @@ def var_names_greek(var_names):
 
 
 class VGPlotting(vg_base.VGBase):
-
     """To be used indirectly (by the VG class) or directly to plot
     meteorological data (met_files, pandas dataframe).
 
     Caching features will be disabled to not overwrite anything more useful.
     """
 
-    def __init__(self, var_names, met_file=None, sum_interval=24, max_nans=12,
-                 plot=False, separator="\t", refit=None,
-                 detrend_vars=None, verbose=False, data_dir=None,
-                 cache_dir=None, seasonal_fitting=False,
-                 dump_data=False, non_rain=None, rain_method=None,
-                 **met_kwds):
+    def __init__(
+        self,
+        var_names,
+        met_file=None,
+        sum_interval=24,
+        max_nans=12,
+        plot=False,
+        separator="\t",
+        refit=None,
+        detrend_vars=None,
+        verbose=False,
+        data_dir=None,
+        cache_dir=None,
+        seasonal_fitting=False,
+        dump_data=False,
+        non_rain=None,
+        rain_method=None,
+        fit_kwds=None,
+        **met_kwds,
+    ):
         # signal for VGBase to not do the seasonal fitting, which takes time
         # and the reason to initiate VGPlotting might be that you just plot
         # something quickly
         self.seasonal_fitting = seasonal_fitting
-        super(VGPlotting, self).__init__(var_names, met_file=met_file,
-                                         sum_interval=sum_interval,
-                                         plot=plot,
-                                         separator=separator,
-                                         refit=refit,
-                                         detrend_vars=detrend_vars,
-                                         verbose=verbose,
-                                         data_dir=data_dir,
-                                         cache_dir=cache_dir,
-                                         dump_data=dump_data,
-                                         non_rain=non_rain,
-                                         rain_method=rain_method,
-                                         max_nans=max_nans,
-                                         **met_kwds)
+        super(VGPlotting, self).__init__(
+            var_names,
+            met_file=met_file,
+            sum_interval=sum_interval,
+            plot=plot,
+            separator=separator,
+            refit=refit,
+            detrend_vars=detrend_vars,
+            verbose=verbose,
+            data_dir=data_dir,
+            cache_dir=cache_dir,
+            dump_data=dump_data,
+            non_rain=non_rain,
+            rain_method=rain_method,
+            max_nans=max_nans,
+            fit_kwds=fit_kwds,
+            **met_kwds,
+        )
 
     def plot_all(self, *args, **kwds):
         """Executes every method of VGPlotting that starts with "plot_".
         There are quite a number of those. You have been warned.
         """
-        methods = {attr: getattr(self, attr)
-                   for attr in dir(VGPlotting)
-                   if (attr.startswith("plot_")
-                       and attr != "plot_all")}
+        methods = {
+            attr: getattr(self, attr)
+            for attr in dir(VGPlotting)
+            if (attr.startswith("plot_") and attr != "plot_all")
+        }
         return_values = []
         for meth_name, meth in list(methods.items()):
             if self.verbose:
@@ -98,8 +112,7 @@ class VGPlotting(vg_base.VGBase):
                 fig_ax = meth(*args, **kwds)
                 return_values += [fig_ax]
             except Exception as exc:
-                warnings.warn("Exception while calling %s:\n%s" %
-                              (meth, exc))
+                warnings.warn("Exception while calling %s:\n%s" % (meth, exc))
                 raise
         return return_values
 
@@ -113,8 +126,9 @@ class VGPlotting(vg_base.VGBase):
         db = dumb.open(self.seasonal_cache_file, "n")
         db.close()
         os.close(f_handle)
-        self.data_trans, self.dist_sol = \
-            super(VGPlotting, self)._fit_seasonal(refit, values, doys)
+        self.data_trans, self.dist_sol = super(VGPlotting, self)._fit_seasonal(
+            refit, values, doys
+        )
 
     def __getattribute__(self, name):
         if name == "dist_sol" and not self.seasonal_fitting:
@@ -126,11 +140,14 @@ class VGPlotting(vg_base.VGBase):
 
     @property
     def ylabels(self):
-        return [conf.units[var] if var in conf.units else "[?]"
-                for var in self.var_names]
+        return [
+            conf.units[var] if var in conf.units else "[?]"
+            for var in self.var_names
+        ]
 
-    def plot_exceedance_daily(self, thresh=None, fig=None, axs=None,
-                            *args, **kwds):
+    def plot_exceedance_daily(
+        self, thresh=None, fig=None, axs=None, *args, **kwds
+    ):
         if "R" not in self.var_names:
             warnings.warn("No R in var_names, no plot_exceedance_daily")
             return
@@ -139,19 +156,29 @@ class VGPlotting(vg_base.VGBase):
         rain_i = self.var_names.index("R")
         sim = self.sim_sea[rain_i]
         obs = self.data_raw[rain_i] / self.sum_interval[rain_i]
-        fig, axs = rain_stats.plot_exceedance(obs, sim, kind="all",
-                                              thresh=thresh, fig=fig,
-                                              axs=axs, *args, **kwds)
+        fig, axs = rain_stats.plot_exceedance(
+            obs,
+            sim,
+            kind="all",
+            thresh=thresh,
+            fig=fig,
+            axs=axs,
+            *args,
+            **kwds,
+        )
         title_str = "Precipitation exceedance"
         fig.suptitle(title_str)
         try:
-            fig.canvas.set_window_title(f"{title_str} ({fig.canvas.manager.num})")
+            fig.canvas.set_window_title(
+                f"{title_str} ({fig.canvas.manager.num})"
+            )
         except AttributeError:
             pass
         return fig, axs
 
-    def plot_exeedance_hourly(self, thresh=None, fig=None, axs=None,
-                            *args, **kwds):
+    def plot_exeedance_hourly(
+        self, thresh=None, fig=None, axs=None, *args, **kwds
+    ):
         if "R" not in self.var_names:
             warnings.warn("No R in var_names, no plot_exceedance_hourly")
             return
@@ -166,35 +193,51 @@ class VGPlotting(vg_base.VGBase):
         rain_i = self.var_names.index("R")
         sim = self.sim_sea_dis[rain_i]
         obs = self.met["R"]
-        return rain_stats.plot_exceedance(obs, sim, kind="all",
-                                     thresh=thresh, fig=None, axs=None,
-                                     *args, **kwds)
+        return rain_stats.plot_exceedance(
+            obs,
+            sim,
+            kind="all",
+            thresh=thresh,
+            fig=None,
+            axs=None,
+            *args,
+            **kwds,
+        )
 
     def plot_hyd_year_sums(self, fig=None, ax=None, alpha=0.5, *args, **kwds):
         if "R" not in self.var_names:
             warnings.warn("No R in var_names, no plot_hyd_year_sums")
             return
         import xarray as xr
+
         if fig is None or ax is None:
             fig, ax = plt.subplots(nrows=1, ncols=1)
             first_fig = True
         else:
             first_fig = False
-        obs_xr = (xr
-                  .DataArray(self.to_df("daily input"))
-                  .rename(dict(dim_1="variable"))
-                  .sel(variable="R"))
+        obs_xr = (
+            xr.DataArray(self.to_df("daily input"))
+            .rename(dict(dim_1="variable"))
+            .sel(variable="R")
+        )
         obs = np.sort(rain_stats.hyd_year_sums(obs_xr, full_years=True))
         ax.step(obs, my.rel_ranks(len(obs)), where="mid", label="obs")
 
         if self.sim_sea is not None:
-            sim_xr = (xr
-                      .DataArray(self.to_df("daily output"))
-                      .rename(dict(dim_1="variable"))
-                      .sel(variable="R"))
+            sim_xr = (
+                xr.DataArray(self.to_df("daily output"))
+                .rename(dict(dim_1="variable"))
+                .sel(variable="R")
+            )
             sim = np.sort(rain_stats.hyd_year_sums(sim_xr, full_years=True))
-            ax.step(sim, my.rel_ranks(len(sim)), where="mid",
-                    color="k", alpha=alpha, label="sim")
+            ax.step(
+                sim,
+                my.rel_ranks(len(sim)),
+                where="mid",
+                color="k",
+                alpha=alpha,
+                label="sim",
+            )
             if first_fig:
                 ax.legend(loc="best")
 
@@ -205,7 +248,9 @@ class VGPlotting(vg_base.VGBase):
             title_str = "Hydrological year sums (cdf)"
             ax.set_title(title_str)
             try:
-                fig.canvas.set_window_title(f"{title_str} ({fig.canvas.manager.num})")
+                fig.canvas.set_window_title(
+                    f"{title_str} ({fig.canvas.manager.num})"
+                )
             except AttributeError:
                 pass
         return fig, ax
@@ -228,30 +273,46 @@ class VGPlotting(vg_base.VGBase):
         fig, axs = plt.subplots(len(var_names))
         if hourly:
             data_obs = [self.met[var_name] for var_name in var_names]
-            data_sim = [self.sim_sea_dis[self.var_names.index(var_name)]
-                        for var_name in var_names]
+            data_sim = [
+                self.sim_sea_dis[self.var_names.index(var_name)]
+                for var_name in var_names
+            ]
             # time discretization
             dt = (self.dis_times[1] - self.dis_times[0]).total_seconds()
             suptitle = "Power spectral density - hourly"
             name = "psd_hourly"
         else:
-            data_obs = [self.data_raw[self.var_names.index(var_name)]
-                        for var_name in var_names]
-            data_sim = [self.sim_sea[self.var_names.index(var_name)]
-                        for var_name in var_names]
+            data_obs = [
+                self.data_raw[self.var_names.index(var_name)]
+                for var_name in var_names
+            ]
+            data_sim = [
+                self.sim_sea[self.var_names.index(var_name)]
+                for var_name in var_names
+            ]
             dt = (self.sim_times[1] - self.sim_times[0]).total_seconds()
             suptitle = "Power spectral density - daily"
             name = "psd_daily"
 
         for var_name in var_names:
             var_i = self.var_names.index(var_name)
-            axs[var_i].psd(data_obs[var_i], Fs=old_div(1, dt),
-                           scale_by_freq=True, label="observed",
-                           *args, **kwds)
-            axs[var_i].psd(data_sim[var_i], Fs=old_div(1, dt),
-                           scale_by_freq=True, label="simulated",
-                           *args, **kwds)
-            axs[var_i].set_xscale('log')
+            axs[var_i].psd(
+                data_obs[var_i],
+                Fs=1 / dt,
+                scale_by_freq=True,
+                label="observed",
+                *args,
+                **kwds,
+            )
+            axs[var_i].psd(
+                data_sim[var_i],
+                Fs=1 / dt,
+                scale_by_freq=True,
+                label="simulated",
+                *args,
+                **kwds,
+            )
+            axs[var_i].set_xscale("log")
             axs[var_i].set_ylabel("%s [dB/Hz]" % var_name)
         axs[0].legend(loc="best")
         fig.suptitle(suptitle)
@@ -259,7 +320,7 @@ class VGPlotting(vg_base.VGBase):
 
         return fig, axs
 
-    def plot_doy_scatter(self, var_names=None, opacity=.4, hourly=False):
+    def plot_doy_scatter(self, var_names=None, opacity=0.4, hourly=False):
         """Plot variables over doys. Measurement and backtransformed simulated
         data will be plotted, if it is available.
 
@@ -279,39 +340,59 @@ class VGPlotting(vg_base.VGBase):
         """
         if var_names is None:
             var_names = self.var_names
-        elif isinstance(var_names, basestring):
-            var_names = var_names,
+        elif isinstance(var_names, str):
+            var_names = (var_names,)
         fig, axs = plt.subplots(nrows=len(var_names))
         if len(var_names) == 1:
-            axs = axs,
+            axs = (axs,)
         for ax, var_name in zip(axs, var_names):
             var_ii = self.var_names.index(var_name)
             if hourly:
-                ax.scatter(times.datetime2doy(self.times_orig),
-                           self.met[var_name],
-                           marker="o", edgecolors=(0, 0, 1, opacity),
-                           facecolors=(0, 0, 0, 0), label="measured")
+                ax.scatter(
+                    times.datetime2doy(self.times_orig),
+                    self.met[var_name],
+                    marker="o",
+                    edgecolors=(0, 0, 1, opacity),
+                    facecolors=(0, 0, 0, 0),
+                    label="measured",
+                )
             else:
-                ax.scatter(self.data_doys,
-                           self.data_raw[var_ii] / self.sum_interval[var_ii],
-                           marker="o", edgecolors=(0, 0, 1, opacity),
-                           facecolors=(0, 0, 0, 0), label="measured")
+                ax.scatter(
+                    self.data_doys,
+                    self.data_raw[var_ii] / self.sum_interval[var_ii],
+                    marker="o",
+                    edgecolors=(0, 0, 1, opacity),
+                    facecolors=(0, 0, 0, 0),
+                    label="measured",
+                )
 
             if self.sim_sea is not None:
                 if hourly:
-                    ax.scatter(self.dis_doys, self.sim_sea_dis[var_ii],
-                               marker="o", edgecolors=(1, 0, 0, opacity),
-                               facecolors=(0, 0, 0, 0),
-                               label="simulated backtransformed")
+                    ax.scatter(
+                        self.dis_doys,
+                        self.sim_sea_dis[var_ii],
+                        marker="o",
+                        edgecolors=(1, 0, 0, opacity),
+                        facecolors=(0, 0, 0, 0),
+                        label="simulated backtransformed",
+                    )
                 else:
-                    ax.scatter(self.sim_doys, self.sim_sea[var_ii],
-                               marker="o", edgecolors=(1, 0, 0, opacity),
-                               facecolors=(0, 0, 0, 0),
-                               label="simulated backtransformed")
+                    ax.scatter(
+                        self.sim_doys,
+                        self.sim_sea[var_ii],
+                        marker="o",
+                        edgecolors=(1, 0, 0, opacity),
+                        facecolors=(0, 0, 0, 0),
+                        label="simulated backtransformed",
+                    )
             ax.set_xlabel("doy")
-            ax.set_ylabel("%s %s" %
-                          (var_names_greek(self.var_names)[var_ii],
-                           conf.units[var_name]))
+            ax.set_ylabel(
+                "%s %s"
+                % (
+                    var_names_greek(self.var_names)[var_ii],
+                    conf.units[var_name],
+                )
+            )
             ax.legend(loc="best")
             ax.grid(True)
             ax.set_xlim(0, 366)
@@ -319,19 +400,32 @@ class VGPlotting(vg_base.VGBase):
         title_str = "Seasonal scatter"
         fig.suptitle(title_str)
         try:
-            fig.canvas.set_window_title(f"{title_str} ({fig.canvas.manager.num})")
+            fig.canvas.set_window_title(
+                f"{title_str} ({fig.canvas.manager.num})"
+            )
         except AttributeError:
             pass
         return fig, ax
 
-    def _meteogram(self, time, data, suptitle, var_names, fig=None, axs=None,
-                 plot_dewpoint=True, p_kwds=None, h_kwds=None, **f_kwds):
+    def _meteogram(
+        self,
+        time,
+        data,
+        suptitle,
+        var_names,
+        fig=None,
+        axs=None,
+        plot_dewpoint=True,
+        p_kwds=None,
+        h_kwds=None,
+        **f_kwds,
+    ):
         if fig is None:
             fig = plt.figure(constrained_layout=True, **f_kwds)
         if var_names is None:
             var_names = self.var_names
-        if isinstance(var_names, basestring):
-            var_names = var_names,
+        if isinstance(var_names, str):
+            var_names = (var_names,)
         if p_kwds is None:
             p_kwds = {}
         if h_kwds is None:
@@ -350,10 +444,12 @@ class VGPlotting(vg_base.VGBase):
         for var_name in var_names:
             var_i = var_names.index(var_name)
             plt.xticks(rotation=70)
-            axs[var_i, 0].plot(time, data[var_i], label=var_name,
-                               **p_kwds)
-            if var_name == "theta" and ("rh" in var_names
-                                      or "abs_hum" in var_names):
+            axs[var_i, 0].plot(time, data[var_i], label=var_name, **p_kwds)
+            if (
+                plot_dewpoint
+                and var_name == "theta"
+                and ("rh" in var_names or "abs_hum" in var_names)
+            ):
                 theta = data[var_i]
                 if "rh" in var_names:
                     rh = data[var_names.index("rh")]
@@ -361,24 +457,41 @@ class VGPlotting(vg_base.VGBase):
                     abs_hum = data[var_names.index("abs_hum")]
                     rh = meteox2y.abs_hum2rel(abs_hum, theta)
                 dewpoint = meteox2y.dewpoint(theta, rh=rh)
-                axs[var_i, 0].plot(time, dewpoint, "--",
-                                   label="dewpoint", color="k", alpha=0.5,
-                                   **p_kwds)
+                axs[var_i, 0].plot(
+                    time,
+                    dewpoint,
+                    "--",
+                    label="dewpoint",
+                    color="k",
+                    alpha=0.5,
+                    **p_kwds,
+                )
             if var_name == "abs_hum" and "theta" in var_names:
                 theta = data[var_names.index("theta")]
                 sat_vap_p = meteox2y.sat_vap_p(theta)
-                axs[var_i, 0].plot(time, sat_vap_p, "--",
-                                   label="sat_vap_p", color="k",
-                                   alpha=0.5, **p_kwds)
+                axs[var_i, 0].plot(
+                    time,
+                    sat_vap_p,
+                    "--",
+                    label="sat_vap_p",
+                    color="k",
+                    alpha=0.5,
+                    **p_kwds,
+                )
             axs[var_i, 0].grid(True)
-            axs[var_i, 0].set_ylabel("%s %s" % (conf.ygreek[var_name],
-                                                conf.units[var_name]))
+            axs[var_i, 0].set_ylabel(
+                "%s %s" % (conf.ygreek[var_name], conf.units[var_name])
+            )
             finite_mask = np.isfinite(data[var_i])
             try:
-                axs[var_i, 1].hist(data[var_i, finite_mask], 40,
-                                   density=True, histtype="step",
-                                   orientation="horizontal",
-                                   **h_kwds)
+                axs[var_i, 1].hist(
+                    data[var_i, finite_mask],
+                    40,
+                    density=True,
+                    histtype="step",
+                    orientation="horizontal",
+                    **h_kwds,
+                )
             except TypeError:
                 pass
             # if var_i < (K - 1):
@@ -391,6 +504,8 @@ class VGPlotting(vg_base.VGBase):
         keys = "u", "l", "uc", "lc"
         for var_i, ax in enumerate(axs[:, 0]):
             var_name = var_names[var_i]
+            if var_name == "R":
+                continue
             if var_name not in conf.par_known:
                 continue
             pars = conf.par_known[var_name]
@@ -399,22 +514,31 @@ class VGPlotting(vg_base.VGBase):
             for key in keys:
                 if key not in pars:
                     continue
-                par_values = (pars[key](doys)
-                              / self.sum_interval_dict[var_name])
+                par_values = pars[key](doys) / self.sum_interval_dict[var_name]
                 ax.plot(times, par_values, label=key)
             ax.legend(loc="best")
         return axs
 
-    def plot_meteogram_daily(self, var_names=None, figs=None, axss=None, figsize=None,
-                           plot_sim_sea=True, obs=None, sim=None,
-                           plot_daily_bounds=True, p_kwds=None, h_kwds=None,
-                           **f_kwds):
+    def plot_meteogram_daily(
+        self,
+        var_names=None,
+        figs=None,
+        axss=None,
+        figsize=None,
+        plot_sim_sea=True,
+        obs=None,
+        sim=None,
+        plot_daily_bounds=True,
+        p_kwds=None,
+        h_kwds=None,
+        **f_kwds,
+    ):
         if var_names is None:
             var_names = self.var_names
         if figs is None:
             figs = 2 * [None]
         elif isinstance(figs, mpl.figure.Figure):
-            figs = figs,
+            figs = (figs,)
         if axss is None:
             axss = 2 * [None]
         if figsize is not None:
@@ -430,15 +554,22 @@ class VGPlotting(vg_base.VGBase):
                 obs[rain_i] *= self.sum_interval[rain_i]
             var_names = list(var_names) + ["external"]
 
-        fig, axs = self._meteogram(self.times, obs,
-                                   "Measured daily",
-                                   var_names, fig=figs[0],
-                                   axs=axss[0], p_kwds=p_kwds,
-                                   h_kwds=h_kwds, **f_kwds)
+        fig, axs = self._meteogram(
+            self.times,
+            obs,
+            "Measured daily",
+            var_names,
+            fig=figs[0],
+            axs=axss[0],
+            p_kwds=p_kwds,
+            h_kwds=h_kwds,
+            **f_kwds,
+        )
         fig.name = "meteogram_measured_daily"
         if plot_daily_bounds:
-            axs = self._add_daily_bounds(axs, var_names,
-                                         self.data_doys, self.times)
+            axs = self._add_daily_bounds(
+                axs, var_names, self.data_doys, self.times
+            )
 
         if plot_sim_sea and self.sim_sea is not None:
             if self.ex_out is None and sim is None:
@@ -446,22 +577,36 @@ class VGPlotting(vg_base.VGBase):
             elif sim is None:
                 sim = np.vstack((self.sim_sea, self.ex_out))
                 var_names = list(var_names) + ["external"]
-            fig_, axs_ = self._meteogram(self.sim_times, sim,
-                                         "Simulated daily", var_names,
-                                         fig=figs[1], axs=axss[1],
-                                         p_kwds=p_kwds, h_kwds=h_kwds,
-                                         **f_kwds)
+            fig_, axs_ = self._meteogram(
+                self.sim_times,
+                sim,
+                "Simulated daily",
+                var_names,
+                fig=figs[1],
+                axs=axss[1],
+                p_kwds=p_kwds,
+                h_kwds=h_kwds,
+                **f_kwds,
+            )
             fig_.name = "meteogram_sim_daily"
             if plot_daily_bounds:
-                axs_ = self._add_daily_bounds(axs_, var_names,
-                                              self.sim_doys,
-                                              self.sim_times)
+                axs_ = self._add_daily_bounds(
+                    axs_, var_names, self.sim_doys, self.sim_times
+                )
             fig, axs = np.array([fig, fig_]), np.array([axs, axs_])
         return fig, axs
 
-    def plot_meteogram_hourly(self, var_names=None, figs=None, axss=None,
-                            plot_sim_sea=True, obs=None, sim=None,
-                            combine=False, **f_kwds):
+    def plot_meteogram_hourly(
+        self,
+        var_names=None,
+        figs=None,
+        axss=None,
+        plot_sim_sea=True,
+        obs=None,
+        sim=None,
+        combine=False,
+        **f_kwds,
+    ):
         """All variables over time in subplots.
         (Not as nice as the meteogram from vg.meteo)
         """
@@ -473,9 +618,14 @@ class VGPlotting(vg_base.VGBase):
             if var_names is None:
                 var_names = self.var_names
             obs = vg_base.met_as_array(self.met, var_names=var_names)
-        fig, axs = self._meteogram(self.times_orig, obs,
-                                   "Measured hourly", var_names,
-                                   fig=figs[0], axs=axss[0])
+        fig, axs = self._meteogram(
+            self.times_orig,
+            obs,
+            "Measured hourly",
+            var_names,
+            fig=figs[0],
+            axs=axss[0],
+        )
         fig.name = "meteogram_measured_houry"
 
         if plot_sim_sea and self.sim_sea_dis is not None:
@@ -486,18 +636,23 @@ class VGPlotting(vg_base.VGBase):
                 sim = np.vstack((self.sim_sea_dis, self.ex_out))
                 var_names = list(self.var_names) + ["external"]
             if combine:
-                fig, axs = self._meteogram(self.dis_times,
-                                           sim,
-                                           "Simulated daily",
-                                           var_names, fig=fig,
-                                           axs=axs)
+                fig, axs = self._meteogram(
+                    self.dis_times,
+                    sim,
+                    "Simulated daily",
+                    var_names,
+                    fig=fig,
+                    axs=axs,
+                )
             else:
-                fig_, axs_ = self._meteogram(self.dis_times,
-                                             sim,
-                                             "Simulated daily",
-                                             var_names,
-                                             fig=figs[1],
-                                             axs=axss[1])
+                fig_, axs_ = self._meteogram(
+                    self.dis_times,
+                    sim,
+                    "Simulated daily",
+                    var_names,
+                    fig=figs[1],
+                    axs=axss[1],
+                )
                 fig_.name = "meteogram_sim_daily"
                 fig, axs = np.array([fig, fig_]), np.array([axs, axs_])
 
@@ -510,30 +665,42 @@ class VGPlotting(vg_base.VGBase):
         #     fig, axs = np.array([fig, fig_]), np.array([axs, axs_])
         return fig, axs
 
-    def plot_meteogram_trans(self, var_names=None, figs=None, axss=None,
-                           **f_kwds):
+    def plot_meteogram_trans(
+        self, var_names=None, figs=None, axss=None, **f_kwds
+    ):
         if figs is None:
             figs = 2 * [None]
         elif isinstance(figs, mpl.figure.Figure):
-            figs = figs,
+            figs = (figs,)
         if axss is None:
             axss = 2 * [None]
         elif isinstance(axss, np.ndarray):
-            axss = axss,
-        fig, axs = self._meteogram(self.times, self.data_trans,
-                                   "Observed transformed", var_names,
-                                   fig=figs[0], axs=axss[0])
+            axss = (axss,)
+        fig, axs = self._meteogram(
+            self.times,
+            self.data_trans,
+            "Observed transformed",
+            var_names,
+            fig=figs[0],
+            axs=axss[0],
+            plot_dewpoint=False,
+        )
         fig.name = "meteogram_measured_daily_trans"
         if self.sim is not None:
-            fig_, axs_ = self._meteogram(self.sim_times, self.sim,
-                                         "Simulated std-normal",
-                                         var_names, fig=figs[1],
-                                         axs=axss[1])
+            fig_, axs_ = self._meteogram(
+                self.sim_times,
+                self.sim,
+                "Simulated std-normal",
+                var_names,
+                fig=figs[1],
+                axs=axss[1],
+                plot_dewpoint=False,
+            )
             fig_.name = "meteogram_sim_trans"
             fig, axs = np.array([fig, fig_]), np.array([axs, axs_])
         return fig, axs
 
-    def plot_doy_scatter_residuals(self, var_names=None, opacity=.4):
+    def plot_doy_scatter_residuals(self, var_names=None, opacity=0.4):
         if var_names is None:
             var_names = self.var_names
         # when given a string, this does not separate the letters, as tuple()
@@ -546,30 +713,47 @@ class VGPlotting(vg_base.VGBase):
             fig, ax = plt.subplots(nrows=1, ncols=1)
             figs.append(fig)
             axs.append(ax)
-            ax.scatter(self.data_doys,
-                       self.data_trans[var_ii], marker="o",
-                       edgecolors=(0, 0, 1, opacity),
-                       facecolors=(0, 0, 0, 0), label="transformed")
+            ax.scatter(
+                self.data_doys,
+                self.data_trans[var_ii],
+                marker="o",
+                edgecolors=(0, 0, 1, opacity),
+                facecolors=(0, 0, 0, 0),
+                label="transformed",
+            )
 
-            ax.scatter(self.data_doys, self.residuals[var_ii], marker="o",
-                       edgecolors=(1, 0, 0, opacity),
-                       facecolors=(0, 0, 0, 0),
-                       label="residuals")
+            ax.scatter(
+                self.data_doys,
+                self.residuals[var_ii],
+                marker="o",
+                edgecolors=(1, 0, 0, opacity),
+                facecolors=(0, 0, 0, 0),
+                label="residuals",
+            )
             ax.set_xlabel("doy")
-            ax.set_ylabel("%s %s" % (var_names_greek(self.var_names)[var_ii],
-                                     conf.units[var_name]))
+            ax.set_ylabel(
+                "%s %s"
+                % (
+                    var_names_greek(self.var_names)[var_ii],
+                    conf.units[var_name],
+                )
+            )
             ax.legend()
             ax.grid()
-            title_str = ("Seasonal scatter of residuals %s" %
-                         conf.long_var_names[var_name])
+            title_str = (
+                "Seasonal scatter of residuals %s"
+                % conf.long_var_names[var_name]
+            )
             ax.set_title(title_str)
             try:
-                fig.canvas.set_window_title(f"{title_str} ({fig.canvas.manager.num})")
+                fig.canvas.set_window_title(
+                    f"{title_str} ({fig.canvas.manager.num})"
+                )
             except AttributeError:
                 pass
         return figs, axs
 
-    def plot_spaces(self, var_names=None, opacity=.4):
+    def plot_spaces(self, var_names=None, opacity=0.4):
         if var_names is None:
             var_names = self.var_names
 
@@ -579,33 +763,45 @@ class VGPlotting(vg_base.VGBase):
             var_ii = self.var_names.index(var_name1)
             for var_jj in range(var_ii + 1, len(var_names)):
                 var_name2 = var_names[var_jj]
-                fig, ax = plt.subplots(nrows=1, ncols=1,
-                                       subplot_kw=dict(aspect="equal"))
+                fig, ax = plt.subplots(
+                    nrows=1, ncols=1, subplot_kw=dict(aspect="equal")
+                )
                 figs.append(fig)
                 axs.append(ax)
-                ax.scatter(my.rel_ranks(self.data_trans[var_ii]),
-                           my.rel_ranks(self.data_trans[var_jj]),
-                           marker="o", edgecolors=(0, 0, 1, opacity),
-                           facecolors=(0, 0, 0, 0), label="transformed data")
-                ax.scatter(my.rel_ranks(self.sim[var_ii]),
-                           my.rel_ranks(self.sim[var_jj]), marker="o",
-                           edgecolors=(1, 0, 0, opacity),
-                           facecolors=(0, 0, 0, 0), label="simulated")
+                ax.scatter(
+                    my.rel_ranks(self.data_trans[var_ii]),
+                    my.rel_ranks(self.data_trans[var_jj]),
+                    marker="o",
+                    edgecolors=(0, 0, 1, opacity),
+                    facecolors=(0, 0, 0, 0),
+                    label="transformed data",
+                )
+                ax.scatter(
+                    my.rel_ranks(self.sim[var_ii]),
+                    my.rel_ranks(self.sim[var_jj]),
+                    marker="o",
+                    edgecolors=(1, 0, 0, opacity),
+                    facecolors=(0, 0, 0, 0),
+                    label="simulated",
+                )
                 ax.legend()
                 ax.set_xlabel(var_name1)
                 ax.set_ylabel(var_name2)
                 ax.grid()
-                title_str = ("Spaces %s over %s" %
-                             (conf.long_var_names[var_name2],
-                              conf.long_var_names[var_name1]))
+                title_str = "Spaces %s over %s" % (
+                    conf.long_var_names[var_name2],
+                    conf.long_var_names[var_name1],
+                )
                 ax.set_title(title_str)
                 try:
-                    fig.canvas.set_window_title(f"{title_str} ({fig.canvas.manager.num})")
+                    fig.canvas.set_window_title(
+                        f"{title_str} ({fig.canvas.manager.num})"
+                    )
                 except AttributeError:
                     pass
         return figs, axs
 
-    def plot_diff_spaces(self, var_names=None, diff=1, opacity=.4):
+    def plot_diff_spaces(self, var_names=None, diff=1, opacity=0.4):
         if var_names is None:
             var_names = self.var_names
 
@@ -613,28 +809,40 @@ class VGPlotting(vg_base.VGBase):
         axs = []
         for var_name in var_names:
             var_ii = self.var_names.index(var_name)
-            fig, ax = plt.subplots(nrows=1, ncols=1,
-                                   subplot_kw=dict(aspect="equal"))
+            fig, ax = plt.subplots(
+                nrows=1, ncols=1, subplot_kw=dict(aspect="equal")
+            )
             figs.append(fig)
             axs.append(ax)
-            ax.scatter(my.rel_ranks(self.data_trans[var_ii, diff:]),
-                       my.rel_ranks(self.data_trans[var_ii, :-diff]),
-                       marker="o", edgecolors=(0, 0, 1, opacity),
-                       facecolors=(0, 0, 0, 0),
-                       label="transformed data")
-            ax.scatter(my.rel_ranks(self.sim[var_ii, diff:]),
-                       my.rel_ranks(self.sim[var_ii, :-diff]),
-                       marker="o", edgecolors=(1, 0, 0, opacity),
-                       facecolors=(0, 0, 0, 0), label="simulated")
+            ax.scatter(
+                my.rel_ranks(self.data_trans[var_ii, diff:]),
+                my.rel_ranks(self.data_trans[var_ii, :-diff]),
+                marker="o",
+                edgecolors=(0, 0, 1, opacity),
+                facecolors=(0, 0, 0, 0),
+                label="transformed data",
+            )
+            ax.scatter(
+                my.rel_ranks(self.sim[var_ii, diff:]),
+                my.rel_ranks(self.sim[var_ii, :-diff]),
+                marker="o",
+                edgecolors=(1, 0, 0, opacity),
+                facecolors=(0, 0, 0, 0),
+                label="simulated",
+            )
             ax.legend()
             ax.set_xlabel("t")
             ax.set_ylabel("t - %d" % diff)
             ax.grid(True)
-            title_str = ("Spaces %d-lagged %s" %
-                         (diff, conf.long_var_names[var_name]))
+            title_str = "Spaces %d-lagged %s" % (
+                diff,
+                conf.long_var_names[var_name],
+            )
             ax.set_title(title_str)
             try:
-                fig.canvas.set_window_title(f"{title_str} ({fig.canvas.manager.num})")
+                fig.canvas.set_window_title(
+                    f"{title_str} ({fig.canvas.manager.num})"
+                )
             except AttributeError:
                 pass
         return figs, axs
@@ -664,8 +872,9 @@ class VGPlotting(vg_base.VGBase):
         s_kwds : None or dict, optional
             Keyword arguments passed on to plt.scatter.
         """
-        return self._plot_seasonal_fit(var_names=None, hourly=True, *args,
-                                       **kwds)
+        return self._plot_seasonal_fit(
+            var_names=None, hourly=True, *args, **kwds
+        )
 
     def plot_daily_fit(self, var_names=None, *args, **kwds):
         """Plots daily scatter with fitted densities and a histogram of the
@@ -692,14 +901,27 @@ class VGPlotting(vg_base.VGBase):
         s_kwds : None or dict, optional
             Keyword arguments passed on to plt.scatter.
         """
-        return self._plot_seasonal_fit(var_names=var_names, hourly=False,
-                                  *args, **kwds)
+        return self._plot_seasonal_fit(
+            var_names=var_names, hourly=False, *args, **kwds
+        )
 
-    def _plot_seasonal_fit(self, var_names=None, plot_quantiles=True,
-                         plot_fourier=True, plot_monthly=False,
-                         plot_seasonality=False, hourly=False,
-                         opacity=.25, n_bins=15, kde=True, figs=None,
-                         axss=None, s_kwds=None, *args, **kwds):
+    def _plot_seasonal_fit(
+        self,
+        var_names=None,
+        plot_quantiles=True,
+        plot_fourier=True,
+        plot_monthly=False,
+        plot_seasonality=False,
+        hourly=False,
+        opacity=0.25,
+        n_bins=15,
+        kde=True,
+        figs=None,
+        axss=None,
+        s_kwds=None,
+        *args,
+        **kwds,
+    ):
         """Plots seasonal scatter with fitted densities and a histogram of the
         transformed quantiles.
 
@@ -726,8 +948,8 @@ class VGPlotting(vg_base.VGBase):
         """
         if var_names is None:
             var_names = self.var_names
-        elif isinstance(var_names, basestring):
-            var_names = var_names,
+        elif isinstance(var_names, str):
+            var_names = (var_names,)
 
         if figs is None:
             figs = []
@@ -758,25 +980,38 @@ class VGPlotting(vg_base.VGBase):
                 long_var_name = var_name
 
             # scatter pdf
-            fig, ax = dist.scatter_pdf(solution, title=long_var_name,
-                                       n_sumup=n_sumup, opacity=opacity,
-                                       s_kwds=s_kwds, *args, **kwds)
+            fig, ax = dist.scatter_pdf(
+                solution,
+                title=long_var_name,
+                n_sumup=n_sumup,
+                opacity=opacity,
+                s_kwds=s_kwds,
+                *args,
+                **kwds,
+            )
             if self.sim_sea is not None:
                 # data_sim = (self.sim_sea[var_ii] *
                 #             self.sum_interval_dict[var_name])
                 data_sim = self.sim_sea[var_ii]
-                ax.scatter(self.sim_doys, data_sim,
-                           marker="x", facecolor=(0, 0, 0, opacity))
+                ax.scatter(
+                    self.sim_doys,
+                    data_sim,
+                    marker="x",
+                    facecolor=(0, 0, 0, opacity),
+                )
                 ymin, ymax = ax.get_ylim()
-                ax.set_ylim(min(ymin, data_sim.min()),
-                            max(ymax, data_sim.max()))
+                ax.set_ylim(
+                    min(ymin, data_sim.min()), max(ymax, data_sim.max())
+                )
             fig.name = "scatter_pdf_%s_%s" % (var_name, discr_str)
-            ax.set_ylabel(conf.units[var_name]
-                          if var_name in conf.units else "[?]")
-            title_str = ("Scatter pdf %s (%d) %s"
-                         % (var_name,
-                            fig.canvas.manager.num,
-                            discr_str))
+            ax.set_ylabel(
+                conf.units[var_name] if var_name in conf.units else "[?]"
+            )
+            title_str = "Scatter pdf %s (%d) %s" % (
+                var_name,
+                fig.canvas.manager.num,
+                discr_str,
+            )
             ax.set_title(title_str)
             try:
                 fig.canvas.set_window_title(title_str)
@@ -789,19 +1024,23 @@ class VGPlotting(vg_base.VGBase):
                 fig = plt.figure(*args, **kwds)
                 var_ii = self.var_names.index(var_name)
                 quantiles = dist.cdf(solution, x=values, doys=doys)
-                my.hist(quantiles[np.isfinite(quantiles)],
-                        n_bins, fig=fig, kde=kde)
-                title_str = ("Quantiles %s (%d) %s"
-                             % (var_name,
-                                fig.canvas.manager.num,
-                                discr_str))
+                my.hist(
+                    quantiles[np.isfinite(quantiles)], n_bins, fig=fig, kde=kde
+                )
+                title_str = "Quantiles %s (%d) %s" % (
+                    var_name,
+                    fig.canvas.manager.num,
+                    discr_str,
+                )
                 plt.title(title_str)
                 try:
                     fig.canvas.set_window_title(title_str)
                 except AttributeError:
                     pass
-                fig.name = ("scatter_pdf_quantiles_%s_%s" %
-                            (var_name, discr_str))
+                fig.name = "scatter_pdf_quantiles_%s_%s" % (
+                    var_name,
+                    discr_str,
+                )
                 figs += [fig]
 
             suptitle = "%s %s" % (var_name, discr_str)
@@ -847,7 +1086,7 @@ class VGPlotting(vg_base.VGBase):
                                 fig.canvas.set_window_title(suptitle)
                             except AttributeError:
                                 pass
-                            
+
                     except TypeError:
                         fig.suptitle(suptitle)
                         try:
@@ -862,18 +1101,34 @@ class VGPlotting(vg_base.VGBase):
                     axss += axs
         return figs, axss
 
-    def plot_qq(self, var_names=None, figsize=None, lines=True, trans=False,
-              color="gray", fig=None, axs=None, *args, **kwds):
+    def plot_qq(
+        self,
+        var_names=None,
+        figsize=None,
+        lines=True,
+        trans=False,
+        color="gray",
+        fig=None,
+        axs=None,
+        obs=None,
+        *args,
+        **kwds,
+    ):
         if var_names is None:
             var_names = self.var_names
-        if isinstance(var_names, basestring):
-            var_names = var_names,
+        if isinstance(var_names, str):
+            var_names = (var_names,)
+        if obs is None:
+            obs_all = self.data_raw
+        else:
+            obs_all = obs
         n_axes = len(var_names)
-        n_cols = int(np.ceil(n_axes ** .5))
-        n_rows = int(np.ceil(old_div(float(n_axes), n_cols)))
+        n_cols = int(np.ceil(n_axes**0.5))
+        n_rows = int(np.ceil(float(n_axes) / n_cols))
         if fig is None and axs is None:
-            fig, axs = plt.subplots(n_rows, n_cols, subplot_kw={"aspect": 1},
-                                    figsize=figsize)
+            fig, axs = plt.subplots(
+                n_rows, n_cols, subplot_kw={"aspect": 1}, figsize=figsize
+            )
         alphas = np.linspace(0, 1, 200)
         try:
             axs = axs.ravel()
@@ -881,18 +1136,13 @@ class VGPlotting(vg_base.VGBase):
             axs = np.array([axs])
         for ax_i, var_name in enumerate(var_names):
             var_ii = self.var_names.index(var_name)
-            # we have to limit ourself to the length of the simulated
-            # data.
-            # TODO: we are biasing this comparision because we take
-            # the first values!
-            # finite_obs = np.isfinite(self.data_raw[var_ii])[:self.T_sim]
-            finite_obs = np.isfinite(self.data_raw[var_ii])
+            finite_obs = np.isfinite(obs_all[var_ii])
             if trans:
                 obs = np.sort(np.copy(self.data_trans[var_ii, finite_obs]))
                 # sim = np.sort(np.copy(self.sim[var_ii, finite_obs]))
                 sim = np.sort(np.copy(self.sim[var_ii]))
             else:
-                obs = np.sort(np.copy(self.data_raw[var_ii, finite_obs]))
+                obs = np.sort(np.copy(obs_all[var_ii, finite_obs]))
                 obs /= self.sum_interval[var_ii]
                 # sim = np.sort(np.copy(self.sim_sea[var_ii, finite_obs]))
                 sim = np.sort(np.copy(self.sim_sea[var_ii]))
@@ -906,12 +1156,14 @@ class VGPlotting(vg_base.VGBase):
             global_min = min(obs[0], sim[0])
             global_max = max(np.nanmax(obs), sim[-1])
 
-            if (self.sim_sea_dis is not None and
-                self.var_names_dis is not None and
-                    var_name in self.var_names_dis):
-
-                obs_dis_all = np.array(self.met[var_name]
-                                       )[:self.sim_sea_dis.shape[1]]
+            if (
+                self.sim_sea_dis is not None
+                and self.var_names_dis is not None
+                and var_name in self.var_names_dis
+            ):
+                obs_dis_all = np.array(self.met[var_name])[
+                    : self.sim_sea_dis.shape[1]
+                ]
                 finite_obs = np.isfinite(obs_dis_all)
                 var_i_dis = self.var_names_dis.index(var_name)
                 obs_dis = np.sort(np.copy(obs_dis_all[finite_obs]))
@@ -922,8 +1174,9 @@ class VGPlotting(vg_base.VGBase):
                 else:
                     ax.scatter(sim_dis, obs_dis, marker="x", color="black")
                 global_min = min(global_min, obs_dis[0], sim_dis[0])
-                global_max = max(global_max, np.nanmax(obs_dis),
-                                 np.nanmax(sim_dis))
+                global_max = max(
+                    global_max, np.nanmax(obs_dis), np.nanmax(sim_dis)
+                )
 
             ax.plot([global_min, global_max], [global_min, global_max], "k--")
             ax.grid()
@@ -932,8 +1185,9 @@ class VGPlotting(vg_base.VGBase):
                 ax.set_xticklabels([])
             else:
                 ax.set_xlabel("simulated")
-            ax.set_title("%s %s" %
-                         (conf.ygreek[var_name], conf.units[var_name]))
+            ax.set_title(
+                "%s %s" % (conf.ygreek[var_name], conf.units[var_name])
+            )
         # delete axs that we did not use
         if len(axs) > n_axes:
             for ax in axs[n_axes:]:
@@ -949,17 +1203,21 @@ class VGPlotting(vg_base.VGBase):
         fig.name = "qq"
         return fig, axs
 
-    def plot_seasonal_corrs(self, var_names=None, trans=False, figsize=None,
-                          fig=None, axs=None):
+    def plot_seasonal_corrs(
+        self, var_names=None, trans=False, figsize=None, fig=None, axs=None
+    ):
         if var_names is None:
             var_names = self.var_names
-        elif isinstance(var_names, basestring):
-            var_names = var_names,
+        elif isinstance(var_names, str):
+            var_names = (var_names,)
         if fig is None and axs is None:
-            fig, axs = plt.subplots(nrows=len(var_names), ncols=1,
-                                    sharex=True,
-                                    constrained_layout=True,
-                                    figsize=figsize)
+            fig, axs = plt.subplots(
+                nrows=len(var_names),
+                ncols=1,
+                sharex=True,
+                constrained_layout=True,
+                figsize=figsize,
+            )
         if trans:
             obs_df = self.to_df("daily input trans", var_names=var_names)
             sim_df = self.to_df("daily output trans", var_names=var_names)
@@ -969,8 +1227,9 @@ class VGPlotting(vg_base.VGBase):
         for ax, var_name in zip(axs, var_names):
             corrs_obs = np.empty((12, self.K - 1), dtype=float)
             var_i = var_names.index(var_name)
-            var_other_ii = [idx for idx in range(len(var_names))
-                            if idx != var_i]
+            var_other_ii = [
+                idx for idx in range(len(var_names)) if idx != var_i
+            ]
             for month_i, group in obs_df.groupby(obs_df.index.month):
                 corrs = np.corrcoef(group.T)
                 corrs_obs[month_i - 1] = corrs[var_i, var_other_ii]
@@ -998,8 +1257,8 @@ class VGPlotting(vg_base.VGBase):
             print("Can only plot wind roses if wind speed is simulated")
             return
 
-        u = old_div(self.data_raw[ui], self.sum_interval[ui])
-        v = old_div(self.data_raw[vi], self.sum_interval[vi])
+        u = self.data_raw[ui] / self.sum_interval[ui]
+        v = self.data_raw[vi] / self.sum_interval[vi]
         wind_dirs = avrwind.component2angle(u, v)[0]
 
         if figsize is not None:
@@ -1009,8 +1268,9 @@ class VGPlotting(vg_base.VGBase):
 
         def rose_func_gen(times_):
             if seasonal:
-                return lambda *args, **kwds: \
-                    seasonal_windroses(times_, *args, **kwds)
+                return lambda *args, **kwds: seasonal_windroses(
+                    times_, *args, **kwds
+                )
             else:
                 return lambda *args, **kwds: windrose(*args, **kwds)
 
@@ -1057,14 +1317,17 @@ class VGPlotting(vg_base.VGBase):
         if ygreek is None:
             # get rid of the incident for this block
             ygreek = collections.defaultdict(lambda: r"-")
-            ygreek.update({"R":      r'$R$',
-                           "theta":  r'$\theta$',
-                           "rh":     r"$\phi$",
-                           "Qsw":    r"$Q_{sw}$",
-                           "ILWR":   r"$Q_{lw(i.)}$",
-                           "u":      r"$u$",
-                           "v":      r"$v$",
-                           })
+            ygreek.update(
+                {
+                    "R": r"$R$",
+                    "theta": r"$\theta$",
+                    "rh": r"$\phi$",
+                    "Qsw": r"$Q_{sw}$",
+                    "ILWR": r"$Q_{lw(i.)}$",
+                    "u": r"$u$",
+                    "v": r"$v$",
+                }
+            )
 
         if self.ex_in is None:
             data = self.data_raw
@@ -1077,15 +1340,24 @@ class VGPlotting(vg_base.VGBase):
             return [ygreek[var_name] for var_name in var_names]
 
         greek_short = my_greek(var_names)
-        figs, axs = append_fa(ts.corr_img(data, 0, "Measured daily",
-                                          greek_short, *args, **kwds))
+        figs, axs = append_fa(
+            ts.corr_img(data, 0, "Measured daily", greek_short, *args, **kwds)
+        )
         figs[0].name = "corr_measured_daily"
-        
+
         if trans:
-            figs, axs = append_fa(ts.corr_img(self.data_trans, 0,
-                                              "Measured daily transformed",
-                                              greek_short, *args, **kwds),
-                                  figs, axs)
+            figs, axs = append_fa(
+                ts.corr_img(
+                    self.data_trans,
+                    0,
+                    "Measured daily transformed",
+                    greek_short,
+                    *args,
+                    **kwds,
+                ),
+                figs,
+                axs,
+            )
             figs[-1].name = "corr_measured_daily_trans"
 
         if self.sim_sea is not None:
@@ -1096,30 +1368,55 @@ class VGPlotting(vg_base.VGBase):
                 data = np.vstack((self.sim_sea, self.ex_out))
                 var_names = list(self.var_names) + ["external"]
             greek_short = my_greek(var_names)
-            figs, axs = append_fa(ts.corr_img(data, 0, "Simulated daily",
-                                              greek_short, *args, **kwds),
-                                  figs, axs)
+            figs, axs = append_fa(
+                ts.corr_img(
+                    data, 0, "Simulated daily", greek_short, *args, **kwds
+                ),
+                figs,
+                axs,
+            )
             figs[-1].name = "corr_sim_daily"
             if trans:
-                figs, axs = append_fa(ts.corr_img(self.sim, 0,
-                                                  "Simulated daily transformed",
-                                                  greek_short, *args, **kwds),
-                                      figs, axs)
+                figs, axs = append_fa(
+                    ts.corr_img(
+                        self.sim,
+                        0,
+                        "Simulated daily transformed",
+                        greek_short,
+                        *args,
+                        **kwds,
+                    ),
+                    figs,
+                    axs,
+                )
                 figs[-1].name = "corr_sim_daily_trans"
 
         if hourly:
-            met_array = vg_base.met_as_array(self.met,
-                                             var_names=self.var_names)
-            figs, axs = append_fa(ts.corr_img(met_array, 0, "Measured hourly",
-                                              greek_short, *args, **kwds),
-                                  figs, axs)
+            met_array = vg_base.met_as_array(
+                self.met, var_names=self.var_names
+            )
+            figs, axs = append_fa(
+                ts.corr_img(
+                    met_array, 0, "Measured hourly", greek_short, *args, **kwds
+                ),
+                figs,
+                axs,
+            )
             figs[-1].name = "corr_measured_hourly"
 
             if self.sim_sea_dis is not None:
-                figs, axs = append_fa(ts.corr_img(self.sim_sea_dis, 0,
-                                                  "Simulated hourly",
-                                                  greek_short, *args, **kwds),
-                                      figs, axs)
+                figs, axs = append_fa(
+                    ts.corr_img(
+                        self.sim_sea_dis,
+                        0,
+                        "Simulated hourly",
+                        greek_short,
+                        *args,
+                        **kwds,
+                    ),
+                    figs,
+                    axs,
+                )
                 figs[-1].name = "corr_sim_hourly"
         return figs, axs
 
@@ -1128,12 +1425,17 @@ class VGPlotting(vg_base.VGBase):
         if self.AM is None:
             print("Call fit first")
             return
-        return ts.matr_img(np.asarray(self.AM),
-                           "AM p=%d q=%d" % (self.p, self.q), None,
-                           self.var_names, **kwds)
+        return ts.matr_img(
+            np.asarray(self.AM),
+            "AM p=%d q=%d" % (self.p, self.q),
+            None,
+            self.var_names,
+            **kwds,
+        )
 
-    def plot_autocorr(self, maxlag=7, title=None, var_names=None, *args,
-                      **kwds):
+    def plot_autocorr(
+        self, maxlag=7, title=None, var_names=None, *args, **kwds
+    ):
         """Plots autocorrelation of transformed and simulated data (if the
         latter is available).
 
@@ -1150,60 +1452,79 @@ class VGPlotting(vg_base.VGBase):
             title_ = "Autocorrelation of standard-normal distributed variables"
         if var_names is None:
             var_names = var_names_greek(self.var_names)
-        figs, axs = append_fa(ts.plot_auto_corr(data, maxlag, title_,
-                                                var_names, *args, **kwds))
+        figs, axs = append_fa(
+            ts.plot_auto_corr(data, maxlag, title_, var_names, *args, **kwds)
+        )
         data = self.data_raw
         if self.sim_sea is not None:
             data = [data, self.sim_sea]
         if title is None:
             title_ = "Autocorrelation of untransformed variables"
-        figs, axs = append_fa(ts.plot_auto_corr(data, maxlag, title_,
-                                                var_names, *args, **kwds),
-                              figs, axs)
+        figs, axs = append_fa(
+            ts.plot_auto_corr(data, maxlag, title_, var_names, *args, **kwds),
+            figs,
+            axs,
+        )
         if self.residuals is not None:
-            figs, axs = append_fa(ts.plot_auto_corr(self.residuals, maxlag,
-                                                     "Autocorrelation of residuals.",
-                                                     var_names, **kwds),
-                                  figs, axs)
+            figs, axs = append_fa(
+                ts.plot_auto_corr(
+                    self.residuals,
+                    maxlag,
+                    "Autocorrelation of residuals.",
+                    var_names,
+                    **kwds,
+                ),
+                figs,
+                axs,
+            )
             # otherwise we probably have been given two arrays.  then
             # things get more complicated, because we would distinguish
             # between two possibly different sample sizes (data.shape[1])
             if isinstance(data, np.ndarray):
                 # bounds for test on the whiteness of the residuals (see page 160)
-                bound = 2. / np.sqrt(data.shape[1]) * np.ones(maxlag)
+                bound = 2.0 / np.sqrt(data.shape[1]) * np.ones(maxlag)
                 plt.plot(list(range(maxlag)), bound, "--", color="grey")
                 plt.plot(list(range(maxlag)), -bound, "--", color="grey")
 
             if self.ut is None:
-                squared_res = self.residuals ** 2
+                squared_res = self.residuals**2
             else:
-                squared_res = [self.residuals ** 2,
-                               self.ut ** 2]
-            figs, axs = append_fa(ts.plot_auto_corr(squared_res, maxlag,
-                                                    "Autocorrelation of "
-                                                    "squared residuals.",
-                                                    var_names, **kwds),
-                                  figs, axs)
+                squared_res = [self.residuals**2, self.ut**2]
+            figs, axs = append_fa(
+                ts.plot_auto_corr(
+                    squared_res,
+                    maxlag,
+                    "Autocorrelation of " "squared residuals.",
+                    var_names,
+                    **kwds,
+                ),
+                figs,
+                axs,
+            )
         return figs, axs
 
     def plot_cross_corr(self, max_lags=7, figsize=None):
         """Plot cross correlations."""
         kwds = dict(var_names=self.var_names, max_lags=max_lags)
-        fig, axs = ts.plot_cross_corr(old_div(self.data_raw, self.sum_interval),
-                                      figsize=figsize, **kwds)
+        fig, axs = ts.plot_cross_corr(
+            self.data_raw / self.sum_interval, figsize=figsize, **kwds
+        )
         if self.sim_sea is not None:
-            fig, axs = ts.plot_cross_corr(self.sim_sea, linestyle="--",
-                                          fig=fig, axs=axs, **kwds)
+            fig, axs = ts.plot_cross_corr(
+                self.sim_sea, linestyle="--", fig=fig, axs=axs, **kwds
+            )
         suptitle = "Daily"
         plt.suptitle(suptitle)
 
         if self.sim_sea_dis is not None:
-            met_array = vg_base.met_as_array(self.met,
-                                             var_names=self.var_names)
+            met_array = vg_base.met_as_array(
+                self.met, var_names=self.var_names
+            )
             kwds["max_lags"] *= max(self.sum_interval)
             fig1, axs1 = ts.plot_cross_corr(met_array, figsize=figsize, **kwds)
-            fig1, axs1 = ts.plot_cross_corr(self.sim_sea_dis, linestyle="--",
-                                            fig=fig1, axs=axs1, **kwds)
+            fig1, axs1 = ts.plot_cross_corr(
+                self.sim_sea_dis, linestyle="--", fig=fig1, axs=axs1, **kwds
+            )
             suptitle = "Hourly"
             plt.suptitle(suptitle)
             fig = [fig, fig1]
@@ -1211,33 +1532,50 @@ class VGPlotting(vg_base.VGBase):
 
         return fig, axs
 
-    def plot_scaling(self, agg_funcs=(np.mean, np.std, stats.skew,
-                                      stats.kurtosis),
-                     max_agg_len=2 * 365, normalize=True, **fig_kw):
+    def plot_scaling(
+        self,
+        agg_funcs=(np.mean, np.std, stats.skew, stats.kurtosis),
+        max_agg_len=2 * 365,
+        normalize=True,
+        **fig_kw,
+    ):
         """Plot mean/std/skew over aggregation length."""
-        kwds = dict(var_names=self.var_names, agg_funcs=agg_funcs,
-                    max_agg_len=max_agg_len, **fig_kw)
-        fig, axs = ts.plot_scaling(self.data_raw / self.sum_interval,
-                                   color="black", **kwds)
+        kwds = dict(
+            var_names=self.var_names,
+            agg_funcs=agg_funcs,
+            max_agg_len=max_agg_len,
+            **fig_kw,
+        )
+        color = kwds.pop("color", "blue")
+        fig = kwds.pop("figs", None)
+        axs = kwds.pop("axss", None)
+        if fig is None and axs is None:
+            fig, axs = ts.plot_scaling(
+                self.data_raw / self.sum_interval, color="black", **kwds
+            )
 
         if self.sim_sea is not None:
             sim = self.sim_sea
             if normalize:
                 # for the sake of argument: make the means equal
-                obs_means = np.nanmean(self.data_raw / self.sum_interval,
-                                       axis=1)
+                obs_means = np.nanmean(
+                    self.data_raw / self.sum_interval, axis=1
+                )
                 sim_means = np.nanmean(self.sim_sea, axis=1)
                 sim += (obs_means - sim_means)[:, None]
-            fig, axs = ts.plot_scaling(sim, color="blue", fig=fig, axs=axs,
-                                       **kwds)
+            fig, axs = ts.plot_scaling(
+                sim, color=color, fig=fig, axs=axs, **kwds
+            )
         return fig, axs
 
-    def plot_monthly_hists(self, var_names=None, bins=20, figs=None, axss=None):
+    def plot_monthly_hists(
+        self, var_names=None, bins=20, figs=None, axss=None
+    ):
         """Plot histograms grouped by month and variable."""
         if var_names is None:
             var_names = self.var_names
-        elif isinstance(var_names, basestring):
-            var_names = var_names,
+        elif isinstance(var_names, str):
+            var_names = (var_names,)
 
         if figs is None:
             figs = []
@@ -1245,15 +1583,19 @@ class VGPlotting(vg_base.VGBase):
         else:
             reuse_figs = True
         data = self.data_raw / self.sum_interval
-        month_ii = [times.time_part(self.times, "%m") == month
-                    for month in range(1, 13)]
+        month_ii = [
+            times.time_part(self.times, "%m") == month
+            for month in range(1, 13)
+        ]
         if self.sim_sea is not None:
-            sim_month_ii = [times.time_part(self.sim_times, "%m") == month
-                            for month in range(1, 13)]
+            sim_month_ii = [
+                times.time_part(self.sim_times, "%m") == month
+                for month in range(1, 13)
+            ]
         for var_name in var_names:
             var_i = self.var_names.index(var_name)
             if reuse_figs:
-                fig, axs = figs[var_i], axs[var_i]
+                fig, axs = figs[var_i], axss[var_i]
             else:
                 fig, axs = plt.subplots(3, 4, sharey=True, sharex=True)
                 axs = axs.ravel()
@@ -1264,14 +1606,15 @@ class VGPlotting(vg_base.VGBase):
                 if self.sim_sea is not None:
                     label = [label, "sim"]
                     dat = [dat, self.sim_sea[var_i, sim_month_ii[month]]]
-                axs[month].hist(dat, bins, density=True, histtype="step",
-                                label=label)
+                axs[month].hist(
+                    dat, bins, density=True, histtype="step", label=label
+                )
                 if self.sim_sea is None:
-                    dat = dat,
+                    dat = (dat,)
                 ax_cdf = axs[month].twinx()
                 for values in dat:
                     values = values[np.isfinite(values)]
-                    ranks = (np.arange(len(values)) - .5) / len(values)
+                    ranks = (np.arange(len(values)) - 0.5) / len(values)
                     ax_cdf.plot(np.sort(values), ranks)
                     ax_cdf.set_yticklabels([])
                 ax_cdf.set_ylim(0, 1)
@@ -1281,7 +1624,7 @@ class VGPlotting(vg_base.VGBase):
 
             suptitle = var_name
             fig.suptitle(suptitle)
-            fig.tight_layout(rect=(0, 0, 1, .95))
+            fig.tight_layout(rect=(0, 0, 1, 0.95))
             if not reuse_figs:
                 figs += [fig]
         if len(figs) == 1 and not reuse_figs:
@@ -1294,16 +1637,20 @@ class VGPlotting(vg_base.VGBase):
         """Plot histograms grouped by month and variable."""
         if var_names is None:
             var_names = self.var_names
-        elif isinstance(var_names, basestring):
-            var_names = var_names,
+        elif isinstance(var_names, str):
+            var_names = (var_names,)
 
         figs = []
         data = vg_base.met_as_array(self.met, var_names=var_names)
-        month_ii = [times.time_part(self.times_orig, "%m") == month
-                    for month in range(1, 13)]
+        month_ii = [
+            times.time_part(self.times_orig, "%m") == month
+            for month in range(1, 13)
+        ]
         if self.sim_sea_dis is not None:
-            sim_month_ii = [times.time_part(self.dis_times, "%m") == month
-                            for month in range(1, 13)]
+            sim_month_ii = [
+                times.time_part(self.dis_times, "%m") == month
+                for month in range(1, 13)
+            ]
         for var_name in var_names:
             var_i = self.var_names.index(var_name)
             fig, axs = plt.subplots(3, 4, sharey=True, sharex=True)
@@ -1315,14 +1662,15 @@ class VGPlotting(vg_base.VGBase):
                 if self.sim_sea is not None:
                     label = [label, "sim"]
                     dat = [dat, self.sim_sea_dis[var_i, sim_month_ii[month]]]
-                axs[month].hist(dat, bins, density=True, histtype="step",
-                                label=label)
+                axs[month].hist(
+                    dat, bins, density=True, histtype="step", label=label
+                )
                 if self.sim_sea is None:
-                    dat = dat,
+                    dat = (dat,)
                 ax_cdf = axs[month].twinx()
                 for values in dat:
                     values = values[np.isfinite(values)]
-                    ranks = (np.arange(len(values)) - .5) / len(values)
+                    ranks = (np.arange(len(values)) - 0.5) / len(values)
                     ax_cdf.plot(np.sort(values), ranks)
                     ax_cdf.set_yticklabels([])
                 ax_cdf.set_ylim(0, 1)
@@ -1332,7 +1680,7 @@ class VGPlotting(vg_base.VGBase):
 
             suptitle = var_name
             fig.suptitle(suptitle)
-            fig.tight_layout(rect=(0, 0, 1, .95))
+            fig.tight_layout(rect=(0, 0, 1, 0.95))
             figs += [fig]
         if len(figs) == 1:
             figs = figs[0]
@@ -1345,30 +1693,39 @@ class VGPlotting(vg_base.VGBase):
         variable."""
         if var_names is None:
             var_names = self.var_names
-        elif isinstance(var_names, basestring):
-            var_names = var_names,
+        elif isinstance(var_names, str):
+            var_names = (var_names,)
 
         figs = []
         axs = []
         for var_name in var_names:
             var_i = self.var_names.index(var_name)
             medians = self.fitted_medians(var_name, self.data_doys)
-            devs_obs = \
+            devs_obs = (
                 self.data_raw[var_i] / self.sum_interval[var_i] - medians
+            )
             sign_changes = np.where(np.diff(np.sign(devs_obs)) != 0)[0]
             durations = [np.diff(sign_changes)]
-            amplitudes = [np.array([np.mean(epi) for epi in
-                                    np.split(devs_obs, sign_changes)
-                                    if len(epi) > 0])]
+            amplitudes = [
+                np.array(
+                    [
+                        np.mean(epi)
+                        for epi in np.split(devs_obs, sign_changes)
+                        if len(epi) > 0
+                    ]
+                )
+            ]
 
             if self.sim_sea is not None:
                 medians = self.fitted_medians(var_name, self.sim_doys)
                 devs_sim = self.sim_sea[var_i] - medians
                 sign_changes = np.where(np.diff(np.sign(devs_sim)) != 0)[0]
                 durations_sim = np.diff(sign_changes)
-                amplitudes_sim = [np.mean(epi) for epi in
-                                  np.split(devs_sim, sign_changes)
-                                  if len(epi) > 0]
+                amplitudes_sim = [
+                    np.mean(epi)
+                    for epi in np.split(devs_sim, sign_changes)
+                    if len(epi) > 0
+                ]
                 durations += [durations_sim]
                 amplitudes += [amplitudes_sim]
 
@@ -1378,15 +1735,21 @@ class VGPlotting(vg_base.VGBase):
             axs_[1].hist(amplitudes, 30, density=True)
             axs_[1].set_xlabel("Deviation %s" % conf.units[var_name])
 
-            legend1 = (r"observed $\overline{x}=%.2f$" %
-                       np.mean(durations[0] - 1))
-            legend2 = (r"observed $\sigma=%.2f$" %
-                       np.std(amplitudes[0][np.isfinite(amplitudes[0])]))
+            legend1 = r"observed $\overline{x}=%.2f$" % np.mean(
+                durations[0] - 1
+            )
+            legend2 = r"observed $\sigma=%.2f$" % np.std(
+                amplitudes[0][np.isfinite(amplitudes[0])]
+            )
             if self.sim_sea is not None:
-                legend1 = [legend1, r"sim $\overline{x}=%.2f$" %
-                           np.mean(durations_sim - 1)]
-                legend2 = [legend2, r"sim $\sigma=%.2f$" %
-                           np.std(amplitudes_sim)]
+                legend1 = [
+                    legend1,
+                    r"sim $\overline{x}=%.2f$" % np.mean(durations_sim - 1),
+                ]
+                legend2 = [
+                    legend2,
+                    r"sim $\sigma=%.2f$" % np.std(amplitudes_sim),
+                ]
             else:
                 legend1, legend2 = (legend1,), (legend2,)
             axs_[0].legend(legend1, loc="best")
@@ -1420,8 +1783,8 @@ class VGPlotting(vg_base.VGBase):
             return
         if var_names is None:
             var_names = self.var_names
-        elif type(var_names) == str:
-            var_names = var_names,
+        elif isinstance(var_names, str):
+            var_names = (var_names,)
 
         if not rain_thresh:
             # rain_mask_obs = np.ones_like(self.met["R"], dtype=bool)
@@ -1430,25 +1793,36 @@ class VGPlotting(vg_base.VGBase):
         if rain_thresh is True or type(rain_thresh) is float:
             if rain_thresh is True:
                 rain_thresh = conf.threshold
-            rain_mask_obs = (self.data_raw[self.var_names.index("R")] >=
-                             rain_thresh)
-            rain_mask_obs = np.repeat(rain_mask_obs,
-                                      self.sum_interval_dict["R"][0])
-            rain_mask_sim = (self.sim_sea[self.var_names.index("R")] >=
-                             rain_thresh)
-            rain_mask_sim = np.repeat(rain_mask_sim,
-                                      self.sum_interval_dict["R"][0])
+            rain_mask_obs = (
+                self.data_raw[self.var_names.index("R")] >= rain_thresh
+            )
+            rain_mask_obs = np.repeat(
+                rain_mask_obs, self.sum_interval_dict["R"][0]
+            )
+            rain_mask_sim = (
+                self.sim_sea[self.var_names.index("R")] >= rain_thresh
+            )
+            rain_mask_sim = np.repeat(
+                rain_mask_sim, self.sum_interval_dict["R"][0]
+            )
             rain_comparison = True
 
         figs, axes = [], []
-        month_iis = [times.time_part(self.times_orig, "%m") == month
-                     for month in range(1, 13)]
-        hour_iis = [times.time_part(self.times_orig, "%H") == hour
-                    for hour in range(24)]
-        month_sim_iis = [times.time_part(self.dis_times, "%m") == month
-                         for month in range(1, 13)]
-        hour_sim_iis = [times.time_part(self.dis_times, "%H") == hour
-                        for hour in range(24)]
+        month_iis = [
+            times.time_part(self.times_orig, "%m") == month
+            for month in range(1, 13)
+        ]
+        hour_iis = [
+            times.time_part(self.times_orig, "%H") == hour
+            for hour in range(24)
+        ]
+        month_sim_iis = [
+            times.time_part(self.dis_times, "%m") == month
+            for month in range(1, 13)
+        ]
+        hour_sim_iis = [
+            times.time_part(self.dis_times, "%H") == hour for hour in range(24)
+        ]
 
         fig_kw.update(dict(sharex=True, sharey=True))
         for var_name in var_names:
@@ -1480,7 +1854,7 @@ class VGPlotting(vg_base.VGBase):
                         mask = month_ii & hour_ii
                         if rain_comparison:
                             mask &= mask_mod(rain_mask_sim)
-                        data_sim = data_sim[mask[:len(data_sim)]]
+                        data_sim = data_sim[mask[: len(data_sim)]]
                         means_obs[month - 1, hour] = np.nanmean(data_obs)
                         means_sim[month - 1, hour] = np.nanmean(data_sim)
 
@@ -1499,12 +1873,12 @@ class VGPlotting(vg_base.VGBase):
                 locator.create_dummy_axis()
                 locator.set_bounds(vmin, vmax)
                 levs = locator()
-                axs[mask_i, 0].contourf(list(range(1, 25)),
-                                        list(range(1, 13)),
-                                        means_obs, levs)
-                co = axs[mask_i, 1].contourf(list(range(1, 25)),
-                                             list(range(1, 13)),
-                                             means_sim, levs)
+                axs[mask_i, 0].contourf(
+                    list(range(1, 25)), list(range(1, 13)), means_obs, levs
+                )
+                co = axs[mask_i, 1].contourf(
+                    list(range(1, 25)), list(range(1, 13)), means_sim, levs
+                )
 
                 axs[mask_i, 0].set_xticks([6, 12, 18, 24])
                 axs[mask_i, 1].set_xticks([6, 12, 18, 24])
@@ -1525,7 +1899,7 @@ class VGPlotting(vg_base.VGBase):
             except AttributeError:
                 pass
             if "constrained_layout" not in fig_kw.keys():
-                fig.tight_layout(rect=(0, 0, 1, .925))
+                fig.tight_layout(rect=(0, 0, 1, 0.925))
             fig.subplots_adjust(right=0.8)
             cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
             cbar = fig.colorbar(co, cax=cbar_ax)
@@ -1534,6 +1908,27 @@ class VGPlotting(vg_base.VGBase):
             figs += [fig]
             axes += [axs]
         return figs, axes
+
+    def plot_candidates(self, figs=None, axss=None):
+        fig, axs = self._meteogram(
+            self.sim_times,
+            self.sim,
+            "Resample candidate bounds",
+            var_names=self.var_names,
+            plot_dewpoint=False,
+            fig=figs,
+            axs=axss,
+        )
+        for candidates, ax in zip(self.candidates, axs):
+            mins = np.min(candidates, axis=1)
+            q25 = np.quantile(candidates, 0.25, axis=1)
+            q75 = np.quantile(candidates, 0.75, axis=1)
+            maxs = np.max(candidates, axis=1)
+            ax[0].fill_between(
+                self.sim_times, mins, maxs, alpha=0.25, color="k"
+            )
+            ax[0].fill_between(self.sim_times, q25, q75, alpha=0.5, color="k")
+        return fig, axs
 
     # def plot_torus(self, var_names=None, **fig_kw):
     #     """Provides a 2d visualization with doys as horizontal and hours as
@@ -1555,7 +1950,7 @@ class VGPlotting(vg_base.VGBase):
     #     ncols = n_years / nrows
     #     for var_name in var_names:
     #         fig, axs = plt.subplots(nrows, ncols, **fig_kw)
-    #         # torus = 
-            
+    #         # torus =
+
     #         figs += [fig]
     #         axes += [axs]
