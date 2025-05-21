@@ -56,8 +56,12 @@ def _calibrate(**res_kwds):
     # theta_min = theta_incr.min()
     # biases = theta_incr - theta_min + np.linspace(0, 5, 15)[:, None]
 
+    # theta_incrs = np.concatenate(
+    #     (np.linspace(0, 1, 10), np.linspace(1.1, 8, 5))
+    # )
+
     theta_incrs = np.concatenate(
-        (np.linspace(0, 1, 10), np.linspace(1.1, 8, 5))
+        (np.linspace(0, 1, 20), np.linspace(1.1, 6, 5))
     )
     biases = theta_incrs
     # theta_incrs = np.linspace(0, 4, 15)
@@ -67,7 +71,7 @@ def _calibrate(**res_kwds):
     for bias in biases:
         res_kwds["bias"] = bias
         # res_kwds["theta_incr"] = bias
-        res, _ = resample(**res_kwds)
+        res, _ = resample(n_sim_steps=5 * data.shape[1], **res_kwds)
         theta_res = res[theta_i]
         means += [np.mean(theta_res)]
     mean_diffs = np.array(means) - np.mean(theta)
@@ -106,6 +110,8 @@ def _transform_theta_incr(
     Fits a curve of the following form:
       x = (- d \ln |1 - a / b|)^{1/c}
     """
+    if theta_incr is None:
+        theta_incr = 0
     if cache_dir:
         shelve_filepath = os.path.join(cache_dir, shelve_filename)
     else:
@@ -142,7 +148,7 @@ def _transform_theta_incr(
     # print("re-transformed bias: %.3f" %
     #       bias2mean(bias_pos, a_pos, b_pos, c_pos, d_pos))
     bias_neg = mean2bias(-theta_incr, a_neg, b_neg, c_neg, d_neg)
-    bias = np.where(theta_incr > 0, bias_pos, -bias_neg)
+    bias = np.where(theta_incr >= 0, bias_pos, -bias_neg)
 
     if np.any(~np.isfinite(bias)):
         fig, ax = plt.subplots()
@@ -182,6 +188,7 @@ def resample(
     verbose=False,
     return_candidates=False,
     recalibrate=False,
+    z_transform=True,
     **kwds,
 ):
     """A simple multivariate resampler.
@@ -231,6 +238,9 @@ def resample(
                 "Transformed theta_incr=%.3f to bias=%.5f"
                 % (np.mean(theta_incr), np.mean(bias))
             )
+    if z_transform:
+        data_orig = np.copy(data)
+        data = (data - data.mean(axis=1)[:, None]) / data.std(axis=1)[:, None]
     if n_sim_steps is None:
         n_sim_steps = data.shape[1]
     K, T = data.shape
@@ -310,6 +320,9 @@ def resample(
         # i points at the beginning of a chunk, we want the values one time
         # step further
         sim[:, t] = data[:, neighbor_i + p]
+
+    if z_transform:
+        sim = data_orig[:, chosen_indices]
 
     if return_candidates:
         return sim, chosen_indices, candidate_series
