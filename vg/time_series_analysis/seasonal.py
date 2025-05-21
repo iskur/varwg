@@ -84,6 +84,23 @@ class Seasonal(object):
         assert len(doys_new) == len(doys)
         return doys_new
 
+    def doys2doys_ii(self, doys):
+        """Doys indices from doy values."""
+        doys = np.atleast_1d(doys)
+        # use the parameters of 28. feb for 29.feb
+        year_end_ii = np.where(np.diff(doys) < 0)[0] + 1
+        year_end_ii = np.concatenate(([0], year_end_ii, [len(doys)]))
+        for start_i, end_i in zip(year_end_ii[:-1], year_end_ii[1:]):
+            year_slice = slice(start_i, end_i)
+            year_doys = doys[year_slice]
+            if np.max(year_doys) >= 366:
+                year_doys[year_doys > 31 + 29] -= 1
+                doys[year_slice] = year_doys
+        doys_ii = ((doys - 1) / self.dt).astype(int)
+        if len(doys_ii) < len(doys):
+            doys_ii = [my.val2ind(self.doys_unique, doy) for doy in doys]
+        return doys_ii
+
     @property
     def n_years(self):
         return self.datetimes[-1].year - self.datetimes[0].year + 1
