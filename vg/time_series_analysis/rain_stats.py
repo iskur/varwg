@@ -49,12 +49,13 @@ def spell_lengths(rain, thresh=0.001):
     """
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", category=RuntimeWarning)
-        rain_mask = rain >= thresh
+        wet_mask = rain >= thresh
+        # dry_mask = rain <= 0
     dry = np.array(
-        [stop_i - start_i + 1 for start_i, stop_i in my.gaps(~rain_mask)]
+        [stop_i - start_i + 1 for start_i, stop_i in my.gaps(~wet_mask)]
     )
     wet = np.array(
-        [stop_i - start_i + 1 for start_i, stop_i in my.gaps(rain_mask)]
+        [stop_i - start_i + 1 for start_i, stop_i in my.gaps(wet_mask)]
     )
     return dry, wet
 
@@ -69,6 +70,7 @@ def plot_exceedance(
     figsize=None,
     lkwds=None,
     draw_scatter=None,
+    log="both",
     *pargs,
     **pkwds,
 ):
@@ -99,7 +101,7 @@ def plot_exceedance(
                 ncols=3, sharey=True, figsize=figsize, constrained_layout=True
             )
         kinds = "depth", "dry", "wet"
-    elif isinstance(kind, basestring):
+    elif isinstance(kind, str):
         kinds = (kind,)
     elif fig is None or axs is None:
         fig, axs = plt.subplots(
@@ -117,7 +119,20 @@ def plot_exceedance(
         sim_conv = conv(sim)
         ranks = rel_ranks(len(sim_conv))
         sim_sorted = np.sort(sim_conv)[::-1]
-        ax.loglog(sim_sorted, ranks, *pargs, **pkwds)
+        match log:
+            case "x":
+                plot_func = ax.semilogx
+            case "y":
+                plot_func = ax.semilogy
+            case "both":
+                plot_func = ax.loglog
+            case False | "none":
+                ax.plot
+            case _:
+                raise RuntimeError(
+                    "log parameter must be one of: 'x', 'y', 'both', 'none', False"
+                )
+        plot_func(sim_sorted, ranks, *pargs, **pkwds)
 
     edgecolor = lkwds.pop("edgecolor", "black")
     for ax_i, kind in enumerate(kinds):
