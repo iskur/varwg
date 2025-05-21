@@ -5,8 +5,9 @@ import vg
 
 
 @my.cache(mask=None)
-def _random_phases(phases, T_sim, T_data, verbose=False, mask_fun=None):
-    K = phases.shape[0]
+def _random_phases(
+    K, T_sim, T_data, zero_phases=None, verbose=False, mask_fun=None
+):
     T_total = 0
     phases_stacked = []
     _random_phases.clear_cache()
@@ -32,7 +33,10 @@ def _random_phases(phases, T_sim, T_data, verbose=False, mask_fun=None):
         phases_neg = -phases_pos[:, ::-1]
         nyquist = np.full(K, 0)[:, None]
         # zero_phases = phases[:, 0, None]
-        zero_phases = np.zeros(K)[:, None]
+        if zero_phases is None:
+            zero_phases = np.zeros(K)[:, None]
+        elif zero_phases.ndim < 2:
+            zero_phases = zero_phases[:, None]
         if T_data % 2 == 0:
             phases = np.hstack((zero_phases, phases_pos, nyquist, phases_neg))
             if mask_fun is not None:
@@ -60,6 +64,7 @@ def randomize2d(
     taboo_period_max=None,
     return_rphases=False,
     rphases=None,
+    qq=True,
 ):
     """
     assumes daily discretization and does not touch yearly cycles."""
@@ -80,9 +85,11 @@ def randomize2d(
     else:
         mask_fun = None
     A = np.fft.fft(data)
-    phases_data = np.angle(A)
+    zero_phases = np.angle(A)[:, 0]
     if rphases is None:
-        rphases = _random_phases(phases_data, T_sim, T_data, mask_fun=mask_fun)
+        rphases = _random_phases(
+            K, T_sim, T_data, zero_phases=zero_phases, mask_fun=mask_fun
+        )
     fft_sim = np.concatenate(
         [np.fft.ifft(A * np.exp(1j * rphases_)).real for rphases_ in rphases],
         axis=1,
