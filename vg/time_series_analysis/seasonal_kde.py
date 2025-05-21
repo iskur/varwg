@@ -79,6 +79,7 @@ class SeasonalKDE(seasonal.Seasonal):
         self._density_grid = self._x_grid = self._quantile_grid = None
         self._cdf_interp_per_day = self._ppf_interp_per_day = None
         self._data_bounds = self._lower_bound = self._upper_bound = None
+        self._medians_per_doy = None
 
         if solution is not None:
             self.solution = solution
@@ -312,6 +313,15 @@ class SeasonalKDE(seasonal.Seasonal):
             # a view)
             densities.ravel()[:: len(data) + 1] = 0
         return np.sum(densities, axis=1) / float(len(densities) - 1)
+
+    def median(self, solution, doys, **kwds):
+        if self._medians_per_doy is None:
+            self._medians_per_doy = self.ppf(
+                solution, np.full_like(doys, 0.5), doys
+            )
+        if doys is None:
+            doys = self.doys
+        return self._medians_per_doy[self.doys2doys_ii(doys)]
 
     def sum_log_density(self, kernel_width, data, doys, doy_middle):
         """objective function to optimize kernel width with MLM leave one
