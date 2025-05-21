@@ -332,7 +332,7 @@ def plot_cross_corr(
     max_lags=10,
     figsize=None,
     fig=None,
-    axs=None,
+    axss=None,
     *args,
     **kwds
 ):
@@ -342,31 +342,31 @@ def plot_cross_corr(
     lags = np.arange(max_lags)
     # shape: (max_lags, K, K)
     cross_corrs = np.array([cross_corr(data, k) for k in lags])
-    if fig is None and axs is None:
+    if fig is None and axss is None:
         size = {}
         if figsize:
             size["figsize"] = figsize
-        fig, axs = plt.subplots(
+        fig, axss = plt.subplots(
             K, squeeze=True, sharey=True, sharex=True, **size
         )
     for var_i in range(K):
         lines = []
         for var_j in range(K):
             # want to set the same colors as before when called with a given
-            # fig and axs
+            # fig and axss
             colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
             color = colors[var_j % len(colors)]
-            lines += axs[var_i].plot(
+            lines += axss[var_i].plot(
                 lags, cross_corrs[:, var_i, var_j], color=color, *args, **kwds
             )
-        axs[var_i].set_title(var_names[var_i])
-        axs[var_i].grid(True)
-        axs[var_i].set_ylabel("correlation")
-    axs[-1].set_xlabel("time lag")
+        axss[var_i].set_title(var_names[var_i])
+        axss[var_i].grid(True)
+        axss[var_i].set_ylabel("correlation")
+    axss[-1].set_xlabel("time lag")
     plt.subplots_adjust(right=0.75, hspace=0.25)
     if fig is not None:
         fig.legend(lines, var_names, loc="center right")
-    return fig, axs
+    return fig, axss
 
 
 def plot_scaling(
