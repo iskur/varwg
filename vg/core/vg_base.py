@@ -1,7 +1,6 @@
 import copy
 import datetime
 import os
-import shelve
 from pickle import UnpicklingError
 import re
 import shlex
@@ -12,9 +11,12 @@ from tqdm import tqdm
 import numpy as np
 import pandas as pd
 from scipy import interpolate, stats
+import matplotlib.pyplot as plt
 
 import vg.time_series_analysis.seasonal_kde as skde
-from vg import helpers as my, times
+from vg import helpers as my
+from vg import times
+from vg import shelve
 import vg
 from vg.meteo import avrwind, meteox2y, meteox2y_cy
 from vg.time_series_analysis import (
@@ -200,11 +202,14 @@ def read_met(
         for key, values in list(var_dict.items())
     }
 
+    from vg import times
+
     met = {
         key: times.regularize(val, datetimes, nan=True, main_diff=main_diff)[0]
         for key, val in list(met.items())
     }
     # get also the regularized datetimes
+
     datetimes = times.regularize(
         np.empty(len(datetimes)), datetimes, main_diff=main_diff
     )[1]
@@ -324,7 +329,9 @@ class VGBase(object):
         rain_method=None,
         neg_rain_doy_width=30,
         neg_rain_fft_order=2,
+        neg_kwds=None,
         infill=False,
+        fit_kwds=None,
         **met_kwds,
     ):
         # external_var_names=None,
@@ -334,6 +341,7 @@ class VGBase(object):
         self.verbose = verbose
         self.met_file = conf.met_file if met_file is None else met_file
         self.data_dir = conf.data_dir if data_dir is None else data_dir
+        self.fit_kwds = {} if fit_kwds is None else fit_kwds
         if cache_dir is not None:
             self.cache_dir = cache_dir
             self.seasonal_cache_file = os.path.join(cache_dir, cache_filename)
@@ -402,12 +410,36 @@ class VGBase(object):
                 print("Fitting seasonal distributions.")
             self.data_trans, self.dist_sol = self._fit_seasonal(refit)
 
-        if "R" in self.var_names:
+        # if "R" in self.var_names:
+        #     if self.verbose:
+        #         print(f"Transforming 'negative rain' (using {rain_method})")
+        #     # populated in negative_rain
+        #     self.rain_mask = np.ones(self.T_summed, dtype=bool)
+        #     rain_i = self.var_names.index("R")
+        #     rain = self.data_raw[rain_i]
+        #     self.data_trans = self._negative_rain(
+        #         self.data_trans,
+        #         rain,
+        #         self.data_doys,
+        #         doy_width=neg_rain_doy_width,
+        #         fft_order=neg_rain_fft_order,
+        #         var_names=non_rain,
+        #         method=rain_method,
+        #         kwds=neg_kwds,
+        #     )
+
+        for var_name, (dist, sol) in self.dist_sol.items():
+            if isinstance(dist, skde.SeasonalKDE):
+                continue
+            if not isinstance(dist.dist, distributions.RainMix):
+                continue
             if self.verbose:
-                print("Transforming 'negative rain'")
+                print(
+                    f"Transforming zero-values of {var_name} (using {rain_method})"
+                )
             # populated in negative_rain
             self.rain_mask = np.ones(self.T_summed, dtype=bool)
-            rain_i = self.var_names.index("R")
+            rain_i = self.var_names.index(var_name)
             rain = self.data_raw[rain_i]
             self.data_trans = self._negative_rain(
                 self.data_trans,
@@ -417,7 +449,10 @@ class VGBase(object):
                 fft_order=neg_rain_fft_order,
                 var_names=non_rain,
                 method=rain_method,
+                kwds=neg_kwds,
+                self_name=var_name,
             )
+
         if infill:
             self.data_trans = self.infill_trans_nans()
 
@@ -862,7 +897,7 @@ class VGBase(object):
         return deltas_drawn, sim_sea_dis
 
     def _load_and_prepare_data(self, delimiter="\t", max_nans=12, **met_kwds):
-        """Loading the data from the met_file and aggregate it according to
+        """Load the data from the met_file and aggregate it according to
         sum_interval (both defined in __init__). Plus plotting if requested."""
         if not os.path.exists(self.cache_dir):
             os.makedirs(self.cache_dir)
@@ -923,13 +958,11 @@ class VGBase(object):
             # return np.nanmean(values) * sum_interval
             return np.nansum(values)
 
-        data_df = (
-            pd.DataFrame(
-                data=self.met, index=self.times_orig, columns=var_names_part
-            )
-            .resample("%dH" % sum_interval)
-            .agg(sum_to_nan)
+        data_df = pd.DataFrame(
+            data=self.met, index=self.times_orig, columns=var_names_part
         )
+        if sum_interval > 1:
+            data_df = data_df.resample("%dh" % sum_interval).agg(sum_to_nan)
 
         data = data_df.values.T
         times_ = data_df.index.to_pydatetime()
@@ -1016,10 +1049,16 @@ class VGBase(object):
             else:
                 self.start_date = self.sim_times[0]
         else:
-            self.start_date = times.str2datetime(start_str)
+            try:
+                self.start_date = times.str2datetime(start_str)
+            except ValueError:
+                self.start_date = times.iso2datetime(start_str)
         if stop_str is not None:
             # overwrite T setting
-            end_date = times.str2datetime(stop_str)
+            try:
+                end_date = times.str2datetime(stop_str)
+            except ValueError:
+                end_date = times.iso2datetime(stop_str)
             t_diff_seconds = (end_date - self.start_date).total_seconds()
             T = int(t_diff_seconds / (60**2 * 24))
         # interval_secs = 60. ** 2 * output_resolution
@@ -1036,11 +1075,18 @@ class VGBase(object):
         return times_out
 
     def _fit_distribution(self, sh, var, var_name, solution_key, **kwds):
-        seas_class = conf.seasonal_classes[var_name]
+        try:
+            seas_class = conf.seasonal_classes[var_name]
+        except KeyError:
+            raise RuntimeError(
+                f"Configure seasonal_classes in {conf.__file__} for {var_name}."
+            )
         if (
             issubclass(seas_class, skde.SeasonalKDE)
             or conf.dists[var_name] == "empirical"
         ):
+            if self.verbose:
+                print(f"\tFitting KDE to {var_name}")
             dist = seas_class(
                 var,
                 self.times,
@@ -1052,7 +1098,7 @@ class VGBase(object):
                 # silverman=(var_name == "sun")
                 silverman=(var_name in ("sun", "R"))
             )
-            sh[solution_key] = [seas_class, None, solution]
+            sh[solution_key] = [dist, None, solution]
         else:
             dist = seas_class(
                 conf.dists[var_name],
@@ -1062,13 +1108,15 @@ class VGBase(object):
                 verbose=self.verbose,
                 **kwds,
             )
+            if self.verbose:
+                print(f"\tFitting {dist} to {var_name}")
             solution = dist.fit()
             try:
-                sh[solution_key] = [seas_class, conf.dists[var_name], solution]
+                sh[solution_key] = [dist, conf.dists[var_name], solution]
             except TypeError:
                 # we will rely on the distribution that is set
                 # in the config file later
-                sh[solution_key] = [seas_class, None, solution]
+                sh[solution_key] = [dist, None, solution]
             if hasattr(dist, "supplements"):
                 sh[solution_key + "suppl"] = dist.supplements
             if kwds.get("tabulate_cdf", False):
@@ -1119,29 +1167,34 @@ class VGBase(object):
             )
 
             if solution_key not in keys or plain_solution_key in refit:
-                if self.verbose:
-                    print("\tFitting a distribution to ", var_name)
+                # if self.verbose:
+                #     print("\tFitting a distribution to ", var_name)
                 dist, solution = self._fit_distribution(
                     sh, var, var_name, solution_key, **kwds
                 )
             else:
-                if self.verbose:
-                    print("\tRecover previous fit from shelve for: ", var_name)
                 try:
-                    seas_class, dist_class, solution = sh[solution_key]
-                except UnpicklingError as exc:
+                    dist, dist_class, solution = sh[solution_key]
+                    if self.verbose:
+                        print(
+                            f"\tRecovered previous fit ({dist}) "
+                            f"from shelve for: {var_name}"
+                        )
+                except (UnpicklingError, EOFError) as exc:
                     if self.verbose:
                         print(exc)
                     self._fit_distribution(
                         sh, var, var_name, solution_key, **kwds
                     )
-                    seas_class, dist_class, solution = sh[solution_key]
+                    dist, dist_class, solution = sh[solution_key]
                 try:
                     supplements = sh[solution_key + "suppl"]
                 except KeyError:
                     supplements = None
                     sh[solution_key + "suppl"] = None
                 if kwds.get("tabulate_cdf", False):
+                    if isinstance(dist_class, tuple):
+                        dist_class = dist_class[1]
                     cdf_table_key = (
                         solution_key + f"cdf_table_{dist_class.name}"
                     )
@@ -1152,37 +1205,42 @@ class VGBase(object):
                 else:
                     cdf_table = None
 
-                var_ = var
-                if (
-                    issubclass(seas_class, skde.SeasonalKDE)
-                    or seas_class == "empirical"
-                ):
-                    dist = seas_class(
-                        var_,
-                        self.times,
-                        solution,
-                        fixed_pars=conf.par_known[var_name],
-                        **kwds,
-                    )
-                else:
-                    if dist_class is None:
-                        dist_class = conf.dists[var_name]
-                    dist = seas_class(
-                        dist_class,
-                        var_,
-                        self.times,
-                        solution=solution,
-                        fixed_pars=conf.par_known[var_name],
-                        supplements=supplements,
-                        cdf_table=cdf_table,
-                        **kwds,
-                    )
+                # var_ = var
+                # if (
+                #     issubclass(seas_class, skde.SeasonalKDE)
+                #     or seas_class == "empirical"
+                # ):
+                #     dist = seas_class(
+                #         var_,
+                #         self.times,
+                #         solution,
+                #         fixed_pars=conf.par_known[var_name],
+                #         **kwds,
+                #     )
+                # else:
+                #     if dist_class is None:
+                #         dist_class = conf.dists[var_name]
+                #     dist = seas_class(
+                #         dist_class,
+                #         var_,
+                #         self.times,
+                #         solution=solution,
+                #         fixed_pars=conf.par_known[var_name],
+                #         supplements=supplements,
+                #         cdf_table=cdf_table,
+                #         **kwds,
+                #     )
 
-            if self.verbose:
-                print(
-                    "\tp-value of chi2 goodness-of-fit %.4f" % dist.chi2_test()
-                )
-            quantiles = dist.cdf(solution, x=var, doys=doys)
+            # if self.verbose:
+            #     print(
+            #         "\tp-value of chi2 goodness-of-fit %.4f" % dist.chi2_test()
+            #     )
+            quantiles = dist.cdf(
+                solution,
+                x=var,
+                doys=doys,
+                # pdb=(pdb and (var_name != "R"))
+            )
             assert len(quantiles) == len(var)
             data_trans[var_ii] = distributions.norm.ppf(quantiles)
             dist_sol[var_name] = dist, solution
@@ -1351,6 +1409,7 @@ class VGBase(object):
         fft_order,
         var_names=None,
         method="regression",
+        kwds=None,
         self_name="R",
     ):
         """
@@ -1366,6 +1425,8 @@ class VGBase(object):
         var_names : None or sequence of str, optional
             Non-rain variables to use.
         """
+        if kwds is None:
+            kwds = dict()
         if doys[1] - doys[0] < 1:
             rain_dist, sol = self.dist_sol_hourly(self_name)
         else:
@@ -1455,10 +1516,9 @@ class VGBase(object):
             rain_reg = (non_rain[:, dry_mask] * betas).sum(axis=0)
             return my.rel_ranks(rain_reg)
 
-        def calc_dist_ranks_simulation():
+        def calc_dist_ranks_simulation(p=3):
             rain_trans = np.where(rain_mask, data_trans[rain_i], np.nan)
             data_for_sim = np.vstack((non_rain, rain_trans))
-            p = 3  # TODO: make this configurable!
             B, sigma_u = models.VAR_LS(data_for_sim, p)
 
             def bottom_stack(matrix):
