@@ -11,7 +11,7 @@ import numpy as np
 from numpy.random import default_rng
 import scipy.optimize as sp_optimize
 from scipy import interpolate, linalg, special, stats
-from scipy.integrate import cumtrapz, quad
+from scipy.integrate import cumulative_trapezoid, quad
 
 
 try:
@@ -361,6 +361,7 @@ class Dist(metaclass=DistMeta):
         )
         if quantiles_finite.size == 1:
             quantiles_finite = np.full_like(x, quantiles_finite)
+        x = self._fix_x(x)
         x[(quantiles_finite < 0) | (quantiles_finite > 1)] = np.nan
         return x
 
@@ -381,7 +382,7 @@ class Dist(metaclass=DistMeta):
 
     def fit_ml(self, values, x0=None, *args, **kwds):
         if x0 is None:
-            x0 = (1,) * len(self.parameter_names)
+            x0 = (1,) * self.n_pars
         result = max_likelihood(
             self.pdf, x0, values, bounds=self._bounds, *args, **kwds
         )
@@ -431,9 +432,7 @@ class Dist(metaclass=DistMeta):
         lower_key = (
             "lc"
             if "lc" in self.parameter_names
-            else "l"
-            if "l" in self.parameter_names
-            else None
+            else "l" if "l" in self.parameter_names else None
         )
         lower = kwds.get(lower_key, False)
         b_shape = np.broadcast(x, lower).shape
@@ -452,9 +451,7 @@ class Dist(metaclass=DistMeta):
         upper_key = (
             "uc"
             if "uc" in self.parameter_names
-            else "u"
-            if "u" in self.parameter_names
-            else None
+            else "u" if "u" in self.parameter_names else None
         )
         upper = kwds.get(upper_key, False)
         if isinstance(upper, np.ndarray) or upper:
@@ -469,6 +466,10 @@ class Dist(metaclass=DistMeta):
                 mask[x > upper] = True
 
         return np.squeeze(mask)
+
+    def _fix_x(self, x, *args, **kwds):
+        """The distributions might know what to replace invalid x-values with."""
+        return x
 
 
 class Frozen(object):
@@ -1540,7 +1541,7 @@ class Kumaraswamy(Dist):
     """Resembles the Beta distribution, but does not need a transcendental
     function."""
 
-    _feasible_start = (2, 5, 0, 1)
+    _feasible_start = (2, 2, 0, 1)
 
     def _pdf(self, x, a, b, l=0, u=1):
         x = np.atleast_1d(x).astype(float)
@@ -1573,7 +1574,15 @@ class Kumaraswamy(Dist):
         return x
 
     def _fit(self, x, l=None, u=None):
-        return beta.fit(x, l, u)
+        # return beta.fit(x, l, u)
+        x0 = beta.fit(x, l, u)
+        par_bounds = [(1e-9, np.inf), (1e-9, np.inf)]
+        # x0 will have entries for l and u if those where None
+        if l is None:
+            par_bounds += [(-np.inf, x0[-2 if u is None else -1])]
+        if u is None:
+            par_bounds += [(x0[-1], np.inf)]
+        return max_likelihood(self.pdf, x0, x, bounds=par_bounds).x
 
     def _constraints(self, x, a, b, l=0, u=1):
         mask = (a < 0) | (b < 0) | (x <= l) | (x > u)
@@ -1718,8 +1727,7 @@ class Gamma(Dist):
             if k >= 8:
                 return np.log(k) - (
                     1.0
-                    + (1.0 - (0.1 - 1.0 / (21.0 * k**2)) / k**2)
-                    / (6.0 * k)
+                    + (1.0 - (0.1 - 1.0 / (21.0 * k**2)) / k**2) / (6.0 * k)
                 ) / (2.0 * k)
             else:
                 return psi(k + 1) - 1.0 / k
@@ -2041,7 +2049,8 @@ class _KDE(object):
     def fit_kde(self, x, x0=None, bounds=None):
         if bounds is not None:
             bounds = np.squeeze(bounds)
-        return kde.optimal_kernel_width(x, x0=None, bounds=bounds)
+        # return kde.optimal_kernel_width(x, x0=None, bounds=bounds)
+        return kde.silvermans_rule(x)
 
     def _kde_integral(
         self, kernel_width, kernel_data, f_thresh, upper_eval, recalc=True
@@ -2087,7 +2096,7 @@ class _KDE(object):
 
         x_eval = np.exp(x_eval_log)
         dens_kde_eval /= x_eval
-        q_kde_eval = cumtrapz(y=dens_kde_eval, x=x_eval, initial=0)
+        q_kde_eval = cumulative_trapezoid(y=dens_kde_eval, x=x_eval, initial=0)
         assert np.all(np.isfinite(q_kde_eval))
         # this is ugly, but I cannot find a better solution (now)
         q_kde_eval /= q_kde_eval[-1]
@@ -2198,7 +2207,7 @@ class RainMix(_KDE, _Rain):
         # as we have a mixed parametric, non-parametric distribution
         # here, supplying a feasible starting solution is non-trivial.
         # the data is part of the solution!
-        sample_quantiles = np.linspace(0.001, 0.999, 500)
+        sample_quantiles = np.linspace(0.001, 0.999, 1000)
         sample_data = self.dist.ppf(
             sample_quantiles, *self.dist._feasible_start
         )
@@ -2616,8 +2625,11 @@ class RainMix(_KDE, _Rain):
         x_eval=None,
         **kwds,
     ):
-        (rain_prob, kernel_width, kernel_data, f_thresh) = map(
-            np.asarray, (rain_prob, kernel_width, kernel_data, f_thresh)
+        # (rain_prob, kernel_width, kernel_data, f_thresh) = map(
+        #     np.asarray, (rain_prob, kernel_width, kernel_data, f_thresh)
+        # )
+        (rain_prob, kernel_width, f_thresh) = map(
+            np.asarray, (rain_prob, kernel_width, f_thresh)
         )
         if "kernel_bounds" in kwds:
             kwds.pop("kernel_bounds")
@@ -2638,15 +2650,15 @@ class RainMix(_KDE, _Rain):
         return mask
 
     def _invalid_x(self, x, *args, **kwds):
-        mask = np.atleast_1d(np.full_like(x, False, dtype=bool))
-        return mask
+        return np.atleast_1d((np.full_like(x, False, dtype=bool)))
+
+    def _fix_x(self, x):
+        return np.where(x < 0, 0, x)
 
 
-# q_threshold = .75
-q_threshold = 0.9
-# rainmix_kumaraswamy = RainMix(kumaraswamy, threshold=.001,
-#                               q_threshold=q_threshold)
-rainmix_kumaraswamy = RainMix(kumaraswamy, threshold=0.001)
+rainmix_kumaraswamy = RainMix(
+    kumaraswamy, threshold=0.001, q_thresh_lower=0.95, q_thresh_upper=0.99
+)
 # rainmix_expon = RainMix(expon, q_threshold=q_threshold)
 # rainmix_weibull = RainMix(weibull, q_threshold=q_threshold)
 # rainmix_gamma = RainMix(gamma, q_threshold=q_threshold)
