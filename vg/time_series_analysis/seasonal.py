@@ -33,13 +33,14 @@ class Seasonal(object):
         # self.timestep = ((self.datetimes[1] -
         #                   self.datetimes[0]).total_seconds() //
         #                  (60 ** 2 * 24))
-        self.timestep = ((self.datetimes[1] -
-                          self.datetimes[0]).total_seconds() /
-                         (60 ** 2 * 24))
+        self.timestep = (
+            self.datetimes[1] - self.datetimes[0]
+        ).total_seconds() / (60**2 * 24)
         assert self.timestep > 0
         self.doys = times.datetime2doy(datetimes[finite_mask])
-        self.doys_unique = np.unique(my.round_to_float(self.doys,
-                                                       self.timestep))
+        self.doys_unique = np.unique(
+            my.round_to_float(self.doys, self.timestep)
+        )
         # we could have timestamps like "2004-01-01T00:30:00", so we
         # might need an offset for the unique doys
         doy0_diff = self.doys.min() - self.doys_unique[0]
@@ -60,8 +61,9 @@ class Seasonal(object):
         # doys should be from 0-365
         isleap = np.array([calendar.isleap(dt.year) for dt in self.datetimes])
         self.doys[isleap & (self.doys >= 31 + 29)] -= 1
-        self.doys_unique = np.unique(my.round_to_float(self.doys,
-                                                       self.timestep))
+        self.doys_unique = np.unique(
+            my.round_to_float(self.doys, self.timestep)
+        )
         self.n_doys = len(self.doys_unique)
 
     def duplicate_feb28(self, doys):
@@ -96,20 +98,33 @@ class Seasonal(object):
 
     @property
     def hours_per_day(self):
-        return int(self.timestep ** -1)
+        return int(self.timestep**-1)
 
     def _set_monthly_ticks(self, ax):
-        ax.set_xticks(
-            (1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335))
-        ax.set_xticklabels(("Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"),
-                           rotation=45)
+        ax.set_xticks((1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335))
+        ax.set_xticklabels(
+            (
+                "Jan",
+                "Feb",
+                "Mar",
+                "Apr",
+                "May",
+                "Jun",
+                "Jul",
+                "Aug",
+                "Sep",
+                "Oct",
+                "Nov",
+                "Dec",
+            ),
+            rotation=45,
+        )
 
     def rain_probs(self, threshold, doys=None):
         if doys is None:
             doys = self.doys
         probs_per_doy = np.zeros_like(self.doys_unique)
-        for doy_i in (self.doys_unique.astype(int) - 1):
+        for doy_i in self.doys_unique.astype(int) - 1:
             data = self.data[self.doy_mask[doy_i]]
             probs_per_doy[doy_i] = np.mean(data > threshold)
         probs_per_doy = smooth(probs_per_doy, self.doy_width, periodic=True)
@@ -167,8 +182,15 @@ class Torus(Seasonal):
         # plt.show()
         return torus
 
-    def torus_fft(self, values, hours=None, doys=None, years=None,
-                  fft_order=5, padded=False):
+    def torus_fft(
+        self,
+        values,
+        hours=None,
+        doys=None,
+        years=None,
+        fft_order=5,
+        padded=False,
+    ):
         if np.ndim(values) == 1:
             values = self._construct_torus(values, hours, doys, years)
         if not padded:
@@ -188,57 +210,64 @@ class Torus(Seasonal):
     def _pad_torus(self, torus):
         # to achieve periodicity, i.e. move up -> advance in hours,
         # move right -> advance in days
-        torus = np.vstack((np.roll(torus[-self.hour_neighbors:], -1, axis=1),
-                           torus,
-                           np.roll(torus[:self.hour_neighbors], 1, axis=1)))
-        torus = np.hstack((torus[:, -self.doy_width:],
-                           torus,
-                           torus[:, :self.doy_width]))
+        torus = np.vstack(
+            (
+                np.roll(torus[-self.hour_neighbors :], -1, axis=1),
+                torus,
+                np.roll(torus[: self.hour_neighbors], 1, axis=1),
+            )
+        )
+        torus = np.hstack(
+            (torus[:, -self.doy_width :], torus, torus[:, : self.doy_width])
+        )
         return torus
 
     def _unpad_torus(self, torus):
-        return torus[self.hour_neighbors:-self.hour_neighbors,
-                     self.doy_width:-self.doy_width]
+        return torus[
+            self.hour_neighbors : -self.hour_neighbors,
+            self.doy_width : -self.doy_width,
+        ]
 
     def _unpadded_index(self, doy):
         doy = np.atleast_1d(doy)
-        hour_index = ((doy - doy.astype(int))
-                      * self.hours_per_day).astype(int)
+        hour_index = ((doy - doy.astype(int)) * self.hours_per_day).astype(int)
         doy_index = doy.astype(int) - 1
         return np.squeeze(hour_index), np.squeeze(doy_index)
 
     def _torus_index(self, doy):
         """Returns the index corresponding to a decimal doy."""
         hour_index, doy_index = self._unpadded_index(doy)
-        return (hour_index + self.hour_neighbors,
-                doy_index + self.doy_width)
+        return (hour_index + self.hour_neighbors, doy_index + self.doy_width)
 
     def _torus_slice(self, doy):
         """Returns slice of the torus centered around doy."""
         hour_index, doy_index = self._torus_index(doy)
-        hour_slice = slice(hour_index - self.hour_neighbors,
-                           hour_index + self.hour_neighbors + 1)
-        doy_slice = slice(doy_index - self.doy_width,
-                          doy_index + self.doy_width + 1)
+        hour_slice = slice(
+            hour_index - self.hour_neighbors,
+            hour_index + self.hour_neighbors + 1,
+        )
+        doy_slice = slice(
+            doy_index - self.doy_width, doy_index + self.doy_width + 1
+        )
         return hour_slice, doy_slice
 
     @property
     def doy_hour_weights(self):
-        """To be used as a kernel to weight distances in the doy-hour domain.
-        """
+        """To be used as a kernel to weight distances in the doy-hour domain."""
         if self._doy_hour_weights is None:
             hour_slice, doy_slice = self._torus_slice(0)
             n_hours = hour_slice.stop - hour_slice.start
             n_doys = doy_slice.stop - doy_slice.start
             # distance in the two temporal dimensions
-            hour_dist, doy_dist = np.meshgrid(list(range(n_doys)),
-                                              list(range(n_hours)))
+            hour_dist, doy_dist = np.meshgrid(
+                list(range(n_doys)), list(range(n_hours))
+            )
             hour_middle = n_hours // 2
             doy_middle = n_doys // 2
             time_distances = np.empty((n_hours, n_doys, self.n_years))
-            temp = np.sqrt((hour_dist - hour_middle) ** 2 +
-                           (doy_dist - doy_middle) ** 2)
+            temp = np.sqrt(
+                (hour_dist - hour_middle) ** 2 + (doy_dist - doy_middle) ** 2
+            )
             time_distances[:] = temp[..., None]
             self._doy_hour_weights = time_distances
         return self._doy_hour_weights.ravel()
-
