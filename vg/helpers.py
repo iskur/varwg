@@ -8,8 +8,10 @@ again..."""
 # compromised.
 from collections import UserDict
 import contextlib
+import datetime
 import inspect
 import itertools
+import numbers
 import os
 import re
 import sys
@@ -26,6 +28,7 @@ import hashlib
 import functools
 import random
 import numpy as np
+import numpy.testing as npt
 
 try:
     from multiprocessing import cpu_count
@@ -36,6 +39,8 @@ try:
 except ImportError:
     NE = False
 from scipy import optimize, stats
+from scipy.stats import rankdata
+import scipy
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import matplotlib.patches as mpatches
@@ -61,11 +66,11 @@ def _build_arg_str(function, *func_args, **func_kwds):
     call. This helps to cache function results that have no side-effects."""
     # remember that default arguments arrive empty in **func_kwds.
     # build dictionary of argument-names to default argument values
-    spec_arg_names = inspect.getargspec(function).args
+    spec_arg_names = inspect.getfullargspec(function).args
     if spec_arg_names[0] == "self":
         spec_arg_names = spec_arg_names[1:]
     arg_dict = dict.fromkeys(spec_arg_names, None)
-    spec_arg_values = inspect.getargspec(function).defaults
+    spec_arg_values = inspect.getfullargspec(function).defaults
     # spec_arg_values apply to the last n spec_arg_names
     if spec_arg_names and spec_arg_values:
         for name, val in zip(spec_arg_names[::-1], spec_arg_values[::-1]):
@@ -152,6 +157,8 @@ def pickle_cache(filepath_template="%s.pkl", clear_cache=False, warn=True):
 
             try:
                 dump(filepath)
+            except OSError:
+                dump(hash_(filepath))
             except IOError:
                 # maybe the filename was too long
                 dump(hash_(filepath))
@@ -435,6 +442,14 @@ def recursive_diff(
         return obj1, obj2
     return diff
 
+
+def key_tree(dict_, level=0):
+    for key, value in dict_.items():
+        print(" " * level + key)
+        if isinstance(value, dict):
+            key_tree(value, level + 1)
+
+
 # Filesystem
 
 
@@ -466,7 +481,7 @@ def kendalls_tau(x, y):
     n = len(x)
     # TODO: we have to be pessimistic when coming across equal values
     y_xrank_sorted = y[np.argsort(x)]
-    y_ranks = stats.rankdata(y_xrank_sorted)
+    y_ranks = rankdata(y_xrank_sorted)
     # i forcefully put in "<" instead of "<=" because i am annoyed that the
     # correlation between a variable and itself is not 1 when there are
     # equal values inside
@@ -509,7 +524,7 @@ def rel_ranks(values, method="average"):
     if isinstance(values, int):
         N = values
         return (np.arange(N) + 0.5) / N
-    return (stats.stats.rankdata(values, method) - 0.5) / len(values)
+    return (rankdata(values, method) - 0.5) / len(values)
 
 
 def val2ind(values, value):
@@ -1189,9 +1204,7 @@ def kde_gauss(
         kdeMatrix = residual_matrix(dataset, evaluation_points)
         preTerm = 1.0 / (np.sqrt(2 * np.pi) * kernel_width)
         with np.errstate(all="ignore"):
-            kdeMatrix = preTerm / np.exp(
-                kdeMatrix**2 / (2 * kernel_width**2)
-            )
+            kdeMatrix = preTerm / np.exp(kdeMatrix**2 / (2 * kernel_width**2))
         # suming lines
         densities = np.sum(kdeMatrix, axis=1) / float(len(dataset))
     return densities
