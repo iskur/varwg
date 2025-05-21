@@ -28,7 +28,7 @@ from collections import namedtuple
 import numpy as np
 import scipy
 from scipy import linalg, optimize
-from scipy.linalg import kron
+from scipy.linalg import kron, issymmetric
 from scipy.stats import skew, rankdata, distributions as sp_distributions
 from tqdm import tqdm
 
@@ -276,7 +276,7 @@ def VAR_LS(data, p=2):
         inv = np.linalg.inv(Z @ Z.T)
     except np.linalg.LinAlgError:
         print("Adding a little random noise in order to invert matrix...")
-        Z += (vg.rng.normal(Z.size) * Z.std() * 1e-9).reshape(Z.shape)
+        Z += vg.rng.normal(size=Z.shape) * Z.std() * 1e-9
         inv = np.linalg.inv(Z @ Z.T)
     B = Y @ Z.T @ inv
 
@@ -452,16 +452,16 @@ def VAR_mean(B):
     return (np.linalg.inv(mu) @ nu.T)[:, None]
 
 
-def VAR_cov(B, sigma_u):
-    """see p. 27-28"""
-    K = B.shape[0]
-    p = (B.shape[1] - 1) // K
-    A = B2A(B)
-    Ikp2 = np.identity((K * p) ** 2)
-    sigma_U = np.zeros_like(A)
-    sigma_U[:K, :K] = sigma_u
-    cov_vec = np.linalg.inv(Ikp2 - np.kron(A, A)) @ vec(sigma_U)
-    return unvec(cov_vec, K)[:K, :K]
+# def VAR_cov(B, sigma_u):
+#     """see p. 27-28"""
+#     K = B.shape[0]
+#     p = (B.shape[1] - 1) // K
+#     A = B2A(B)
+#     Ikp2 = np.identity((K * p) ** 2)
+#     sigma_U = np.zeros_like(A)
+#     sigma_U[:K, :K] = sigma_u
+#     cov_vec = np.linalg.inv(Ikp2 - np.kron(A, A)) @ vec(sigma_U)
+#     return unvec(cov_vec, K)[:K, :K]
 
 
 def B2A(B):
@@ -492,6 +492,7 @@ def SVAR_LS_sim(
     p_kwds=None,
     taboo_period_min=None,
     taboo_period_max=None,
+    verbose=False,
 ):
     if p_kwds is None:
         p_kwds = dict()
@@ -506,14 +507,16 @@ def SVAR_LS_sim(
     if phase_randomize:
         if u is None:
             raise RuntimeError("u must be passed for phase randomization!")
+        if verbose:
+            print("Phase randomizing residuals")
         u = phase_randomization.randomize2d(
             u,
             T=T,
-            # taboo_period_min=taboo_period_min,
-            # taboo_period_max=taboo_period_max,
+            taboo_period_min=taboo_period_min,
+            taboo_period_max=taboo_period_max,
             return_rphases=return_rphases,
             rphases=rphases,
-            **p_kwds
+            **p_kwds,
         )
         if return_rphases:
             u, rphases = u
@@ -634,7 +637,14 @@ def scale_z(z, i, x_i, A):
 
 def _cholesky_partial(u, sigma_us, A=None):
     if A is None:
-        A = np.linalg.cholesky(sigma_us)
+        try:
+            A = np.linalg.cholesky(sigma_us)
+        except np.linalg.LinAlgError:
+            print("Adding a little random noise in order to invert matrix...")
+            sigma_us += (
+                vg.rng.normal(size=sigma_us.shape) * sigma_us.std() * 1e-9
+            )
+            A = np.linalg.cholesky(sigma_us)
     finite_mask = np.isfinite(u)
     z = np.empty_like(u)
     z[~finite_mask] = vg.rng.normal(size=np.sum(~finite_mask))
@@ -674,7 +684,7 @@ def VAR_LS_sim_asy(
     verbose=False,
     var_names=None,
     *args,
-    **kwds
+    **kwds,
 ):
     residuals = VAR_residuals(data, B, p)
     data_skew = VAR_LS_asy(data, skewed_i, p)
@@ -941,7 +951,7 @@ def VAR_LS_sim(
             # taboo_period_max=taboo_period_max,
             return_rphases=return_rphases,
             rphases=rphases,
-            **p_kwds
+            **p_kwds,
         )
         if return_rphases:
             u, rphases = u
@@ -1139,7 +1149,7 @@ def VAR_residuals(data, B, p=2):
             resi[:, t] -= Ai @ data[:, t - i - 1]
         if not mean_adjusted:
             resi[:, t] -= nu
-    return resi[:, p:] + mu if mean_adjusted else resi[:, p:]
+    return resi[:, p:] - mu if mean_adjusted else resi[:, p:]
 
 
 def VAR_LS_extro(data, data_trans, transforms, backtransforms, p=2):
@@ -1267,7 +1277,13 @@ def SVAR_residuals(data, doys, B, p=2):
         for i in range(p):
             Ai = B[:, i_shift + i * K : i_shift + (i + 1) * K, doys_ii[t - p]]
             resi[:, t] -= Ai @ data[:, t - i - 1]
-    return resi[:, p:] + mu if mean_adjusted else resi[:, p:]
+        if not mean_adjusted:
+            resi[:, t] -= B[:, 0, doys_ii[t - p]]
+    resi = resi[:, p:] - mu if mean_adjusted else resi[:, p:]
+    # A is smoothed by fft approximation. this can sometimes lead to
+    # invalid matrices
+    resi = my.interp_nan(resi)
+    return resi
 
 
 def VARMA_LS_prelim(data, p, q):
