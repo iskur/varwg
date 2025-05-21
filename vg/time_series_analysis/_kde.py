@@ -34,12 +34,15 @@ def distance_array_sparse(x_vec, y_vec, mask):
     return dist_sparse.T.tocsr()
 
 
+@my.cache("distances")
 def apply_kernel_ne(kernel_width, data, eval_points=None, recalc=False):
-    has_distance_cache = hasattr(apply_kernel_ne, "distances")
-    if eval_points is not None and has_distance_cache:
-        if len(eval_points) != apply_kernel_ne.distances.shape[0]:
+    if eval_points is not None and apply_kernel_ne.distances is not None:
+        if (
+            len(np.atleast_1d(eval_points))
+            != apply_kernel_ne.distances.shape[0]
+        ):
             recalc = True
-    if recalc or not has_distance_cache:
+    if recalc or apply_kernel_ne.distances is None:
         if eval_points is None:
             _distances = distance_array(data, data)
             apply_kernel_ne.distances = _distances
@@ -58,14 +61,17 @@ def apply_kernel_ne(kernel_width, data, eval_points=None, recalc=False):
     return densities
 
 
+@my.cache("distances")
 def apply_kernel_np(
     kernel_width, data, eval_points=None, mask=None, recalc=False
 ):
-    has_distance_cache = hasattr(apply_kernel_ne, "distances")
-    if eval_points is not None and has_distance_cache:
-        if len(eval_points) != apply_kernel_ne.distances.shape[0]:
+    if eval_points is not None and apply_kernel_np.distances is not None:
+        if (
+            len(np.altleast_1d(eval_points))
+            != apply_kernel_ne.distances.shape[0]
+        ):
             recalc = True
-    if recalc or not has_distance_cache:
+    if recalc or apply_kernel_np.distances is None:
         if eval_points is None:
             _distances = distance_array(data, data)
             apply_kernel_ne.distances = _distances
@@ -74,8 +80,12 @@ def apply_kernel_np(
     else:
         _distances = apply_kernel_ne.distances
     if _distances.ndim > 2:
-        k_slice = [Ellipsis] + (_distances.ndim - kernel_width.ndim) * [None]
-        kernel_width = kernel_width[k_slice]
+        # k_slice = [Ellipsis] + (_distances.ndim - kernel_width.ndim) * [None]
+        # kernel_width = kernel_width[k_slice]
+        kernel_width = np.expand_dims(
+            kernel_width,
+            list(range(1, _distances.ndim - kernel_width.ndim + 1)),
+        )
     return (
         1.0
         / (np.sqrt(2 * np.pi) * kernel_width)
