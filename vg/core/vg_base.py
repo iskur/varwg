@@ -503,6 +503,29 @@ class VGBase(object):
     def start_hour_of_src(self):
         return self.times_orig[0].hour
 
+    def _diff(self, other, plot=False, verbose=True):
+        """Show differences in attribute values between this and other VG instance.
+
+        For debugging.
+        """
+        if not isinstance(other, type(self)):
+            raise RuntimeError(
+                "Can only compare two VG objects (got {type(other)})."
+            )
+        diff = my.recursive_diff("", self, other, verbose=verbose, plot=plot)
+        if diff:
+            # the first dictionary is uninformative and has only one element
+            diff = diff.popitem()[1]
+        if plot and my.recursive_diff.fig_axs is not None:
+            # my.recursive_diff does not know about the variables' names. but we do.
+            for name, (fig, axs) in my.recursive_diff.fig_axs.items():
+                if len(axs) == self.K:
+                    for ax, var_name in zip(axs, self.var_names):
+                        ax[0].set_title(var_name)
+            plt.show()
+        my.recursive_diff.clear_cache()
+        return diff
+
     def fitted_medians(self, var_name, doys=None):
         """Medians of the fitted seasonal distribution.
 

@@ -232,6 +232,209 @@ def clear_def_cache(function, cache_names=None, cache_name_values=None):
         setattr(function, name, value)
 
 
+def _plot_array_diff(name, array1, array2):
+    array1, array2 = map(np.atleast_2d, (array1, array2))
+    nrows1, ncols1 = array1.shape
+    nrows2, ncols2 = array2.shape
+    if nrows1 != nrows2:
+        print(
+            "Cannot plot with different number of variables"
+            + f"({nrows1} != {nrows2})"
+        )
+        return None, None
+    fig, axs = plt.subplots(
+        nrows=nrows1,
+        ncols=2,
+        constrained_layout=True,
+        sharex="col",
+        sharey="row",
+        width_ratios=(0.8, 0.2),
+    )
+    if nrows1 == 1:
+        axs = np.atleast_2d(axs)
+    for row_i, ax in enumerate(axs):
+        ax[0].plot(array1[row_i], label="1")
+        ax[0].plot(array2[row_i], label="2")
+        if ncols1 == ncols2:
+            ax[1].scatter(
+                array1[row_i],
+                array2[row_i],
+                marker="o",
+                edgecolor=(0, 0, 0, 0),
+                facecolor=(1, 1, 1, 0.5),
+            )
+        else:
+            ax[1].text(
+                0.5,
+                0.5,
+                "Different number of records",
+                horizontalalignment="center",
+                verticalalignment="center",
+            )
+        ax[1].set_aspect("equal", "box")
+    axs[0, 0].legend(loc="best")
+    for ax in np.ravel(axs):
+        ax.grid(True)
+    fig.suptitle(name)
+    return fig, axs
+
+
+@cache("fig_axs")
+def recursive_diff(
+    name,
+    obj1,
+    obj2,
+    *,
+    ignore_types=None,
+    plot=False,
+    verbose=False,
+    diff=None,
+):
+    """Show differences between two objects.
+
+    For debugging purposes mostly. Recurses into sequences and instances of the current module.
+
+    Parameters
+    ----------
+    name : str or None
+        Name of the current object. If None, will be determined by str(obj1).
+    obj1 : object
+        First object to compare.
+    obj2 : object
+        Second object to compare.
+    ignore_types : sequence or None, optional
+        Ignore differences for objects of these types. callables are ignored by default.
+    plot : bool, optional
+        Plot 1- and 2-D np.ndarrays if they are different.
+    verbose : bool, optional
+        Be more talkative.
+
+    Examples
+    --------
+    tba
+
+    """
+    if name is None:
+        name = str(obj1)
+    if ignore_types is None:
+        ignore_types = (scipy.interpolate.interpolate.interp1d, np.vectorize)
+    if diff is None:
+        diff = {}
+    r_kwds = dict(ignore_types=ignore_types, plot=plot, verbose=verbose)
+    name = f"  {name}"
+    if isinstance(obj1, ignore_types) or isinstance(obj2, ignore_types):
+        if verbose > 1:
+            print(f"{name}: ignoring type {type(obj1)}")
+        return diff
+    if any(
+        itertools.chain(
+            map(inspect.isfunction, (obj1, obj2)),
+            map(inspect.isgenerator, (obj1, obj2)),
+            # map(lambda x: hasattr(x, "__call__"), (obj1, obj2)),
+        )
+    ):
+        if verbose > 1:
+            print(f"{name}: ignoring callable {obj1}")
+        return diff
+    if plot and recursive_diff.fig_axs is None:
+        recursive_diff.fig_axs = {}
+
+    if type(obj1) != type(obj2):
+        if verbose:
+            print(f"{name}: {type(obj1)} != {type(obj2)}")
+        diff[name.lstrip()] = obj1, obj2
+        return diff
+    if isinstance(obj1, np.ndarray):
+        try:
+            if isinstance(obj1[0], datetime.datetime):
+                obj1 = np.array([np.datetime64(value) for value in obj1])
+                obj2 = np.array([np.datetime64(value) for value in obj2])
+                assert np.all(obj2 == obj1)
+                if verbose > 1:
+                    print(f"{name}: arrays are approximately equal")
+                return False
+            if obj1.shape == obj2.shape:
+                npt.assert_almost_equal(obj1, obj2, verbose=True)
+            else:
+                if verbose:
+                    print(
+                        f"{name}: arrays have different shape "
+                        + f"({obj1.shape} != {obj2.shape})"
+                    )
+                diff[name.lstrip()] = obj1, obj2
+        except AssertionError as exc:
+            if verbose:
+                print(name)
+                print(exc)
+            if plot and obj1.dtype != bool and obj1.shape[0] < 20:
+                recursive_diff.fig_axs[name.lstrip()] = _plot_array_diff(
+                    name, obj1, obj2
+                )
+                diff[name.lstrip()] = obj1, obj2
+            return diff
+    elif isinstance(obj1, dict):
+        # check keys on both
+        keys1, keys2 = set(obj1.keys()), set(obj2.keys())
+        if extra1 := keys1 - keys2:
+            if verbose:
+                print(f"{name}: {obj1} has extra keys: {extra1}")
+            diff[f"{name.lstrip()}_obj1_extra_keys"] = (
+                obj1,
+                obj2,
+            )
+        if extra2 := keys2 - keys1:
+            if verbose:
+                print(f"{name}: {obj2} has extra keys: {extra2}")
+            diff[f"{name.lstrip()}_obj2_extra_keys"] = (
+                obj1,
+                obj2,
+            )
+        diff_sub = {}
+        for key in keys1 & keys2:
+            if diff_element := recursive_diff(
+                f"{key}", obj1[key], obj2[key], diff=None, **r_kwds
+            ):
+                if len(diff_element) == 1 and isinstance(diff_element, dict):
+                    diff_element = diff_element[list(diff_element.keys())[0]]
+                diff_sub[key] = diff_element
+        if diff_sub:
+            diff[name.lstrip()] = diff_sub
+        return diff
+    elif isinstance(obj1, (list, tuple, set)):
+        diff_sub = []
+        for elem_i, (elem1, elem2) in enumerate(zip(obj1, obj2)):
+            if diff_element := recursive_diff(
+                f"{elem_i}", elem1, elem2, diff=None, **r_kwds
+            ):
+                diff_sub += [diff_element]
+
+        if diff_sub:
+            diff[name.lstrip()] = diff_sub
+        return diff
+    elif (
+        hasattr(obj1, "__module__")
+        and obj1.__module__.split(".")[0] == __name__.split(".")[0]
+    ):  # HACK! only consider differences arising from our own code.
+        return recursive_diff(
+            # f"{name}{obj1}",
+            f"{obj1}",
+            obj1.__dict__,
+            obj2.__dict__,
+            diff=diff,
+            **r_kwds,
+        )
+    elif obj1 != obj2:
+        if (
+            isinstance(obj1, numbers.Number)
+            and isinstance(obj2, numbers.Number)
+            and np.all(np.isnan([obj1, obj2]))
+        ):
+            return False
+        if verbose:
+            print(f"{name}: {obj1} (self) != {obj2} (other)")
+        return obj1, obj2
+    return diff
+
 # Filesystem
 
 
