@@ -4,12 +4,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from scipy import interpolate, optimize, stats
-from scipy.integrate import cumtrapz
+from scipy.integrate import cumulative_trapezoid
 from tqdm import tqdm
 
 from vg import helpers as my, times
 from vg.smoothing import smooth
-from vg.time_series_analysis import _kde as kde, seasonal
+from vg.time_series_analysis import _kde as kde, seasonal, distributions
 
 
 try:
@@ -246,7 +246,7 @@ class SeasonalKDE(seasonal.Seasonal):
     @property
     def quantile_grid(self):
         if self._quantile_grid is None:
-            quantiles = cumtrapz(
+            quantiles = cumulative_trapezoid(
                 y=self.density_grid, x=self.x_grid, axis=1, initial=0
             )
             # if there is only zero-valued data at some doys
@@ -278,14 +278,16 @@ class SeasonalKDE(seasonal.Seasonal):
     def ppf_interp_per_day(self):
         if self._ppf_interp_per_day is None:
             self._ppf_interp_per_day = [
-                interpolate.interp1d(
-                    quantiles,
-                    self.x_grid[doy_i],
-                    kind="nearest",
-                    assume_sorted=True,
+                (
+                    interpolate.interp1d(
+                        quantiles,
+                        self.x_grid[doy_i],
+                        kind="nearest",
+                        assume_sorted=True,
+                    )
+                    if self.x_grid[doy_i, -1] > 0
+                    else lambda q, *args, **kwds: 0
                 )
-                if self.x_grid[doy_i, -1] > 0
-                else lambda q, *args, **kwds: 0
                 for doy_i, quantiles in enumerate(self.quantile_grid)
             ]
         return self._ppf_interp_per_day
@@ -362,7 +364,7 @@ class SeasonalKDE(seasonal.Seasonal):
                 # options=dict(disp=True),
                 options=dict(disp=False),
             )
-            kernel_width = result.x
+            kernel_width = result.x[0]
             # we want to avoid very small kernel widths as that causes
             # problems later on
             if kernel_width < 1e-8:
@@ -472,10 +474,14 @@ class SeasonalKDE(seasonal.Seasonal):
             self.solution = solution
         if doys is None:
             doys = self.doys
-        if mean_shift is not None:
-            raise NotImplementedError(
-                f"mean_shift not implemented" f"for {type(self)} yet."
-            )
+        if mean_shift is not None and ~np.isclose(mean_shift, 0):
+            # normalize quantiles and shift the target distribution
+            # normalize quantiles
+            stdn = distributions.norm.ppf(quantiles)
+            quantiles = distributions.norm.cdf(stdn - stdn.mean())
+            # raise NotImplementedError(
+            #     f"mean_shift not implemented" f"for {type(self)} yet."
+            # )
         quantiles, doys = np.atleast_1d(quantiles, doys)
         # for the purpose of distribution parameters: assume February
         # 29th behaves as February 28th
@@ -485,6 +491,8 @@ class SeasonalKDE(seasonal.Seasonal):
             # doy_i = my.val2ind(self.doys_unique, doy)
             doy_i = int((doy - 1) / self.dt)
             x[ii] = self.ppf_interp_per_day[doy_i](quantile_single)
+        if mean_shift is not None and ~np.isclose(mean_shift, 0):
+            x += mean_shift
         return x
 
     def scatter_pdf(
