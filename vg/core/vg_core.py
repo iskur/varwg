@@ -282,7 +282,6 @@ def sw_diurnal(date, daily_sw_data, del_t=3600):
 
 
 class VG(vg_plotting.VGPlotting):
-
     """A Vector-Autoregressive weather generator.
 
     >>> my_vg = VG(("theta", "Qsw", "ILWR", "rh", "u", "v"))
@@ -309,6 +308,7 @@ class VG(vg_plotting.VGPlotting):
         conf_update=None,
         station_name=None,
         infill=False,
+        fit_kwds=None,
         **met_kwds,
     ):
         """A vector autoregressive moving average (VARMA) weather generator.
@@ -394,6 +394,7 @@ class VG(vg_plotting.VGPlotting):
             rain_method=rain_method,
             max_nans=max_nans,
             infill=infill,
+            fit_kwds=fit_kwds,
             **met_kwds,
         )
         # simulated residuals
@@ -404,6 +405,8 @@ class VG(vg_plotting.VGPlotting):
             setattr(conf, name, value)
             setattr(vg_base.conf, name, value)
             setattr(vg_plotting.conf, name, value)
+            if hasattr(self, name):
+                setattr(self, name, value)
 
     def __getattribute__(self, name):
         # VGPlotting overwrites __getattribute__ to do a seasonal fitting
@@ -419,7 +422,7 @@ class VG(vg_plotting.VGPlotting):
         p=None,
         q=0,
         p_max=10,
-        seasonal=False,
+        seasonal=True,
         ex=None,
         ex_kwds=None,
         extro=False,
@@ -466,7 +469,8 @@ class VG(vg_plotting.VGPlotting):
                         self.data_trans.ravel()[
                             np.argmin(self.data_trans)
                         ] = np.nan
-                    self.data_trans = my.interp_nan(self.data_trans)
+                    if not self.infill:
+                        self.data_trans = my.interp_nan(self.data_trans)
                     self.fit(p, q, p_max, seasonal, ex, ex_kwds)
                 if self.verbose:
                     print("p=%d seems parsimonious to me" % self.p)
@@ -585,6 +589,7 @@ class VG(vg_plotting.VGPlotting):
     def simulate(
         self,
         T=None,
+        *,
         mean_arrival=None,
         disturbance_std=None,
         theta_incr=None,
@@ -600,7 +605,7 @@ class VG(vg_plotting.VGPlotting):
         ex=None,
         ex_kwds=None,
         seed_before_sim=None,
-        loc_shift=False,
+        # loc_shift=False,
         resample=False,
         res_kwds=None,
         asy=False,
@@ -730,6 +735,9 @@ class VG(vg_plotting.VGPlotting):
             )
         ]
         self.fixed_variables = fixed_variables
+        if primary_var is None:
+            # we got to have one
+            self.primary_var = primary_var = self.var_names[0]
         if isinstance(primary_var, str):
             self.primary_var = (primary_var,)
             self.climate_signal = np.atleast_1d(climate_signal)
@@ -779,7 +787,7 @@ class VG(vg_plotting.VGPlotting):
 
         # we depend on order selection if self.fit was not called
         if self.p is None and sim_func is None:
-            self.fit()
+            self.fit(**self.fit_kwds)
 
         # if this is True, we still call self._gen_sim_times because
         # of expected side-effects
@@ -838,43 +846,59 @@ class VG(vg_plotting.VGPlotting):
                 vine = sim_func_kwds["wcop"].vine
                 var_names_back = vine.varnames[: stop_at + 1]
             if return_rphases := sim_func_kwds.get("return_rphases", False):
-                sim, rphases = sim
-
+                sim, ranks_sim, rphases = sim
+            else:
+                sim, ranks_sim = sim
         elif resample or res_kwds is not None:
             # in contrast to the parametric models, we do not
             # transform anything
             # here we combine any change in theta_incr
             m_resampler = (m + m_t + m_trend[:, None])[self.primary_var_ii]
+            # m_resampler = m[:, 0]
             try:
                 res_kwds = my.ADict(res_kwds)
             except TypeError:
                 res_kwds = my.ADict()
             cy = "cy" in res_kwds and res_kwds["cy"]
+            resample_raw = res_kwds.pop("resample_raw", False)
             if cy:
                 sim, self.res_indices, self.candidates = cresample.resample(
-                    self.data_trans,
+                    (
+                        self.data_raw / self.sum_interval
+                        if resample_raw
+                        else self.data_trans
+                    ),
                     self.times,
                     self.p,
                     n_sim_steps=self.T_sim,
-                    theta_incr=m_resampler,
+                    theta_incr=theta_incr if resample_raw else m_resampler,
                     theta_i=self.primary_var_ii,
-                    cache_dir=conf.cache_dir,
+                    # cache_dir=conf.cache_dir,
+                    cache_dir=self.cache_dir,
                     verbose=self.verbose,
                     return_candidates=True,
+                    z_transform=resample_raw,
                     **(res_kwds - "cy"),
                 )
             else:
                 sim, self.res_indices, self.candidates = resampler.resample(
-                    data=self.data_trans,
+                    data=(
+                        self.data_raw / self.sum_interval
+                        if resample_raw
+                        else self.data_trans
+                    ),
                     dtimes=self.times,
                     p=self.p,
                     n_sim_steps=self.T_sim,
-                    theta_incr=m_resampler,
+                    theta_incr=theta_incr if resample_raw else m_resampler,
                     bias=None,
                     theta_i=self.primary_var_ii,
-                    cache_dir=conf.cache_dir,
+                    # cache_dir=conf.cache_dir,
+                    cache_dir=self.cache_dir,
                     verbose=self.verbose,
+                    # verbose=True,
                     return_candidates=True,
+                    z_transform=resample_raw,
                     **res_kwds,
                 )
         elif self.q in (0, None):
@@ -979,65 +1003,77 @@ class VG(vg_plotting.VGPlotting):
                 self.var_names,
             )
 
-        # location shifting
-        if loc_shift:
-            sim = self._location_shift_normal(sim)
+        # # location shifting
+        # # DO NOT USE
+        # if loc_shift:
+        #     __import__("pdb").set_trace()
+        #     sim = self._location_shift_normal(sim)
 
         # transform back
-        # if resample or res_kwds is not None:
-        #     # use the indices to map back, we do not want any new
-        #     # values to occur here!
-        #     # sim_sea = np.array([self.data_raw[self.var_names.index(var_name),
-        #     #                                   self.res_indices]
-        #     #                     for var_name in self.var_names])
-        #     # sim_sea = self.data_raw[:, self.res_indices]
-        #     # sim_sea /= self.sum_interval
+        if resample or res_kwds is not None:
 
-        #     # data_raw = self.data_raw / self.sum_interval
-        #     # sim_sea = (sim * data_raw.std(axis=1)[:, None]
-        #     #            + data_raw.mean(axis=1)[:, None])
+            # use the indices to map back, we do not want any new
+            # values to occur here!
 
-        #     sim_sea = seasonal_back(self.dist_sol, sim, self.var_names,
-        #                             doys=self.sim_doys)
-        #     sim_sea /= self.sum_interval
-
-        #     # if theta_incr > 0:
-        #     #     plt.scatter(self.times, self.data_raw[0] / 24)
-        #     #     plt.scatter(self.times[self.res_indices],
-        #     #                 self.data_raw[0, self.res_indices] / 24)
-        #     #     plt.show()
-        # else:
-        #     sim_sea = seasonal_back(self.dist_sol, sim, self.var_names,
-        #                             doys=self.sim_doys)
-        #     sim_sea /= self.sum_interval
-        #     # if "R" in self.var_names:
-        #     #     r_index = self.var_names.index("R")
-        #     #     sim_sea[r_index] *= self.sum_interval[r_index]
-
-        if self.theta_incr is not None:
-            mean_shifts = dict(
-                theta=self.theta_incr
-                * self.sum_interval.ravel()[self.primary_var_ii]
+            sim_sea = np.array(
+                [
+                    self.data_raw[
+                        self.var_names.index(var_name), self.res_indices
+                    ]
+                    for var_name in self.var_names
+                ]
             )
+            sim_sea /= self.sum_interval
+
+            # data_raw = self.data_raw / self.sum_interval
+            # sim_sea = (
+            #     sim * data_raw.std(axis=1)[:, None]
+            #     + data_raw.mean(axis=1)[:, None]
+            # )
+
+            # sim_sea = seasonal_back(
+            #     self.dist_sol, sim, self.var_names, doys=self.sim_doys
+            # )
+            # sim_sea /= self.sum_interval
+
+            # if theta_incr > 0:
+            #     plt.scatter(self.times, self.data_raw[0] / 24)
+            #     plt.scatter(self.times[self.res_indices],
+            #                 self.data_raw[0, self.res_indices] / 24)
+            #     plt.show()
         else:
-            mean_shifts = None
-        sim_sea = seasonal_back(
-            self.dist_sol,
-            sim,
-            self.var_names,
-            doys=self.sim_doys,
-            var_names_back=var_names_back,
-            mean_shifts=mean_shifts,
-            # pass_doys=(not self.sim_times_is_times)
-        )
-        sim_sea /= self.sum_interval
+            # sim_sea = seasonal_back(self.dist_sol, sim, self.var_names,
+            #                         doys=self.sim_doys)
+            # sim_sea /= self.sum_interval
+            # if "R" in self.var_names:
+            #     r_index = self.var_names.index("R")
+            #     sim_sea[r_index] *= self.sum_interval[r_index]
+
+            if self.theta_incr is not None:
+                mean_shifts = dict(
+                    theta=self.theta_incr
+                    * self.sum_interval.ravel()[self.primary_var_ii]
+                )
+            else:
+                mean_shifts = None
+            sim_sea = seasonal_back(
+                self.dist_sol,
+                sim,
+                self.var_names,
+                doys=self.sim_doys,
+                var_names_back=var_names_back,
+                mean_shifts=mean_shifts,
+                # pass_doys=(not self.sim_times_is_times)
+            )
+            sim_sea /= self.sum_interval
 
         # spicyness can lead to infs
         sim_sea[~np.isfinite(sim_sea)] = np.nan
         sim_sea = my.interp_nan(sim_sea, max_interp=3)
 
-        if loc_shift:
-            sim_sea = self._location_shift_back(sim_sea)
+        # if loc_shift:
+        #     sim_sea = self._location_shift_back(sim_sea)
+
         if conversions:
             for conversion in list(conversions):
                 self.sim_times, sim_sea, self.var_names_conv = conversion(
@@ -1063,6 +1099,11 @@ class VG(vg_plotting.VGPlotting):
                 out_dir=self.data_dir,
                 conversions=conversions if conversions else conf.conversions,
             )
+
+        if sim_func is not None:
+            if return_rphases:
+                return self.sim_times, sim_sea, ranks_sim, rphases
+            return self.sim_times, sim_sea, ranks_sim
 
         if return_rphases:
             return self.sim_times, sim_sea, rphases
@@ -1645,14 +1686,17 @@ class VG(vg_plotting.VGPlotting):
         if self.p is None:
             if self.verbose:
                 print("Fitting seasonal VAR for infilling.")
-            self.fit(seasonal=True)
+            self.fit(**self.fit_kwds)
         data_infilled = models.SVAR_LS_fill(
             self.Bs, self.sigma_us, self.data_doys, self.data_trans
         )
+        n_nan_timesteps = (np.isnan(self.data_trans).sum(axis=0) > 0).sum()
         if self.verbose:
-            n_nan_timesteps = (np.isnan(self.data_trans).sum(axis=0) > 0).sum()
             nan_perc = n_nan_timesteps / self.T_summed * 100
-            print(f"Filled in {n_nan_timesteps} time steps ({nan_perc:.1f}%)")
+            if n_nan_timesteps:
+                print(
+                    f"Filled in {n_nan_timesteps} time steps ({nan_perc:.1f}%)"
+                )
             for var_i, values in enumerate(self.data_trans):
                 n_nan_timesteps = np.isnan(values).sum()
                 if n_nan_timesteps:
@@ -1680,7 +1724,8 @@ class VG(vg_plotting.VGPlotting):
             self.dist_sol, self.data_trans, self.var_names, self.data_doys
         )
 
-        self.fit(seasonal=True)
+        if n_nan_timesteps:
+            self.fit(**self.fit_kwds)
         # fig, axs = self.plot_meteogram_daily(figs=fig, axss=axs)
         # plt.show()
 
@@ -1708,7 +1753,7 @@ class VG(vg_plotting.VGPlotting):
         prediction : (K, T) or (K, T, n_realizations) ndarray
         """
         if self.p is None:
-            self.fit()
+            self.fit(**self.fit_kwds)
         if dtimes is None:
             dtimes = self.times[-self.p :]
         if data_past is None:
@@ -1750,7 +1795,7 @@ class VG(vg_plotting.VGPlotting):
         verbose = self.verbose
         self.verbose = False
         if self.p is None:
-            self.fit()
+            self.fit(**self.fit_kwds)
         n_prev_steps = (4 if hindcast else 2) * self.p
         if dtimes is None:
             dtimes = self.times[-n_prev_steps:]
@@ -1840,26 +1885,41 @@ class VG(vg_plotting.VGPlotting):
     def _gen_m(
         self, prim_i, prim_index, prim_is_normal, sigma, scale, scale_nn
     ):
-        theta_incr = self.theta_incr[prim_i]
-        if np.isnan(theta_incr):
-            self._m_single += [np.zeros((self.K, self.T_sim))]
-            return self._m_single[-1]
+        if self.theta_incr is not None:
+            theta_incr = self.theta_incr[prim_i]
+            if np.isnan(theta_incr):
+                self._m_single += [np.zeros((self.K, self.T_sim))]
+                return self._m_single[-1]
 
         intercept = (
-            self.data_trans.mean(axis=1)
+            # self.data_trans.mean(axis=1)
+            np.nanmean(self.data_trans, axis=1)
             - scale * self.data_trans[prim_index].mean()
         ).reshape((self.K, 1))
         intercept[prim_index] = 0
-        # change in mean in the real world
-        delta_primvar = theta_incr * self.sum_interval[prim_index]
-        if prim_is_normal:
-            m_primvar = delta_primvar / sigma
+        if self.theta_incr is not None:
+            # change in mean in the real world
+            delta_primvar = theta_incr * self.sum_interval[prim_index]
+            if prim_is_normal:
+                m_primvar = delta_primvar / sigma
+            else:
+                m_primvar = scale_nn(delta_primvar)
         else:
-            m_primvar = scale_nn(delta_primvar)
+            m_primvar = 0
         if self.phase_randomize and self.phase_randomize_vary_mean:
-            m_primvar += 0.25 * vg.rng.normal()
-        self._m_single += [m_primvar * scale.reshape((self.K, 1)) + intercept]
-        return self._m_single[-1]
+            var_mean_scale = (
+                self.phase_randomize_vary_mean
+                if isinstance(self.phase_randomize_vary_mean, float)
+                else 0.5
+            )
+            m_primvar += var_mean_scale * vg.rng.normal()
+            return m_primvar
+
+        else:
+            self._m_single += [
+                m_primvar * scale.reshape((self.K, 1)) + intercept
+            ]
+            return self._m_single[-1]
 
     def _gen_m_t(
         self,
@@ -2009,8 +2069,8 @@ class VG(vg_plotting.VGPlotting):
             if prim in self.var_names:
                 seas_dist, trig_params = self.dist_sol[prim]
                 if hasattr(seas_dist, "dist"):
-                    prim_is_normal = (
-                        type(seas_dist.dist) == distributions.Normal
+                    prim_is_normal = isinstance(
+                        seas_dist.dist, distributions.Normal
                     )
                 else:
                     prim_is_normal = False
@@ -2067,7 +2127,7 @@ class VG(vg_plotting.VGPlotting):
                 else:
                     self._m_trend_single += [np.zeros(self.K)]
 
-                if theta_incr is not None:
+                if theta_incr is not None or self.phase_randomize_vary_mean:
                     m += self._gen_m(
                         prim_i,
                         prim_index,
@@ -2098,7 +2158,8 @@ class VG(vg_plotting.VGPlotting):
         variable and the given climate signal."""
         var_name = self.primary_var[prim_i]
         return (
-            np.atleast_2d(self.climate_signal)[prim_i]
+            # np.atleast_2d(self.climate_signal)[prim_i]
+            self.climate_signal[prim_i]
             - self.fitted_medians(var_name)
         ) * self.sum_interval_dict[var_name]
 
@@ -2107,7 +2168,7 @@ class VG(vg_plotting.VGPlotting):
             prim_index = self.var_names.index(prim)
             dummy_time = np.arange(self.T_sim, dtype=float)
             m = self._m_single[prim_i][prim_index]
-            m_t = self._m_t_single[prim_i][prim_index]
+            m_t = mt[prim_i][prim_index] if (mt := self._m_t_single) else 0
             m_trend = self._m_trend_single[prim_i][prim_index]
             sim[prim_index] -= m + m_t + dummy_time / self.T_sim * m_trend
         return sim
