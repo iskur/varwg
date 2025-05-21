@@ -1351,6 +1351,7 @@ class VGBase(object):
         fft_order,
         var_names=None,
         method="regression",
+        self_name="R",
     ):
         """
         Transform rain-gaps to standard-normal by distance to wet conditions.
@@ -1366,9 +1367,9 @@ class VGBase(object):
             Non-rain variables to use.
         """
         if doys[1] - doys[0] < 1:
-            rain_dist, sol = self.dist_sol_hourly("R")
+            rain_dist, sol = self.dist_sol_hourly(self_name)
         else:
-            rain_dist, sol = self.dist_sol["R"]
+            rain_dist, sol = self.dist_sol[self_name]
 
         if isinstance(rain_dist, distributions._Rain):
             rain_prob = rain_dist.all_parameters_dict(sol, doys)["rain_prob"]
@@ -1376,9 +1377,9 @@ class VGBase(object):
             rain_prob = rain_dist.rain_probs(conf.threshold, doys)
         dry_prob = 1 - rain_prob
 
-        rain_i = self.var_names.index("R")
+        rain_i = self.var_names.index(self_name)
         if var_names is None:
-            var_names = [name for name in self.var_names if name != "R"]
+            var_names = [name for name in self.var_names if name != self_name]
         if ("abs_hum" in var_names) and ("abs_hum" not in self.var_names):
             if "rh" not in self.var_names and "theta" not in self.var_names:
                 raise RuntimeError(
@@ -1396,7 +1397,7 @@ class VGBase(object):
                 [
                     self.var_names.index(var_name)
                     for var_name in var_names
-                    if var_name != "R"
+                    if var_name != self_name
                 ]
             ]
             non_rain = np.vstack((abs_hum[None, :], non_rain))
@@ -1405,7 +1406,7 @@ class VGBase(object):
                 [
                     self.var_names.index(var_name)
                     for var_name in var_names
-                    if var_name != "R"
+                    if var_name != self_name
                 ]
             ]
         threshold = conf.threshold
@@ -1523,7 +1524,7 @@ class VGBase(object):
             )
 
             non_rain_var_names = (
-                var_name for var_name in var_names if var_name != "R"
+                var_name for var_name in var_names if var_name != self_name
             )
             for var_name, wet_mean in zip(non_rain_var_names, wet_means):
                 print("\t%s: %.3f" % (var_name, wet_mean.mean()))
