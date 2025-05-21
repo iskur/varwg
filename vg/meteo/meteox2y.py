@@ -1106,7 +1106,27 @@ def sonnenscheindauer(date, sw, del_t=60):
     return sunshine_hour
 
 
-def sunshine_hours(dates, longitude, latitude, tz_offset=0):
+def get_tz_offset(dates, longitude, latitude):
+    # from tzwhere import tzwhere
+    # import pytz
+    # tzw = tzwhere.tzwhere()
+    # timezone offset
+    # timezone_str = tzw.tzNameAt(latitude, longitude)
+    if isinstance(dates, datetime):
+        dates = (dates,)
+    timezone_str = tzf.timezone_at(lat=float(latitude), lng=float(longitude))
+    timezone = pytz.timezone(timezone_str)
+    dts = [datetime(date.year, date.month, date.day) for date in dates]
+    tz_offset = (
+        np.array(
+            [timezone.utcoffset(dt, is_dst=True).total_seconds() for dt in dts]
+        )
+        / 86400
+    )
+    return np.squeeze(tz_offset)
+
+
+def sunshine_hours(dates, longitude, latitude, tz_offset=None):
     """Calculates hours from sunrise to sunset.
 
     Notes
@@ -1121,74 +1141,69 @@ def sunshine_hours(dates, longitude, latitude, tz_offset=0):
     >>> sunshine_hours([date(2018, 6, 1)], 8.848, 48.943)  # mühlacker
     array([15.89961046])
     """
+    if tz_offset is None:
+        tz_offset = get_tz_offset(dates, longitude, latitude)
     J_rise, J_set = sunshine_riseset(dates, longitude, latitude, tz_offset)
-    return (J_set - J_rise) * 60
+    # return (J_set - J_rise) * 60
+    return J_set - J_rise
 
 
-def max_sunshine_minutes(dates, longitude, latitude, tz_offset=0):
+def max_sunshine_minutes(dates, longitude, latitude, tz_offset=None):
+    if tz_offset is None:
+        tz_offset = get_tz_offset(dates, longitude, latitude)
     hour_of_day = np.array([date.hour for date in dates])
-    sun_rise, sun_set = sunshine_riseset(dates, longitude, latitude,
-                                         tz_offset)
+    sun_rise, sun_set = sunshine_riseset(dates, longitude, latitude, tz_offset)
     minutes = np.zeros_like(dates, dtype=float)
-    minutes[(hour_of_day > sun_rise) &
-            (hour_of_day < sun_set)] = 60
+    minutes[(hour_of_day > sun_rise) & (hour_of_day < sun_set)] = 60
     # if sunrise happens in the hour_of_day, we have to make minutes
     # smaller
-    dawn_mask = ((hour_of_day < sun_rise) &
-                 (sun_rise < hour_of_day + 1))
-    minutes[dawn_mask] = 60 * (sun_rise[dawn_mask] -
-                               hour_of_day[dawn_mask])
+    dawn_mask = (hour_of_day < sun_rise) & (sun_rise < hour_of_day + 1)
+    minutes[dawn_mask] = 60 * (sun_rise[dawn_mask] - hour_of_day[dawn_mask])
     # equivalent for the evening
-    twilight_mask = ((hour_of_day < sun_set) &
-                     (sun_set < hour_of_day + 1))
-    minutes[twilight_mask] = 60 * (hour_of_day[twilight_mask] + 1
-                                   - sun_set[twilight_mask])
+    twilight_mask = (hour_of_day < sun_set) & (sun_set < hour_of_day + 1)
+    minutes[twilight_mask] = 60 * (
+        hour_of_day[twilight_mask] + 1 - sun_set[twilight_mask]
+    )
     assert np.all(minutes >= 0)
     assert np.all(minutes <= 60)
     return minutes
 
 
-def sunshine_riseset(dates, longitude, latitude, tz_offset=0):
+def sunshine_riseset(dates, longitude, latitude, tz_offset=None):
     """Calculates sunrise and sunset hours."""
+    if tz_offset is None:
+        tz_offset = get_tz_offset(dates, longitude, latitude)
     jdn = times.date2jdn(dates)
 
     if tz_offset is None:
-        # from tzwhere import tzwhere
-        # import pytz
-        # tzw = tzwhere.tzwhere()
-        # timezone offset
-        # timezone_str = tzw.tzNameAt(latitude, longitude)
-        timezone_str = tzf.timezone_at(lat=float(latitude),
-                                       lng=float(longitude))
-        timezone = pytz.timezone(timezone_str)
-        dts = [datetime(date.year, date.month, date.day)
-               for date in dates]
-        tz_offset = np.array([timezone.utcoffset(dt, is_dst=True
-                                                 ).total_seconds()
-                              for dt in dts]) / 86400
-
+        tz_offset = get_tz_offset(dates, longitude, latitude)
     n = jdn - 2451545.0008  # current julian day
     J_star = n - longitude / 360 + tz_offset  # mean solar noon
-    M = (357.5291 + .98560028 * J_star) % 360  # solar mean anomaly
+    M = (357.5291 + 0.98560028 * J_star) % 360  # solar mean anomaly
     M_radians = np.radians(M)
     # equation of the center
-    C = (1.9148 * np.sin(M_radians)
-         + .02 * np.sin(2 * M_radians)
-         + .0003 * np.sin(3 * M_radians))
+    C = (
+        1.9148 * np.sin(M_radians)
+        + 0.02 * np.sin(2 * M_radians)
+        + 0.0003 * np.sin(3 * M_radians)
+    )
     # ecliptic longitude
     lambda_radians = np.radians((M + C + 282.9372) % 360)
     # solar transit
-    J_transit = (2451545.5 + J_star
-                 + .0053 * np.sin(M_radians)
-                 - .0069 * np.sin(2 * lambda_radians))
+    J_transit = (
+        2451545.5
+        + J_star
+        + 0.0053 * np.sin(M_radians)
+        - 0.0069 * np.sin(2 * lambda_radians)
+    )
     # declination of the sun
     sin_del = np.sin(lambda_radians) * np.sin(np.radians(23.44))
     cos_del = np.cos(np.arcsin(sin_del))
     # hour angle
     latitude_radians = np.radians(latitude)
-    cos_omega0 = ((np.sin(np.radians(-.83))
-                   - np.sin(latitude_radians) * sin_del)
-                  / (np.cos(latitude_radians) * cos_del))
+    cos_omega0 = (
+        np.sin(np.radians(-0.83)) - np.sin(latitude_radians) * sin_del
+    ) / (np.cos(latitude_radians) * cos_del)
     omega0 = np.degrees(np.arccos(cos_omega0)) / 360
     J_transit = J_transit - J_transit.astype(int)
     J_rise = 24 * (J_transit - omega0)
