@@ -246,12 +246,15 @@ par_known_hourly.update(
 conversions = []
 
 
-def R_m2mm(times_, data, var_names):
+def R_m2mm(times_, data, var_names, inverse=False):
     try:
         ri = var_names.index("R")
     except ValueError:
         return times_, data, var_names
-    data[ri] *= 1000 * 24
+    if inverse:
+        data[ri] /= 1000 * 24
+    else:
+        data[ri] *= 1000 * 24
     return times_, data, var_names
 
 
