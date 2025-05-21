@@ -6,6 +6,7 @@ from contextlib import closing
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import optimize
+import shelve
 import matplotlib.pyplot as plt
 import cython
 import vg
@@ -15,12 +16,13 @@ from cython.parallel import prange, parallel
 
 
 PY2 = sys.version_info.major == 2
-shelve_filename = ("resampler_cache_{version}.sh"
-                   .format(version="p2" if PY2 else "py3"))
+shelve_filename = "resampler_cache_{version}.sh".format(
+    version="p2" if PY2 else "py3"
+)
 
 
 def bias2mean(bias, a, b, c, d):
-    return a * (1 - np.exp(-bias ** b / c)) + d
+    return a * (1 - np.exp(-(bias**b) / c)) + d
 
 
 def mean2bias(mean, a, b, c, d):
@@ -31,8 +33,7 @@ def mean2bias(mean, a, b, c, d):
     too_small_mask = mean < d
     bias[too_small_mask] = 0
     valid_mask = ~too_big_mask & ~too_small_mask
-    bias[valid_mask] = ((-c * np.log(1 - (mean[valid_mask] - d) / a))
-                        ** (1 / b))
+    bias[valid_mask] = (-c * np.log(1 - (mean[valid_mask] - d) / a)) ** (1 / b)
     return bias
 
 
@@ -56,8 +57,13 @@ def _calibrate(**res_kwds):
     # theta_min = theta_incr.min()
     # biases = theta_incr - theta_min + np.linspace(0, 5, 15)[:, None]
 
-    theta_incrs = np.concatenate((np.linspace(0, 1, 10),
-                                  np.linspace(1.1, 8, 5)))
+    # theta_incrs = np.concatenate(
+    #     (np.linspace(0, 1, 10), np.linspace(1.1, 8, 5))
+    # )
+
+    theta_incrs = np.concatenate(
+        (np.linspace(0, 1, 20), np.linspace(1.1, 6, 5))
+    )
     biases = theta_incrs
     # theta_incrs = np.linspace(0, 4, 15)
 
@@ -66,7 +72,7 @@ def _calibrate(**res_kwds):
     for bias in biases:
         res_kwds["bias"] = bias
         # res_kwds["theta_incr"] = bias
-        res, _ = resample(**res_kwds)
+        res, _ = resample(n_sim_steps=10 * data.shape[1], **res_kwds)
         theta_res = res[theta_i]
         means += [np.mean(theta_res)]
     mean_diffs = np.array(means) - np.mean(theta)
@@ -77,11 +83,11 @@ def _calibrate(**res_kwds):
         mean_diffs_est = bias2mean(biases, a, b, c, d)
         return np.sum((mean_diffs - mean_diffs_est) ** 2)
 
-    result = optimize.minimize(error,
-                               (max(mean_diffs) + min(mean_diffs),
-                                .5, 1., min(mean_diffs)),
-                               # options=dict(disp=True)
-                               )
+    result = optimize.minimize(
+        error,
+        (max(mean_diffs) + min(mean_diffs), 0.5, 1.0, min(mean_diffs)),
+        # options=dict(disp=True)
+    )
 
     # import matplotlib.pyplot as plt
     # fig, ax = plt.subplots()
@@ -96,8 +102,9 @@ def _calibrate(**res_kwds):
     return result.x
 
 
-def _transform_theta_incr(theta_incr, cache_dir=None, verbose=False,
-                          recalibrate=False, **res_kwds):
+def _transform_theta_incr(
+    theta_incr, cache_dir=None, verbose=False, recalibrate=False, **res_kwds
+):
     """Calibrate theta_incr in order to get a specific mean increase in
     temperature.
 
@@ -129,8 +136,11 @@ def _transform_theta_incr(theta_incr, cache_dir=None, verbose=False,
             # calibration for negative mean changes
             res_kwds["theta_incr"] = theta_incr
             a_neg, b_neg, c_neg, d_neg = _calibrate(
-                **{key: -val if key == "data" else val
-                   for key, val in list(res_kwds.items())})
+                **{
+                    key: -val if key == "data" else val
+                    for key, val in list(res_kwds.items())
+                }
+            )
             sh[par_key_neg] = a_neg, b_neg, c_neg, d_neg
 
     bias_pos = mean2bias(theta_incr, a_pos, b_pos, c_pos, d_pos)
@@ -258,15 +268,17 @@ cpdef resample(data, dtimes, p=3, n_sim_steps=None, theta_incr=0.0,
         cal_kwds = dict(my.ADict(locals()) - ("return_candidates", "t"))
         bias = _transform_theta_incr(**cal_kwds)
         if verbose:
-            print("Transformed theta_incr=%.3f to bias=%.5f"
-                  % (np.mean(theta_incr), np.mean(bias)))
+            print(
+                "Transformed theta_incr=%.3f to bias=%.5f"
+                % (np.mean(theta_incr), np.mean(bias))
+            )
     if n_sim_steps is None:
         n_sim_steps = data.shape[1]
     K, T = data.shape
     if n_candidates is None:
         n_candidates = int(np.sqrt(T))
         if verbose:
-            print(f"Setting n_candidates={n_candidates}")
+            print(f"Setting {n_candidates=}")
     candidate_series = np.empty((K, n_sim_steps, n_candidates))
     chosen_indices = np.empty(n_sim_steps, dtype=int)
     doys = times.datetime2doy(dtimes)
@@ -288,7 +300,7 @@ cpdef resample(data, dtimes, p=3, n_sim_steps=None, theta_incr=0.0,
     doy_neighbors = np.where(ctimes.doy_distance(doys[0], doys[:-p]) <=
                              doy_tolerance)[0]
     start_i = vg.rng.choice(doy_neighbors)
-    sim[:, :p] = data[:, start_i:start_i + p]
+    sim[:, :p] = data[:, start_i : start_i + p]
     candidate_series[:, :p] = sim[:, :p, None]
     chosen_indices[:p] = list(range(start_i, start_i + p))
 
@@ -298,7 +310,7 @@ cpdef resample(data, dtimes, p=3, n_sim_steps=None, theta_incr=0.0,
     # Lall, U., & Sharma, A. (1996). A Nearest Neighbor Bootstrap For
     # Resampling Hydrologic Time Series. Water Resources Research,
     # 32(3), 679–693. http://doi.org/10.1029/95WR02966
-    k_ji = 1. / np.arange(1, n_candidates + 1)
+    k_ji = 1.0 / np.arange(1, n_candidates + 1)
     k_ji /= np.sum(k_ji)
 
     for t in range(p, n_sim_steps):
