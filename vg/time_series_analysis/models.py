@@ -28,14 +28,14 @@ from collections import namedtuple
 import numpy as np
 import scipy
 from scipy import linalg, optimize
-from scipy.linalg import kron, issymmetric
-from scipy.stats import skew, rankdata, distributions as sp_distributions
+from scipy.linalg import kron
+from scipy.stats import skew
 from tqdm import tqdm
 
 import vg
 from vg import helpers as my
 from vg.time_series_analysis import time_series as ts
-from vg.time_series_analysis.distributions import MDFt, norm
+from vg.time_series_analysis.distributions import MDFt
 from vg.time_series_analysis import phase_randomization
 
 
