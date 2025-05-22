@@ -470,7 +470,7 @@ class VG(vg_plotting.VGPlotting):
                             np.argmin(self.data_trans)
                         ] = np.nan
                     if not self.infill:
-                        self.data_trans = my.interp_nan(self.data_trans)
+                        self.data_trans = my.interp_nonfin(self.data_trans)
                     self.fit(p, q, p_max, seasonal, ex, ex_kwds)
                 if self.verbose:
                     print("p=%d seems parsimonious to me" % self.p)
@@ -1069,7 +1069,7 @@ class VG(vg_plotting.VGPlotting):
 
         # spicyness can lead to infs
         sim_sea[~np.isfinite(sim_sea)] = np.nan
-        sim_sea = my.interp_nan(sim_sea, max_interp=3)
+        sim_sea = my.interp_nonfin(sim_sea, max_interp=3)
 
         # if loc_shift:
         #     sim_sea = self._location_shift_back(sim_sea)

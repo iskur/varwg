@@ -381,7 +381,7 @@ class SeasonalKDE(seasonal.Seasonal):
             right_ii = np.minimum(nan_ii + 2, len(kernel_widths) - 1)
             kernel_widths[left_ii] = np.nan
             kernel_widths[right_ii] = np.nan
-            kernel_widths = my.interp_nan(kernel_widths, pad_periodic=True)
+            kernel_widths = my.interp_nonfin(kernel_widths, pad_periodic=True)
             assert len(kernel_widths) == len(self.doys_unique)
 
         kernel_widths = smooth(kernel_widths, self.doy_width, periodic=True)
@@ -466,7 +466,7 @@ class SeasonalKDE(seasonal.Seasonal):
                     quantiles[ii] = np.nan
                     continue
         if np.any(np.isnan(quantiles)):
-            quantiles = my.interp_nan(quantiles, max_interp=3)
+            quantiles = my.interp_nonfin(quantiles, max_interp=3)
         return quantiles
 
     def ppf(self, solution, quantiles, doys=None, mean_shift=None, **kwds):

@@ -411,7 +411,7 @@ def SVAR_LS(
         return np.asarray(
             [
                 [
-                    my.fourier_approx(M[:, k, j], fft_order)
+                    my.fourier_approx(my.interp_nonfin(M[:, k, j]), fft_order)
                     for j in range(M.shape[2])
                 ]
                 for k in range(K)
@@ -1282,7 +1282,7 @@ def SVAR_residuals(data, doys, B, p=2):
     resi = resi[:, p:] - mu if mean_adjusted else resi[:, p:]
     # A is smoothed by fft approximation. this can sometimes lead to
     # invalid matrices
-    resi = my.interp_nan(resi)
+    resi = my.interp_nonfin(resi)
     return resi
 
 
