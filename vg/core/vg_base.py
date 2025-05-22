@@ -133,8 +133,11 @@ def _parse_time(var_dict):
     elif "date" in var_dict:
         datetimes = times.str2datetime(var_dict["date"])
         del var_dict["date"]
+    elif "time-iso" in var_dict:
+        datetimes = times.iso2datetime(var_dict["time-iso"])
+        del var_dict["time"]
     elif "time" in var_dict:
-        datetimes = times.iso2datetime(var_dict["time"])
+        datetimes = times.str2datetime(var_dict["time"], "%Y-%m-%d %H:%M:%S")
         del var_dict["time"]
     elif "times" in var_dict:
         datetimes = times.str2datetime(var_dict["times"], "%Y-%m-%d %H:%M:%S")
@@ -189,7 +192,7 @@ def read_met(
     var_dict = my.csv2dict(filepath, delimiter=delimiter, **kwds)
     # get rid of quotes around filenames
     var_dict = {
-        shlex.split(var_name)[0]: values
+        shlex.split(var_name)[0]: np.asarray(values)
         for var_name, values in list(var_dict.items())
     }
 
