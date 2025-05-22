@@ -585,7 +585,9 @@ def periodic_pad(values):
     return np.concatenate((values[-half:], values, values[:half]))
 
 
-def interp_nan(values, times=None, max_interp=None, pad_periodic=False):
+def interp_nonfin(
+    values, times=None, max_interp=None, pad_periodic=False, mask=None
+):
     """Remove nans from values by linear interpolation.
 
     Parameters
@@ -614,7 +616,7 @@ def interp_nan(values, times=None, max_interp=None, pad_periodic=False):
         values = periodic_pad(values)
     values = np.atleast_2d(np.copy(values))
     for row_i, row in enumerate(values):
-        nans = np.isnan(row)
+        nans = ~np.isfinite(row)
         if times is None:
             times = np.arange(values.shape[1])
 
@@ -677,7 +679,7 @@ def sumup(
     """
     width = int(width)
     if max_interp > 0 and not sum_to_nan:
-        values = interp_nan(values, max_interp=max_interp)
+        values = interp_nonfin(values, max_interp=max_interp)
     if len(values.shape) == 1:
         values = values[np.newaxis, :]
     # we hack the values into a (x, width) shape, sum along the rows and

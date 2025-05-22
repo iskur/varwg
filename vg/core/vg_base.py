@@ -701,7 +701,9 @@ class VGBase(object):
         for var_name in var_names_dis:
             var_i = self.var_names.index(var_name)
             # hourly measured values
-            var_h = my.interp_nan(self.met[var_name][: nn + tpd], max_interp=3)
+            var_h = my.interp_nonfin(
+                self.met[var_name][: nn + tpd], max_interp=3
+            )
             # if self.start_hour_of_src:
             #     print(f"prepending var_h by {self.start_hour_of_src=} steps")
             #     var_h = np.concatenate((np.zeros(self.start_hour_of_src),
@@ -832,7 +834,7 @@ class VGBase(object):
             deltas_drawn = np.empty((len(var_names_dis), m))
             rain_i = var_names_dis.index("R")
             thresh = conf.threshold
-            hourly_rain_in = my.interp_nan(
+            hourly_rain_in = my.interp_nonfin(
                 self.met["R"][: nn + tpd], max_interp=3
             )
             daily_rain_in = hourly_rain_in.reshape(-1, tpd).mean(axis=1)
@@ -1255,7 +1257,7 @@ class VGBase(object):
                 np.isfinite(data_trans), data_trans, 1e300
             )
             data_trans[np.abs(data_trans_finite) >= 1e300] = np.nan
-            data_trans = my.interp_nan(data_trans, max_interp=3)
+            data_trans = my.interp_nonfin(data_trans, max_interp=3)
         return data_trans, dist_sol
 
     def _fit_seasonal_hourly(self, refit=None):
@@ -1353,7 +1355,7 @@ class VGBase(object):
             )
         wet_means_by_doy = np.array(
             [
-                my.fourier_approx(my.interp_nan(x), order=fft_order)
+                my.fourier_approx(my.interp_nonfin(x), order=fft_order)
                 for x in wet_means_by_doy.T
             ]
         ).T
@@ -1373,7 +1375,7 @@ class VGBase(object):
             )
         wet_stds_by_doy = np.array(
             [
-                my.fourier_approx(my.interp_nan(x), order=fft_order)
+                my.fourier_approx(my.interp_nonfin(x), order=fft_order)
                 for x in wet_stds_by_doy.T
             ]
         ).T
@@ -1392,7 +1394,7 @@ class VGBase(object):
             betas_by_doy[doy_i] = beta
         betas_by_doy = np.array(
             [
-                my.fourier_approx(my.interp_nan(x), order=fft_order)
+                my.fourier_approx(my.interp_nonfin(x), order=fft_order)
                 for x in betas_by_doy.T
             ]
         ).T
@@ -1509,7 +1511,7 @@ class VGBase(object):
         def calc_dist_ranks_regression():
             X = np.array(
                 [
-                    my.interp_nan(non_rain_var, max_interp=2)
+                    my.interp_nonfin(non_rain_var, max_interp=2)
                     for non_rain_var in non_rain
                 ]
             ).T

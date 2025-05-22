@@ -252,7 +252,7 @@ class SeasonalDist(seasonal.Seasonal):
                 par[invalid_mask] = np.nan
                 half = T // 2
                 par_pad = np.concatenate((par[-half:], par, par[:half]))
-                params[name] = my.interp_nan(par_pad)[half:-half]
+                params[name] = my.interp_nonfin(par_pad)[half:-half]
         # assert np.all(~self.dist._constraints(x, **params))
         return params
 
@@ -1228,7 +1228,7 @@ class SlidingDist(SeasonalDist):
             if np.any(np.isnan(par)):
                 half = len(par) // 2
                 par_pad = np.concatenate((par[-half:], par, par[:half]))
-                interp = my.interp_nan(par_pad)[half:-half]
+                interp = my.interp_nonfin(par_pad)[half:-half]
                 self._sliding_pars[:, par_i] = interp
 
         if self.dist.supplements_names is None:
@@ -1255,7 +1255,7 @@ class SlidingDist(SeasonalDist):
                 values_pad = np.concatenate(
                     (values[-half:], values, values[:half])
                 )
-                interp = my.interp_nan(values_pad)[half:-half]
+                interp = my.interp_nonfin(values_pad)[half:-half]
                 for day_ii in range(self.n_doys):
                     self._supplements[day_ii][sup_name] = interp[day_ii]
         return self._sliding_pars.T
