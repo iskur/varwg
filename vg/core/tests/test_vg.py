@@ -12,7 +12,8 @@ vg.set_conf(config_template)
 
 seed = 0
 p = 3
-T = 2 * 365
+T = 3 * 365
+fit_kwds = dict(p=p, fft_order=3, doy_width=15, seasonal=True)
 var_names = (
     # we do not use precipitation here as long as we cannot
     # disaggregate it properly
