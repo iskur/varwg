@@ -35,21 +35,18 @@ variables from measured meteorological values.
 
 """
 
-from builtins import range
-from datetime import datetime, timedelta
 import warnings
-import numpy as np
-from timezonefinder import TimezoneFinder
-import pytz
+from datetime import datetime, timedelta
+
 import bottleneck
-from scipy import stats
+import numpy as np
+import pytz
 import xarray as xr
+from scipy import stats
+from timezonefinder import TimezoneFinder
 
-# import multiprocessing
-
-# from math import sin, cos, radians, degrees, asin, acos
-from vg import times
 from vg import helpers as my
+from vg import times
 
 tzf = TimezoneFinder()
 
