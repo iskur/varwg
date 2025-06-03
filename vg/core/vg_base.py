@@ -915,6 +915,8 @@ class VGBase(object):
                 not os.path.exists(self.met_file)
             ):
                 self.met_file = os.path.join(self.data_dir, self.met_file)
+            if self.verbose:
+                print(f"Reading {self.met_file}")
             self.times_orig, self.met = read_met(
                 self.met_file,
                 delimiter=delimiter,
