@@ -1589,7 +1589,7 @@ def _measure_ar(
     )
     measure_coords = obs_ar.coords.copy()
     measure_coords["variable"] = varname
-    measure_ar = xr.DataArray(measure_data, coords=measure_coords)
+    measure_ar = xr.DataArray(np.squeeze(measure_data), coords=measure_coords)
     return measure_ar
 
 
