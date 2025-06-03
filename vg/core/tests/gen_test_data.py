@@ -10,11 +10,8 @@ from vg.core.tests import test_vg
 config_template = vg.config_template
 vg.set_conf(config_template)
 
-# import config_konstanz as conf
-# vg.set_conf(conf)
-
-
-p, T = test_vg.p, test_vg.T
+T = test_vg.T
+fit_kwds = test_vg.fit_kwds
 
 
 def main():
@@ -40,7 +37,7 @@ def main():
         infill=True,
         rain_method="regression",
     )
-    met_vg.fit(p)
+    met_vg.fit(**fit_kwds)
     vg.reseed(test_vg.seed)
     met_vg.simulate(T=T)
     met_vg.disaggregate(test_vg.disagg_varnames)
