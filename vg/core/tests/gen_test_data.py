@@ -27,7 +27,7 @@ def main():
     cache_dir = tempfile.mkdtemp("vg_test_data_gen")
 
     vg.reseed(test_vg.seed)
-    met_vg = vg.VG(
+    met_vg: vg.VG = vg.VG(
         test_vg.var_names,
         met_file=test_in_data_filepath,
         cache_dir=cache_dir,
@@ -50,6 +50,12 @@ def main():
     )
     shutil.rmtree(cache_dir)
 
+    return met_vg
+
 
 if __name__ == "__main__":
-    main()
+    import matplotlib.pyplot as plt
+
+    met_vg = main()
+    met_vg.plot_meteogram_daily()
+    plt.show()
