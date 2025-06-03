@@ -1,9 +1,10 @@
 """Generates data/test_out_sample.met using ../sample.met as input."""
 
-import os
 import shutil
 import tempfile
+
 import vg
+from pathlib import Path
 from vg.core.tests import test_vg
 
 config_template = vg.config_template
@@ -17,16 +18,14 @@ p, T = test_vg.p, test_vg.T
 
 
 def main():
-    data_filepath = os.path.join(
-        os.path.dirname(vg.core.__file__), "tests", "data"
-    )
-    test_in_data_filepath = os.path.join(data_filepath, "sample.met")
-    if not os.path.exists(test_in_data_filepath):
+    data_filepath = Path(vg.core.__file__).parent / "tests" / "data"
+    test_in_data_filepath = data_filepath / "sample.met"
+    if not test_in_data_filepath.exists():
         # try to look where the stand-alone vg has its sample data
-        test_in_data_filepath = os.path.join(
-            "..", os.path.dirname(vg.__file__), "sample.met"
+        test_in_data_filepath = (
+            Path("..") / Path(vg.__file__).parent / "sample.met"
         )
-    test_out_data_filepath = os.path.join(data_filepath, "test_out_sample.met")
+    test_out_data_filepath = data_filepath / "test_out_sample.met"
     # in order not to refit the present fit...
     cache_dir = tempfile.mkdtemp("vg_test_data_gen")
 
