@@ -1515,7 +1515,7 @@ def AIC(sigma_u, p, T):
     """Akaike Information Criterion for order selection of a VAR process.
     See p.147"""
     K = sigma_u.shape[0]
-    return np.log(np.linalg.det(sigma_u)) + old_div((2 * p * K**2), T)
+    return np.log(np.linalg.det(sigma_u)) + (2 * p * K**2) / T
 
 
 def FPE(sigma_u, p, T):
@@ -1770,7 +1770,7 @@ def VAR_YW_sim(A, sigma_u, T):
     # number of variables
     K = A.shape[0]
     # order of VAR-process
-    p = old_div(A.shape[1], K)
+    p = A.shape[1] / K
 
     # the first p columns are initial values, which will be omitted later
     Y = np.zeros((K, T + p))
@@ -1861,7 +1861,7 @@ def VARMA_LS(data, p, q, rel_change=1e-3):
     ts.matr_img(AM, "AM p=%d q=%d Preliminary" % (p, q))
     ii = 0
     while (det_new > 1e-60) and (
-        old_div(np.abs(det_old - det_new), det_old) > rel_change
+        np.abs(det_old - det_new) / det_old > rel_change
     ):
         ut_gamma_part = _ut_gamma_part(data, p, q, AM, ut)
         sigma_u_gamma = T**-1 * np.sum(
