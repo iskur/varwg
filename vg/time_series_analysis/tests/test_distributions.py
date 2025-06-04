@@ -42,7 +42,6 @@ class Test(npt.TestCase):
         self.verbose = False
         vg.reseed(0)
 
-    @npt.dec.slow
     def test_fit(self):
         """Is fit able to reproduce parameters of a ppf-generated sample?"""
         if self.verbose:
