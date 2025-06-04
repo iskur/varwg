@@ -42,7 +42,7 @@ from vg.time_series_analysis import phase_randomization
 
 
 mgarch_param_factory = namedtuple(
-    "mgarch_params", ("gamma0", "Gammas", "Gs", "cov_residuals")
+    "mgarch_param_factory", ("gamma0", "Gammas", "Gs", "cov_residuals")
 )
 
 
@@ -360,7 +360,7 @@ def VAREX_LS(data, p, ex):
 
 
 def SVAR_LS(
-    data, doys, p=2, doy_width=60, fft_order=2, var_names=None, verbose=True
+    data, doys, p=2, doy_width=60, fft_order=3, var_names=None, verbose=True
 ):
     """Seasonal version of the least squares estimator."""
     K, T = data.shape
