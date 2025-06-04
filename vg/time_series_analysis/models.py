@@ -24,11 +24,12 @@ Introduction to Multiple Time Series Analysis".
 
 import itertools
 from collections import namedtuple
+from warnings import warn
 
 import numpy as np
 import scipy
 from scipy import linalg, optimize
-from scipy.linalg import kron
+from scipy.linalg import kron, logm, expm
 from scipy.stats import skew
 from tqdm import tqdm
 from warnings import warn
@@ -268,15 +269,6 @@ def VAR_LS(data, p=2, biased=True):
     Y = Y[:, mask]
     Z = Z[:, mask]
 
-    # B contains all the parameters we want: (nu, A1, ..., Ap)
-    # Y = BZ + U
-    # try:
-    #     inv = np.linalg.inv(Z @ Z.T)
-    # except np.linalg.LinAlgError:
-    #     print("Adding a little random noise in order to invert matrix...")
-    #     Z += vg.rng.normal(size=Z.shape) * Z.std() * 1e-9
-    #     inv = np.linalg.inv(Z @ Z.T)
-
     if Y.shape[1] <= K * p + 1:
         warn("High number of nans. Doing ridge regularization.")
         inv = np.linalg.inv(Z @ Z.T + 1e-6 * np.eye(Z.shape[0]))
@@ -386,66 +378,28 @@ def SVAR_LS(
 
     Bs, sigma_us = np.asarray(Bs), np.asarray(sigma_us)
 
-    # import matplotlib.pyplot as plt
-    # import itertools
-    # Bs = np.asarray(Bs)
-    # sigma_us = np.asarray(sigma_us)
-    # for i, j in itertools.combinations(range(data.shape[0]), 2):
-    #     plt.figure()
-    #     plt.plot(Bs[:, i, j + 1], "b")
-    #     plt.plot(np.fft.irfft(np.fft.fft(Bs[:, i, j + 1])[:fft_order + 1],
-    #                           n_doys_unique),
-    #              "b", label="%s_t-1 -> %s_t" % (var_names[j], var_names[i]))
-    #     plt.plot(Bs[:, j, i + 1], "g")
-    #     plt.plot(np.fft.irfft(np.fft.fft(Bs[:, j, i + 1])[:fft_order + 1],
-    #                           n_doys_unique),
-    #              "g", label="%s_t-1 -> %s_t" % (var_names[i], var_names[j]))
-    #     plt.plot(sigma_us[:, i, j])
-    #     plt.plot(np.fft.irfft(np.fft.fft(sigma_us[:, i, j])[:fft_order + 1],
-    #                           n_doys_unique))
-    #     plt.legend()
-    #     plt.title("%s %s" % (var_names[i], var_names[j]))
-    #     plt.grid()
-    # for i in range(data.shape[0]):
-    #     plt.figure()
-    #     plt.plot(Bs[:, i, i + 1], "b")
-    #     plt.plot(np.fft.irfft(np.fft.fft(Bs[:, i, i + 1])[:fft_order + 1],
-    #                           n_doys_unique),
-    #              "b")
-    #     plt.grid()
-    #     plt.title(var_names[i])
-
     def matr_fft(M, fft_order):
-        return np.asarray(
-            [
-                [
-                    my.fourier_approx(my.interp_nonfin(M[:, k, j]), fft_order)
-                    for j in range(M.shape[2])
-                ]
-                for k in range(K)
-            ]
-        )
+        smoothed = np.zeros((M.shape[1], M.shape[2], M.shape[0]))
+        for k in range(K):
+            for j in range(M.shape[2]):
+                smoothed[k, j] = my.fourier_approx(
+                    my.interp_nonfin(M[:, k, j], fft_order)
+                )
+        return smoothed
 
-    # import matplotlib.pyplot as plt
-    # plt.rcParams["font.size"] = 7
-    # plt.rcParams["legend.fontsize"] = 6
-    # Bs = np.asarray(Bs)
-    # Bs_app = matr_fft(Bs)
-    # columnwidth_pt = 307.28987
-    # inches_per_pt = 1. / 72.27
-    # fig_width = columnwidth_pt * inches_per_pt
-    # plt.figure(figsize=(fig_width, .5 * fig_width))
-    # plt.plot(Bs[:, 0, 1], label="from moving window")
-    # plt.plot(Bs_app[0, 1], label="fft approximated")
-    # plt.grid()
-    # plt.xlabel("day of year")
-    # plt.tight_layout()
-    # plt.savefig("/home/dirk/Desktop/Diss/Praesentationen/A00_approx",
-    #             transparent=True, dpi=600)
-    # plt.show()
+    def cov_matr_fft(M, fft_order):
+        smoothed = np.zeros_like(M)
+        M_log = np.asarray([matrix_log_spd(cov).real for cov in M])
+        for k in range(K):
+            for j in range(M.shape[2]):
+                smoothed[:, k, j] = my.fourier_approx(
+                    my.interp_nonfin(M_log[:, k, j], fft_order)
+                )
+        smoothed = np.asarray([matrix_exp_sym(cov.real) for cov in smoothed])
+        return np.moveaxis(smoothed, 0, -1)
 
     Bs = matr_fft(Bs, fft_order)
-    sigma_us = matr_fft(sigma_us, fft_order)
+    sigma_us = cov_matr_fft(sigma_us, fft_order)
     return Bs, sigma_us
 
 
@@ -1528,6 +1482,21 @@ def unvech(sequence, K):
     A[np.tril_indices_from(A)] = np.squeeze(sequence)
     A[np.triu_indices_from(A, k=1)] = A[np.tril_indices_from(A, k=-1)]
     return A
+
+
+def symmetrize(A):
+    return 0.5 * (A + A.T)
+
+
+def matrix_log_spd(A, eps=1e-10):
+    eigvals, eigvecs = np.linalg.eigh(A)
+    eigvals_clipped = np.clip(eigvals, eps, None)
+    return eigvecs @ np.diag(np.log(eigvals_clipped)) @ eigvecs.T
+
+
+def matrix_exp_sym(A):
+    eigvals, eigvecs = np.linalg.eigh(A)
+    return eigvecs @ np.diag(np.exp(eigvals)) @ eigvecs.T
 
 
 def SC(sigma_u, p, T):
