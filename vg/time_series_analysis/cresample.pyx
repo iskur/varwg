@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+# cython: infer_types=False
+
 import os
 import sys
 from contextlib import closing
@@ -172,7 +174,7 @@ def _transform_theta_incr(
 @cython.wraparound(False)
 cdef inline double[::1] get_diffs(double[:, :, :] data_chunked,
                                   double[:, :] now):
-    cdef unsigned int i, j, t
+    cdef unsigned int i, j, t, K, p, n_chunks
     cdef double diff_single
     K = data_chunked.shape[0]
     p = data_chunked.shape[1]
