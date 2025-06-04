@@ -1,15 +1,13 @@
 import sys
 
-import numpy as np
-from scipy import integrate
-from scipy.misc import derivative
-import numpy.testing as npt
 import matplotlib.pyplot as plt
+import numpy as np
+import numpy.testing as npt
+from scipy import integrate
 
-import vg.time_series_analysis.distributions as ds
 import vg
+import vg.time_series_analysis.distributions as ds
 from vg import helpers as my
-
 
 distributions = {
     name: obj
