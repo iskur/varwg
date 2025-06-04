@@ -33,7 +33,7 @@ dists_frozen = {
 # avoid quantiles of 0 or 1, because that causes problems with the unbounded
 # distributions
 quantiles = np.linspace(1e-6, 1 - 1e-6, 11)
-quantiles_more = np.linspace(0.001, 0.999, 500)
+quantiles_more = np.linspace(0.001, 0.999, 1000)
 incr = 1e-6
 
 
