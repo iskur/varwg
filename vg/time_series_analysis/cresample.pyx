@@ -2,13 +2,14 @@
 # cython: infer_types=False
 
 import os
+import shelve
 import sys
 from contextlib import closing
 
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import optimize
-import shelve
+
 import matplotlib.pyplot as plt
 import cython
 import vg
