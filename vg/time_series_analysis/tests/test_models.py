@@ -514,6 +514,46 @@ class Test(npt.TestCase):
                     axs[k, 1].plot(sigma_u_fit[k, j], "--")
                 for ax in axs[k]:
                     ax.legend(loc="best")
+    def test_SVAR_LS_fill(self):
+        T = 3 * 365
+        vg.reseed(0)
+        doys = np.arange(T) % 365
+        Bs_test = self.Bs_test(T)
+        sigma_u_test_s = self.sigma_u_test_s(T)
+        # introduce nans
+        sim = models.SVAR_LS_sim(Bs_test, sigma_u_test_s, doys)
+        sim_before = np.copy(sim)
+        slices = (
+            (0, slice(100, 110)),
+            (-1, slice(150, 160)),
+            (slice(1, None), slice(200, 210)),
+            (slice(None), slice(250, 260)),
+        )
+        for slice_ in slices:
+            sim[slice_] = np.nan
+        sim_filled = models.SVAR_LS_fill(Bs_test, sigma_u_test_s, doys, sim)
+        assert np.all(np.isfinite(sim_filled))
+        sim_filled_nans = np.copy(sim_filled)
+        # did we only touch the nans?
+        for slice_ in slices:
+            sim_filled_nans[slice_] = np.nan
+        try:
+            npt.assert_almost_equal(sim, sim_filled_nans)
+        except AssertionError:
+            import matplotlib.pyplot as plt
+
+            fig, axs = plt.subplots(nrows=sim.shape[0], ncols=1, sharex=True)
+            for var_i, ax in enumerate(axs):
+                ax.plot(sim[var_i], "-x", label="sim")
+                ax.plot(sim_before[var_i], label="sim_before")
+                # ax.plot(sim_filled[var_i], label="sim_filled")
+            for real_i in range(100):
+                sim_filled = models.SVAR_LS_fill(
+                    Bs_test, sigma_u_test_s, doys, sim
+                )
+                for var_i, ax in enumerate(axs):
+                    ax.plot(sim_filled[var_i], color="k", alpha=0.1)
+            axs[0].legend(loc="best")
             plt.show()
             raise
 
