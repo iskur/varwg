@@ -75,7 +75,7 @@ def _calibrate(**res_kwds):
     for bias in biases:
         res_kwds["bias"] = bias
         # res_kwds["theta_incr"] = bias
-        res, _ = resample(n_sim_steps=10 * data.shape[1], **res_kwds)
+        res, _ = resample(n_sim_steps=5 * data.shape[1], **res_kwds)
         theta_res = res[theta_i]
         means += [np.mean(theta_res)]
     mean_diffs = np.array(means) - np.mean(theta)
@@ -152,7 +152,7 @@ def _transform_theta_incr(
     # print("re-transformed bias: %.3f" %
     #       bias2mean(bias_pos, a_pos, b_pos, c_pos, d_pos))
     bias_neg = mean2bias(-theta_incr, a_neg, b_neg, c_neg, d_neg)
-    bias = np.where(theta_incr > 0, bias_pos, -bias_neg)
+    bias = np.where(theta_incr >= 0, bias_pos, -bias_neg)
 
     # if verbose:
     #     import matplotlib.pyplot as plt
