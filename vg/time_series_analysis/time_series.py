@@ -37,7 +37,7 @@ def matr_img(
     colorbar=False,
     text=True,
     *args,
-    **kwds
+    **kwds,
 ):
     fig = plt.figure(figsize=figsize) if fig is None else fig
     plt.imshow(array, interpolation="nearest", **kwds)
@@ -89,7 +89,7 @@ def corr_img(data, k=0, title=None, var_names=None, rank=False, *args, **kwds):
         vmax=1,
         cmap="coolwarm",
         *args,
-        **kwds
+        **kwds,
     )
 
 
@@ -227,7 +227,7 @@ def plot_auto_corr(
     fig=None,
     ax=None,
     *args,
-    **kwds
+    **kwds,
 ):
     if fig is None or ax is None:
         fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
@@ -334,7 +334,7 @@ def plot_cross_corr(
     fig=None,
     axss=None,
     *args,
-    **kwds
+    **kwds,
 ):
     K = data.shape[0]
     if var_names is None:
@@ -377,7 +377,7 @@ def plot_scaling(
     fig=None,
     axs=None,
     *args,
-    **kwds
+    **kwds,
 ):
     if var_names is None:
         var_names = np.arange(data.shape[0]).astype(str)
