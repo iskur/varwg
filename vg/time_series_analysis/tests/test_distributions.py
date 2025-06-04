@@ -97,6 +97,15 @@ class Test(npt.TestCase):
                     )
                 except AssertionError:
                     print("\rfailed")
+                    raise
+
+    def test_mean(self):
+        """Is the mean-property of Frozen working?"""
+        # mean should be median for symmetric distributions
+        sym_names = "norm", "student_t"
+        for sym_name in sym_names:
+            dist = dists_frozen[sym_name]
+            npt.assert_almost_equal(dist.median, dist.mean)
 
     def test_pdf_integral(self):
         """Is the cdf the integral of the pdf?"""
