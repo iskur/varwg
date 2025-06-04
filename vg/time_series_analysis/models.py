@@ -263,20 +263,16 @@ def VAR_LS(data, p=2, biased=True):
         Z[:, t - p] = Zt
 
     # delete all columns containing nans
-    mask = ~np.isnan(Y).any(axis=0) & ~np.isnan(Z).any(axis=0)
-    Y = Y[:, mask]
-    Z = Z[:, mask]
-
-    # Y_nan_cols = np.where(np.isnan(Y))[1]
-    # Y = np.delete(Y, Y_nan_cols, axis=1)
-    # Z = np.delete(Z, Y_nan_cols, axis=1)
-    # Z_nan_cols = np.where(np.isnan(Z))[1]
-    # Y = np.delete(Y, Z_nan_cols, axis=1)
-    # Z = np.delete(Z, Z_nan_cols, axis=1)
-    # # # no idea why there are remaining columns with nans in Z!
-    # # Z_nan_cols_ = np.where(np.isnan(Z))[1]
-    # # Y = np.delete(Y, Z_nan_cols_, axis=1)
-    # # Z = np.delete(Z, Z_nan_cols_, axis=1)
+    Y_nan_cols = np.where(np.isnan(Y))[1]
+    Y = np.delete(Y, Y_nan_cols, axis=1)
+    Z = np.delete(Z, Y_nan_cols, axis=1)
+    Z_nan_cols = np.where(np.isnan(Z))[1]
+    Y = np.delete(Y, Z_nan_cols, axis=1)
+    Z = np.delete(Z, Z_nan_cols, axis=1)
+    # no idea why there are remaining columns with nans in Z!
+    Z_nan_cols_ = np.where(np.isnan(Z))[1]
+    Y = np.delete(Y, Z_nan_cols_, axis=1)
+    Z = np.delete(Z, Z_nan_cols_, axis=1)
 
     # B contains all the parameters we want: (nu, A1, ..., Ap)
     # Y = BZ + U
