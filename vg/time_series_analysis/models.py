@@ -212,7 +212,7 @@ def _MGARCH_unpack(params, K, q, m):
     return gamma0, Gammas, Gs
 
 
-def VAR_LS(data, p=2):
+def VAR_LS(data, p=2, biased=True):
     """Least-Squares parameter estimation for a vector auto-regressive model of
     the form Y = B*Z + U. Records containing nans are excluded.
     Refer to the Least-Squares Estimator example 3.2.3 p.78. for method and
@@ -229,8 +229,11 @@ def VAR_LS(data, p=2):
     -------
     B : array
         Parameters of the fitted VAR-process.
-    sigma_u: array
+    sigma_u : array
         Covariance matrix of the residuals.
+    biased : bool, optional
+        If true, use the number of non-nan observations (n_obs) to
+        'unbias' sigma_u. Otherwise, use n_obs - K * p - 1.
 
     See also
     --------
@@ -238,6 +241,7 @@ def VAR_LS(data, p=2):
     VAR_residuals : Returns the residuals based on given data and LS estimator
     VAR_LS_sim : Simulation based on LS estimator.
     VAR_LS_predict : Predict given prior data and LS estimator.
+
     """
     # number of variables
     if np.ndim(data) == 2:
@@ -272,17 +276,27 @@ def VAR_LS(data, p=2):
 
     # B contains all the parameters we want: (nu, A1, ..., Ap)
     # Y = BZ + U
-    try:
-        inv = np.linalg.inv(Z @ Z.T)
-    except np.linalg.LinAlgError:
-        print("Adding a little random noise in order to invert matrix...")
-        Z += vg.rng.normal(size=Z.shape) * Z.std() * 1e-9
+    # try:
+    #     inv = np.linalg.inv(Z @ Z.T)
+    # except np.linalg.LinAlgError:
+    #     print("Adding a little random noise in order to invert matrix...")
+    #     Z += vg.rng.normal(size=Z.shape) * Z.std() * 1e-9
+    #     inv = np.linalg.inv(Z @ Z.T)
+
+    if Y.shape[1] <= K * p + 1:
+        warn("High number of nans. Doing ridge regularization.")
+        inv = np.linalg.inv(Z @ Z.T + 1e-6 * np.eye(Z.shape[0]))
+    else:
         inv = np.linalg.inv(Z @ Z.T)
     B = Y @ Z.T @ inv
 
     # covariance matrix of the noise
-    sigma_u = Y @ Y.T - B @ Z @ Y.T
-    sigma_u /= Y.shape[1] - K * p - 1
+    U = Y - B @ Z
+    if biased:
+        denominator = Y.shape[1]
+    else:
+        denominator = Y.shape[1] - K * p - 1
+    sigma_u = U @ U.T / denominator
 
     return B, sigma_u
 
