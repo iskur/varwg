@@ -3,12 +3,12 @@ Created on 26.02.2014
 
 @author: dirk
 """
+
 import numpy as np
 from numpy.testing import (
     assert_almost_equal,
     assert_equal,
     TestCase,
-    run_module_suite,
 )
 import vg
 from vg.time_series_analysis import rain_stats
@@ -54,4 +54,5 @@ class Test(TestCase):
 
 if __name__ == "__main__":
     # import sys;sys.argv = ['', 'Test.testName']
-    run_module_suite()
+    # run_module_suite()
+    pass
