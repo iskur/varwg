@@ -1,12 +1,10 @@
 import os
 import numpy as np
 import numpy.testing as npt
-from numpy.testing import dec
+import pytest
 import vg
 from vg.time_series_analysis import models, tests
 
-setastest = dec.setastest
-knownfailureif = dec.knownfailureif
 
 # the following parameters and data are taken from p.707 in order to test
 # functions regarding the VAR least-squares estimator
@@ -45,12 +43,11 @@ data_means = data.mean(axis=1).reshape((3, 1))
 
 
 class Test(npt.TestCase):
-    msg = "They do suggest the right p, however."
+    msg = "Values differ from Luetkepohl's. Same p, however."
     # Test is not conclusive: solutions are for ML estimator of VAR process...
     # We get however, the same p!
 
-    @setastest(False)
-    @knownfailureif(True, msg)
+    @pytest.mark.skip(reason=msg)
     def test_AIC(self):
         """See p.148"""
         order_data = np.copy(data[:, 4:])
@@ -71,8 +68,7 @@ class Test(npt.TestCase):
         AICs = -24 - np.array([0.42, 0.5, 0.59, 0.41, 0.36])
         npt.assert_almost_equal(AICs, objectives, decimal=2)
 
-    @setastest(False)
-    @knownfailureif(True, msg)
+    @pytest.mark.skip(reason=msg)
     def test_HQ(self):
         order_data = np.copy(data[:, 4:])
         objectives = np.array(
@@ -86,8 +82,7 @@ class Test(npt.TestCase):
         HQs = -24 - np.array([0.42, 0.38, 0.37, 0.07, -0.1])
         npt.assert_almost_equal(HQs, objectives, decimal=2)
 
-    @setastest(False)
-    @knownfailureif(True, msg)
+    @pytest.mark.skip(reason=msg)
     def test_SC(self):
         order_data = np.copy(data[:, 4:])
         objectives = np.array(
@@ -101,8 +96,7 @@ class Test(npt.TestCase):
         SCs = np.array([-24.42, -24.21, -24.02, -23.55, -23.21])
         npt.assert_almost_equal(SCs, objectives, decimal=2)
 
-    @setastest(False)
-    @knownfailureif(True, msg)
+    @pytest.mark.skip(reason=msg)
     def test_FPE(self):
         order_data = np.copy(data[:, 4:])
         K, T = order_data.shape
@@ -124,6 +118,22 @@ class Test(npt.TestCase):
         )
         A_act = models.B2A(B)
         npt.assert_almost_equal(A_act, A_exp)
+
+    # def test_VAR_cov(self):
+    #     # VAR(1)
+    #     B = np.array([[0, 0.5, 0, 0], [0, 0.1, 0.1, 0.3], [0, 0, 0.2, 0.3]])
+    #     sigma_u = np.array([[2.25, 0, 0], [0, 1, 0.5], [0, 0.5, 0.74]])
+    #     cov_exp = np.array(
+    #         [[3, 0.161, 0.019], [0.161, 1.172, 0.674], [0.019, 0.674, 0.954]]
+    #     )
+    #     cov_act = models.VAR_cov(B, sigma_u)
+    #     npt.assert_almost_equal(cov_act, cov_exp, decimal=3)
+    #     # VAR(2)
+    #     B = np.array([[0, 0.5, 0.1, 0, 0], [0, 0.4, 0.5, 0.25, 0]])
+    #     sigma_u = np.array([[0.09, 0], [0, 0.04]])
+    #     cov_exp = np.array([[0.131, 0.066], [0.066, 0.181]])
+    #     cov_act = models.VAR_cov(B, sigma_u)
+    #     npt.assert_allclose(cov_act, cov_exp, atol=1e-3)
 
     def test__scale_additive(self):
         self.assertRaises(
@@ -148,7 +158,7 @@ class Test(npt.TestCase):
     def test_VAR_LS(self):
         """Checking the example mentioned in the VAR_LS-docstring (p. 707f)."""
         # values from 1960-1978 with presample data
-        B, sigma_u = models.VAR_LS(data, VAR_p)
+        B, sigma_u = models.VAR_LS(data, VAR_p, biased=False)
         # sigma_u = np.cov(models.VAR_LS_residuals(data, B, VAR_p), ddof=1)
         npt.assert_almost_equal(B, B_test, decimal=3)
         npt.assert_almost_equal(sigma_u, sigma_u_test, decimal=6)
@@ -404,17 +414,23 @@ class Test(npt.TestCase):
             import matplotlib.pyplot as plt
 
             fig, axs = plt.subplots(
-                ncols=sim.shape[0], subplot_kw=dict(aspect="equal")
+                nrows=VAR_K, ncols=2, width_ratios=(0.8, 0.2), sharex="col"
             )
-            for var_i, ax in enumerate(axs):
-                _ = ax.scatter(
+            for var_i, axs_k in enumerate(axs):
+                axs_k[0].plot(residuals_test[var_i], label="expected")
+                axs_k[0].plot(residuals[var_i], label="actual")
+                axs_k[1].scatter(
                     residuals[var_i, VAR_p:], residuals_test[var_i, VAR_p:]
                 )
+                axs_k[1].set_aspect("equal", "box")
+            axs[0, 0].legend(loc="best")
+            for ax in axs.ravel():
+                ax.grid(True)
             plt.show()
             raise
 
     def test_SVAR_LS_B_recover(self):
-        T = 50 * 365
+        T = 500 * 365
         vg.reseed(0)
         doys = np.arange(T) % 365
         Bs_test = self.Bs_test(T)
@@ -456,33 +472,37 @@ class Test(npt.TestCase):
         # std_stat = sim_stat.std(axis=1)
         # npt.assert_almost_equal(std, std_stat, decimal=3)
 
-        import matplotlib.pyplot as plt
-
-        fig, axs = plt.subplots(nrows=2, ncols=K, figsize=(9, 6))
-        ranks = (np.arange(T) - 0.5) / T
-        for var_i in range(K):
-            sim_sorted = np.sort(sim[var_i])
-            sim_stat_sorted = np.sort(sim_stat[var_i])
-            axs[0, var_i].plot(sim_sorted, ranks, label="seasonal")
-            axs[0, var_i].plot(sim_stat_sorted, ranks, label="stationary")
-            axs[1, var_i].plot(np.sort(sim_stat[var_i]), np.sort(sim[var_i]))
-            smin = min(sim_sorted[0], sim_stat_sorted[0])
-            smax = max(sim_sorted[-1], sim_stat_sorted[-1])
-            axs[1, var_i].plot([smin, smax], [smin, smax], "--k")
-            axs[1, var_i].set_xlabel("stationary")
-        axs[1, 0].set_ylabel("seasonal")
-        axs[0, 0].legend(loc="best")
-        for ax in np.ravel(axs):
-            ax.grid(True)
-        plt.show()
+        # import matplotlib.pyplot as plt
+        # fig, axs = plt.subplots(nrows=2, ncols=K,
+        #                         figsize=(9, 6))
+        # ranks = (np.arange(T) - .5) / T
+        # for var_i in range(K):
+        #     sim_sorted = np.sort(sim[var_i])
+        #     sim_stat_sorted = np.sort(sim_stat[var_i])
+        #     axs[0, var_i].plot(sim_sorted, ranks,
+        #                        label="seasonal")
+        #     axs[0, var_i].plot(sim_stat_sorted, ranks,
+        #                        label="stationary")
+        #     axs[1, var_i].plot(np.sort(sim_stat[var_i]),
+        #                        np.sort(sim[var_i]))
+        #     smin = min(sim_sorted[0], sim_stat_sorted[0])
+        #     smax = max(sim_sorted[-1], sim_stat_sorted[-1])
+        #     axs[1, var_i].plot([smin, smax], [smin, smax],
+        #                        "--k")
+        #     axs[1, var_i].set_xlabel("stationary")
+        # axs[1, 0].set_ylabel("seasonal")
+        # axs[0, 0].legend(loc="best")
+        # for ax in np.ravel(axs):
+        #     ax.grid(True)
+        # plt.show()
 
         # fit on simulated values check if we can recover B and
         # sigma_u
         B_fit, sigma_u_fit = models.SVAR_LS(
             sim,
             doys,
-            doy_width=20,
-            fft_order=2,
+            doy_width=10,
+            fft_order=3,
             p=VAR_p,
         )
         try:
@@ -514,6 +534,12 @@ class Test(npt.TestCase):
                     axs[k, 1].plot(sigma_u_fit[k, j], "--")
                 for ax in axs[k]:
                     ax.legend(loc="best")
+                    ax.grid(True)
+            axs[0, 0].set_title("B")
+            axs[0, 1].set_title("sigma_u")
+            plt.show()
+            raise
+
     def test_SVAR_LS_fill(self):
         T = 3 * 365
         vg.reseed(0)
