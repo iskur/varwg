@@ -2,7 +2,7 @@ import datetime
 
 import numpy as np
 import numpy.testing as npt
-from numpy.testing import TestCase, run_module_suite
+from numpy.testing import TestCase
 
 from vg import times
 from vg.time_series_analysis import (
@@ -115,4 +115,5 @@ if __name__ == "__main__":
     # import sys;sys.argv = ['', 'Test.testName']
     # import warnings
     # warnings.simplefilter("error", RuntimeWarning)
-    run_module_suite()
+    # run_module_suite()
+    pass
