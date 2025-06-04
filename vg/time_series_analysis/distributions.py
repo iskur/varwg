@@ -1,6 +1,3 @@
-import os
-import sys
-import subprocess
 import warnings
 from abc import ABCMeta, abstractmethod
 from collections import namedtuple
@@ -8,14 +5,13 @@ from functools import partial
 
 import matplotlib.pyplot as plt
 import numpy as np
-from numpy.random import default_rng
 import scipy.optimize as sp_optimize
 from scipy import interpolate, linalg, special, stats
 from scipy.integrate import cumulative_trapezoid, quad
 
-
 try:
     from multiprocessing import cpu_count
+
     import numexpr as ne
 
     ne.set_num_threads(min(64, cpu_count()))
@@ -2760,11 +2756,11 @@ rain_expon = Rain(expon, threshold=0.002)
 rain_weibull = Rain(weibull, threshold=0.002)
 
 if __name__ == "__main__":
-    import vg
-    from vg import vg_base, vg_plotting
-
     # import config_konstanz_disag as conf
     import config_konstanz as conf
+
+    import vg
+    from vg import vg_base, vg_plotting
 
     vg.set_conf(conf)
     # times_hourly, met = vg.read_met(vg.conf.met_file)
