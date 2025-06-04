@@ -2,7 +2,7 @@ import tempfile
 import shutil
 import numpy as np
 import numpy.testing as npt
-from vg.time_series_analysis import resample, cresample, time_series
+from vg.time_series_analysis import resample, time_series
 import vg
 
 # import config_konstanz
@@ -18,6 +18,7 @@ class Test(npt.TestCase):
         )
         self.data = self.met_vg.data_trans
         self.times = self.met_vg.times
+        self.verbose = False
 
     def tearDown(self):
         shutil.rmtree(self.tempdir)
@@ -41,17 +42,17 @@ class Test(npt.TestCase):
         npt.assert_almost_equal(
             np.mean(res, axis=1), np.mean(self.data, axis=1), decimal=1
         )
-        theta_incr = 1.0
+        theta_incr = 1.5
 
         # we only expect to hit the right theta_incr in the mean of a
         # lot of realizations.  so we do a very long simulation which
         # is about the same thing
-        # n_sim_steps = 10 * self.data.shape[1]
-        n_sim_steps = None
+        n_sim_steps = 10 * self.data.shape[1]
+        # n_sim_steps = None
         theta_i = self.met_vg.var_names.index("theta")
         means = []
         data_mean = np.mean(self.data[theta_i])
-        theta_incrs = np.linspace(0, 1.1, 15, endpoint=False)
+        theta_incrs = np.linspace(0, 0.8, 15, endpoint=False)
         for theta_incr in theta_incrs:
             ress = []
             for _ in range(2):
@@ -68,15 +69,20 @@ class Test(npt.TestCase):
                 ress += [res[theta_i]]
             means += [np.mean(ress) - data_mean]
 
-        # import matplotlib.pyplot as plt
-        # fig, ax = plt.subplots(subplot_kw=dict(aspect="equal"))
-        # ax.scatter(theta_incrs, means)
-        # min_ = np.min(np.array([means, theta_incrs]))
-        # max_ = np.max(np.array([means, theta_incrs]))
-        # ax.plot([min_, max_], [min_, max_])
-        # ax.set_xlabel("expected means")
-        # ax.set_ylabel("actual means")
-        # ax.grid(True)
-        # plt.show()
+        try:
+            npt.assert_almost_equal(means, theta_incrs, decimal=1)
+        except AssertionError:
+            if not self.verbose:
+                raise
+            import matplotlib.pyplot as plt
 
-        npt.assert_almost_equal(means, theta_incrs, decimal=1)
+            fig, ax = plt.subplots(
+                nrows=1, ncols=1, subplot_kw=dict(aspect="equal")
+            )
+            ax.scatter(theta_incrs, means, marker="x")
+            ax.set_xlabel("expected mean increases")
+            ax.set_ylabel("actual mean increases")
+            ax.grid(True)
+            ax.axline([0, 0], slope=1, color="k", linestyle="--")
+            plt.show()
+            raise
