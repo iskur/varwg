@@ -31,6 +31,7 @@ from scipy import linalg, optimize
 from scipy.linalg import kron
 from scipy.stats import skew
 from tqdm import tqdm
+from warnings import warn
 
 import vg
 from vg import helpers as my
@@ -263,16 +264,9 @@ def VAR_LS(data, p=2, biased=True):
         Z[:, t - p] = Zt
 
     # delete all columns containing nans
-    Y_nan_cols = np.where(np.isnan(Y))[1]
-    Y = np.delete(Y, Y_nan_cols, axis=1)
-    Z = np.delete(Z, Y_nan_cols, axis=1)
-    Z_nan_cols = np.where(np.isnan(Z))[1]
-    Y = np.delete(Y, Z_nan_cols, axis=1)
-    Z = np.delete(Z, Z_nan_cols, axis=1)
-    # no idea why there are remaining columns with nans in Z!
-    Z_nan_cols_ = np.where(np.isnan(Z))[1]
-    Y = np.delete(Y, Z_nan_cols_, axis=1)
-    Z = np.delete(Z, Z_nan_cols_, axis=1)
+    mask = ~np.isnan(Y).any(axis=0) & ~np.isnan(Z).any(axis=0)
+    Y = Y[:, mask]
+    Z = Z[:, mask]
 
     # B contains all the parameters we want: (nu, A1, ..., Ap)
     # Y = BZ + U
