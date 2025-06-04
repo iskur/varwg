@@ -268,9 +268,12 @@ def plot_auto_corr(
     ax.grid()
     fig.suptitle(title)
     if window_title:
-        fig.canvas.set_window_title(
-            "%s (%d)" % (title, fig.canvas.manager.num)
-        )
+        try:
+            fig.canvas.set_window_title(
+                "%s (%d)" % (title, fig.canvas.manager.num)
+            )
+        except AttributeError:
+            pass
     return fig, ax
 
 
