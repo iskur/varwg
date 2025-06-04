@@ -223,7 +223,7 @@ cdef inline double[::1] get_diffs(double[:, :, :] data_chunked,
 cpdef resample(data, dtimes, p=3, n_sim_steps=None, theta_incr=0.0,
                theta_i=0, n_candidates=None, doy_tolerance=10,
                cache_dir=None, bias=None, verbose=False,
-               return_candidates=False, recalibrate=False):
+               return_candidates=False, recalibrate=False, z_transform=True):
     """A simple multivariate resampler.
     Assumes that all variables are in the same dimension as similarity is
     evaluated in terms of summed absolute differences.
@@ -272,6 +272,9 @@ cpdef resample(data, dtimes, p=3, n_sim_steps=None, theta_incr=0.0,
                 "Transformed theta_incr=%.3f to bias=%.5f"
                 % (np.mean(theta_incr), np.mean(bias))
             )
+    if z_transform:
+        data_orig = np.copy(data)
+        data = (data - data.mean(axis=1)[:, None]) / data.std(axis=1)[:, None]
     if n_sim_steps is None:
         n_sim_steps = data.shape[1]
     K, T = data.shape
@@ -341,6 +344,9 @@ cpdef resample(data, dtimes, p=3, n_sim_steps=None, theta_incr=0.0,
         # i points at the beginning of a chunk, we want the values one time
         # step further
         sim[:, t] = data[:, neighbor_i + p]
+
+    if z_transform:
+        sim = data_orig[:, chosen_indices]
 
     if return_candidates:
         return sim, chosen_indices, candidate_series
