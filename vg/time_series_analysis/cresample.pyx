@@ -113,6 +113,8 @@ def _transform_theta_incr(
     Fits a curve of the following form:
       x = (- d \ln |1 - a / b|)^{1/c}
     """
+    if theta_incr is None:
+        theta_incr = 0
     if cache_dir:
         shelve_filepath = os.path.join(cache_dir, shelve_filename)
     else:
