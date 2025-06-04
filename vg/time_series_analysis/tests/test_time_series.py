@@ -6,7 +6,7 @@ Created on 06.09.2012
 
 import matplotlib.pyplot as plt
 import numpy as np
-from numpy.testing import TestCase, assert_almost_equal, run_module_suite
+from numpy.testing import TestCase, assert_almost_equal
 
 import vg
 from vg.time_series_analysis import time_series
@@ -171,4 +171,5 @@ class Test(TestCase):
 
 if __name__ == "__main__":
     # import sys;sys.argv = ['', 'Test.test_auto_corr']
-    run_module_suite()
+    # run_module_suite()
+    pass
