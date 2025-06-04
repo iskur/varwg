@@ -1309,7 +1309,7 @@ class NoncentralT(Dist):
 
     def _fit(self, x):
         x_noninf = x[np.isfinite(x)]
-        mode = stats.mode(np.round(x_noninf, 1))[0][0]
+        mode = stats.mode(np.round(x_noninf, 1)).mode
         x0 = (1, 2 * stats.skew(x_noninf), mode)
         df, nc, mu = self.fit_ml(x_noninf, x0=x0, method="Nelder-Mead").x
         #        if df >= 30:
@@ -1863,7 +1863,7 @@ class ExponTwo(Dist):
 
     def _fit(self, x):
         x_noninf = x[np.isfinite(x)]
-        x0 = stats.mode(np.round(x_noninf, 1))[0][0]
+        x0 = stats.mode(np.round(x_noninf, 1)).mode
         lambda1 = -1 / np.mean(x_noninf[x_noninf < x0] - x0)
         lambda2 = 1 / np.mean(x_noninf[x_noninf > x0] - x0)
         q0 = (np.argmin(np.abs(np.sort(x_noninf) - x0)) + 0.5) / len(x)
@@ -1914,7 +1914,7 @@ class NoncentralLaplace(Dist):
         return x
 
     def _fit(self, x):
-        x0 = stats.mode(np.round(x, 1))[0][0]
+        x0 = stats.mode(np.round(x, 1)).mode
         q0 = (np.argmin(np.abs(np.sort(x) - x0)) + 0.5) / len(x)
         lambd = (1 - 2 * q0) / (q0 * np.mean(x[np.isfinite(x)]))
         if lambd < 0:
