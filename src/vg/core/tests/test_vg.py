@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 import tempfile
 
 import matplotlib.pyplot as plt
@@ -26,15 +26,18 @@ var_names = (
     "v",
 )
 disagg_varnames = [name for name in var_names if name != "R"]
-script_home = os.path.dirname(vg.__file__)
-met_file = os.path.join(script_home, "sample.met")
-data_dir = os.path.join(os.path.dirname(vg.core.__file__), "tests", "data")
-sim_file = os.path.join(data_dir, "test_out_sample.met")
+# script_home = os.path.dirname(vg.__file__)
+# met_file = os.path.join(script_home, "sample.met")
+# data_dir = os.path.join(os.path.dirname(vg.core.__file__), "tests", "data")
+# sim_file = os.path.join(data_dir, "test_out_sample.met")
+script_home = Path(vg.__file__).parent
+met_file = script_home / "sample.met"
+data_dir = Path(vg.core.__file__).parent / "tests" / "data"
+sim_file = data_dir / "test_out_sample.met"
 
-if not os.path.exists(data_dir):
-    os.mkdir(data_dir)
+data_dir.mkdir(exist_ok=True)
 
-if not os.path.exists(met_file):
+if not met_file.exists():
     # try to retrieve it from the VG repository on bitbucket
     import urllib.request
 
@@ -42,7 +45,7 @@ if not os.path.exists(met_file):
     print("Downloading sample data for VG.")
     urllib.request.urlretrieve(url, met_file)
 
-if not os.path.exists(sim_file):
+if not sim_file.exists():
     from . import gen_test_data
 
     gen_test_data.main()
@@ -54,8 +57,7 @@ class TestVG(npt.TestCase):
         met = vg.read_met(
             sim_file, verbose=self.verbose, with_conversions=True
         )[1]
-        self.refit = False
-        # self.refit = "R"
+        self.refit = True
         self.sample_sim = np.array([met[var_name] for var_name in var_names])
         self.data_dir = tempfile.mkdtemp("vg_temporary_test")
         kwds = dict(
