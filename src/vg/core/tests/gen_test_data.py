@@ -40,14 +40,21 @@ def main():
     met_vg.fit(**fit_kwds)
     vg.reseed(test_vg.seed)
     met_vg.simulate(T=T)
-    met_vg.disaggregate(test_vg.disagg_varnames)
-    # shutil.copy(met_vg.outfilepath, test_out_data_filepath)
-    # met_vg.to_df("hourly output", with_conversions=False).to_csv(
-    #     test_out_data_filepath, sep="\t"
-    # )
+    sim = met_vg.disaggregate(test_vg.disagg_varnames)[1]
     met_vg.to_df("hourly output", with_conversions=True).to_csv(
         test_out_data_filepath, sep="\t"
     )
+
+    # do a roundtrip test
+    met = vg.read_met(
+        test_out_data_filepath, verbose=True, with_conversions=True
+    )[1]
+    import numpy as np
+    import numpy.testing as npt
+
+    sample_sim = np.array([met[var_name] for var_name in test_vg.var_names])
+    npt.assert_almost_equal(sim, sample_sim)
+
     shutil.rmtree(cache_dir)
 
     return met_vg
