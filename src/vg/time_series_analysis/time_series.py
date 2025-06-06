@@ -230,7 +230,9 @@ def plot_auto_corr(
     **kwds,
 ):
     if fig is None or ax is None:
-        fig, ax = plt.subplots(nrows=1, ncols=1, figsize=figsize)
+        fig, ax = plt.subplots(
+            nrows=1, ncols=1, figsize=figsize, constrained_layout=True
+        )
     fig.canvas.mpl_connect("draw_event", my.scale_yticks)
     lags = np.arange(k_range)
     corr_func = partial_autocorr if partial else auto_corr
@@ -246,7 +248,6 @@ def plot_auto_corr(
     symbols = "x^*"
     for data_2d, linestyle, symbol in zip(d_data, linestyles, symbols):
         for diff in range(n_difference + 1):
-            fig.add_subplot(n_difference + 1, 1, diff + 1)
             autos = corr_func(data_2d, lags)
             for auto, color in zip(autos.T, "bgrcmykw"):
                 ax.plot(
@@ -265,7 +266,7 @@ def plot_auto_corr(
                     frameon=False,
                     borderaxespad=0.0,
                 )
-    ax.grid()
+    ax.grid(True)
     fig.suptitle(title)
     if window_title:
         try:
