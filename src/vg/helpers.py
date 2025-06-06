@@ -197,8 +197,8 @@ def cache(*names, **name_values):
     compile time. The wrapped function also has a 'clear_cache'-method
     to delete those variables.
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     *names : str
 
     """
@@ -222,8 +222,8 @@ def clear_def_cache(function, cache_names=None, cache_name_values=None):
     'function.attribute = value'.  This function helps cleaning it up,
     i.e. setting them to None.
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     function : object with settable attributes
     cache_names : sequence of str or None, optional
         if None, function should have an attribute called _cache_names with
@@ -1049,8 +1049,8 @@ def kde_gauss(
 ):
     """
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     dataset : (T,) ndarray
         input data as array of length T
     evaluation points : (N,) ndarray, optional if return_width=True

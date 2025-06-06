@@ -42,8 +42,6 @@ except ImportError:
     conf_filepath = conf.__file__
     if conf_filepath.endswith(".pyc"):
         conf_filepath = conf_filepath[:-1]
-    # warnings.warn('Could not import "config.py".' + os.linesep +
-    #               'Edit "%s" and rename it to "config.py"' % conf_filepath)
 
 
 def delete_cache():
@@ -143,8 +141,8 @@ def seasonal_back(
 ):
     """Transform variables from normal to real-world marginals.
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     dist_sol : mapping like dict or shelve object
         Distribution fitting parameters.
     norm_data : (K, T) array
@@ -1434,7 +1432,7 @@ class VG(vg_plotting.VGPlotting):
         """Converts output to a DYRESM input file.
 
         Parameters
-        ---------
+        ----------
         outfilepath : str
             dyresm meteorological bc file
         ts : int
