@@ -2,12 +2,11 @@ include MANIFEST.in
 include *.txt
 include distribute_setup.py
 include setup.py
-include src/vg/sample.met
-include src/vg/core/dyresm_header_template
-include src/vg/time_series_analysis/cresample.pyx
-include src/vg/ctimes.pyx
-include src/vg/meteo/meteox2y_cy.pyx
-include src/vg/*.py
+include vg/sample.met
+include vg/core/dyresm_header_template
+include vg/time_series_analysis/cresample.pyx
+include vg/ctimes.pyx
+include vg/*.py
 recursive-include vg *.pyd
 recursive-include vg *.so
 
