@@ -1,10 +1,6 @@
-from distribute_setup import use_setuptools
-
-use_setuptools()
-
 import sys
 import numpy as np
-from setuptools import setup, find_packages, findall
+from setuptools import setup
 from setuptools.extension import Extension
 
 try:
