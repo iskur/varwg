@@ -1871,8 +1871,7 @@ class VGPlotting(vg_base.VGBase):
                 vmax = max(means_obs.max(), means_sim.max())
                 locator = ticker.MaxNLocator(8)
                 locator.create_dummy_axis()
-                # locator.set_bounds(vmin, vmax)
-                levs = locator()
+                levs = locator.tick_values(vmin, vmax)
                 axs[mask_i, 0].contourf(
                     list(range(1, 25)), list(range(1, 13)), means_obs, levs
                 )
