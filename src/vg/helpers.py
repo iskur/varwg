@@ -1091,9 +1091,7 @@ def kde_gauss(
             optMatrix = ne.evaluate(ne_str)
         else:
             preTerm = 1.0 / (np.sqrt(2 * np.pi) * kernel_width)
-            optMatrix = (
-                preTerm / np.exp(optMatrix**2 / (2 * kernel_width**2)),
-            )
+            optMatrix = preTerm / np.exp(optMatrix**2 / (2 * kernel_width**2))
         nDataset = np.shape(dataset)[0]
         # sets diagonal to 0, i.e. leave-one-out method
         optMatrix.ravel()[:: nDataset + 1] = 0
