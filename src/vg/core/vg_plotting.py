@@ -543,6 +543,8 @@ class VGPlotting(vg_base.VGBase):
             figs = (figs,)
         if axss is None:
             axss = 2 * [None]
+        if figsize is None:
+            figsize = (8, len(var_names))
         if figsize is not None:
             f_kwds["figsize"] = figsize
         # elif isinstance(axss, np.ndarray):
@@ -1955,3 +1957,13 @@ class VGPlotting(vg_base.VGBase):
 
     #         figs += [fig]
     #         axes += [axs]
+
+
+if __name__ == "__main__":
+    import vg
+
+    met_vg = vg.VG(("theta", "Qsw", "ILWR", "rh", "u", "v"), verbose=True)
+    met_vg.simulate()
+    # met_vg.disaggregate()
+    met_vg.plot_autocorr()
+    plt.show()
