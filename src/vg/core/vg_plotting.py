@@ -320,7 +320,9 @@ class VGPlotting(vg_base.VGBase):
 
         return fig, axs
 
-    def plot_doy_scatter(self, var_names=None, opacity=0.4, hourly=False):
+    def plot_doy_scatter(
+        self, var_names=None, opacity=0.4, hourly=False, **f_kwds
+    ):
         """Plot variables over doys. Measurement and backtransformed simulated
         data will be plotted, if it is available.
 
@@ -342,7 +344,7 @@ class VGPlotting(vg_base.VGBase):
             var_names = self.var_names
         elif isinstance(var_names, str):
             var_names = (var_names,)
-        fig, axs = plt.subplots(nrows=len(var_names))
+        fig, axs = plt.subplots(nrows=len(var_names), **f_kwds)
         if len(var_names) == 1:
             axs = (axs,)
         for ax, var_name in zip(axs, var_names):
