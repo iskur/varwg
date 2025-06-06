@@ -34,6 +34,9 @@ build-backend = "setuptools.build_meta"
 [dependency-groups]
 dev = [
   "cython>=3.1.1",
+  "docutils>=0.21.2",
+  "ipython>=9.3.0",
+  "numpydoc>=1.8.0",
   "pytest>=8.4.0",
 ]
 
