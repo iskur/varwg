@@ -1,36 +1,40 @@
-#!/usr/bin/env python
-import collections
 import copy
 import datetime
-import os
-from pathlib import Path
-import warnings
-import shutil
-import pickle
-from collections import namedtuple, defaultdict
 import functools
+import os
+import pickle
+import shutil
+import warnings
+from collections import abc, defaultdict, namedtuple
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
 import vg
-from vg.time_series_analysis import seasonal_distributions as sd
-from vg import helpers as my, times
+from vg import helpers as my
+from vg import times
+from vg.core import vg_base, vg_plotting
 from vg.meteo import avrwind, meteox2y
-from vg.meteo.meteox2y import sunshine_riseset
 
 # from vg.meteo.meteox2y_cy import pot_s_rad
-from vg.meteo.meteox2y import pot_s_rad
+from vg.meteo.meteox2y import pot_s_rad, sunshine_riseset
 from vg.time_series_analysis import (
     conditional_sim as csim,
+)
+from vg.time_series_analysis import (
+    cresample,
     distributions,
     models,
+)
+from vg.time_series_analysis import (
     resample as resampler,
+)
+from vg.time_series_analysis import seasonal_distributions as sd
+from vg.time_series_analysis import (
     time_series as ts,
 )
-from vg.core import vg_base, vg_plotting
-from vg.time_series_analysis import cresample
 
 read_met = vg_base.read_met
 
@@ -1137,7 +1141,7 @@ class VG(vg_plotting.VGPlotting):
         data_hourly = vg_base.met_as_array(self.met, var_names=self.var_names)
         # the nans mess up the calculation of the covariance matrix
         data_hourly = data_hourly[:, np.all(np.isfinite(data_hourly), axis=0)]
-        if isinstance(self.sum_interval, collections.abc.Iterable):
+        if isinstance(self.sum_interval, abc.Iterable):
             warnings.warn(
                 "Per-variable sum_interval is not supported " "anymore."
             )
@@ -2272,6 +2276,7 @@ if __name__ == "__main__":
 
     # import config_konstanz_disag as conf
     import config_konstanz as conf
+
     from vg.core import vg_plotting
 
     vg_base.conf = vg_plotting.conf = conf

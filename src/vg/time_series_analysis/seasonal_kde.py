@@ -570,8 +570,8 @@ class SeasonalKDE(seasonal.Seasonal):
 def doy_hour_fft(data, dtimes, order=4):
     """Remove yearly and daily cycle.
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     data : 1d array
     dtimes : 1d array of datetime objects
     order : int, optional
@@ -606,8 +606,8 @@ def fft2par(
     The output is repeated for as many periods underlying the doys (think of
     years).
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     fft_pars : ndarray
         As returned from numpy.fft.fft (or its siblings).
     doys : float 1d array
@@ -774,8 +774,8 @@ class SeasonalHourlyKDE(SeasonalKDE, seasonal.Torus):
 
     def fit(self, silverman=False, order=4):
         """
-        Parameter
-        ---------
+        Parameters
+        ----------
         silverman : boolean or callable, optional
             Use rule of silverman instead of leave-one-out maximum
             likelihood estimation.

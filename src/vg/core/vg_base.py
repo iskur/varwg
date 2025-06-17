@@ -1,31 +1,30 @@
 import copy
 import datetime
 import os
-from pickle import UnpicklingError
 import re
 import shlex
 import sys
 import warnings
-from tqdm import tqdm
+from pickle import UnpicklingError
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy import interpolate, stats
-import matplotlib.pyplot as plt
+from tqdm import tqdm
 
-import vg.time_series_analysis.seasonal_kde as skde
-from vg import helpers as my
-from vg import times
-from vg import shelve
 import vg
-from vg.meteo import avrwind, meteox2y, meteox2y_cy
+import vg.time_series_analysis.seasonal_kde as skde
+from vg import ctimes, shelve, times
+from vg import helpers as my
+from vg.meteo import avrwind, meteox2y
 from vg.time_series_analysis import (
     distributions,
-    seasonal_distributions as sd,
     models,
 )
-from vg import ctimes
-
+from vg.time_series_analysis import (
+    seasonal_distributions as sd,
+)
 
 try:
     from vg import config as conf
@@ -569,8 +568,8 @@ class VGBase(object):
 
         Usefull to construct `climate_signal`s
 
-        Parameter
-        ---------
+        Parameters
+        ----------
         var_name : str or sequence of strings
         doys : 1d array
             If None, `sim_times` is used. If that is not available,
@@ -1422,8 +1421,8 @@ class VGBase(object):
         """
         Transform rain-gaps to standard-normal by distance to wet conditions.
 
-        Parameter
-        ---------
+        Parameters
+        ----------
         data_trans : 2d array
             Transformed variables.
         rain : 1d array
@@ -1668,9 +1667,10 @@ class VGBase(object):
 if __name__ == "__main__":
     vg.reseed(0)
     warnings.simplefilter("error", RuntimeWarning)
-    import matplotlib.pyplot as plt
-    import vg
     import config_konstanz as conf
+    import matplotlib.pyplot as plt
+
+    import vg
 
     vg.conf = vg.vg_base.conf = vg.vg_plotting.conf = conf
     met_vg = vg.VG(

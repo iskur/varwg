@@ -1066,8 +1066,8 @@ def kde_gauss(
     verbose : boolean, optional
         Print information (also from the optimizer).
 
-    Example
-    -------
+    Examples
+    --------
         dataset = np.array(np.random.normal(size=1e3))
         xx = np.linspace(-3,3, 1e3)
         plt.plot(xx,kde_gauss(dataset,xx))

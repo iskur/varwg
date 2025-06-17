@@ -611,8 +611,8 @@ def timestamp2index(ts, dt, refts, **kwargs):
                The index of a discrete time series array of the given
                parameters
 
-    Example
-    -------
+    Examples
+    --------
     >>> timestr1, timestr2 = '2008-06-01T00:00:00', '2007-01-01T00:00:00'
     >>> timestamp2index(timestr1, 'minutes=5', timestr2)
     148896
@@ -944,8 +944,8 @@ def feb29_mask(dtimes):
 
     Should help you to get rid off those buggers.
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     dtimes : ndarray
 
     Returns

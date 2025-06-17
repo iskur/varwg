@@ -261,8 +261,8 @@ def apply_sparse_kernel(
 ):
     """Apply a given kernel on parts of data indicated by a mask.
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     kernel : callable
     widths : float or 1d array
     data : 1d array
@@ -337,8 +337,8 @@ def doyhour_distance(doys1, doys2, doy_width=1, circ=1):
     """Distance between two times treating the hour as a second dimension.
     Similar but not exactly like the distance on the surface of a torus.
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     doys1 : decimal doy or ndarray of decimal doys
     doys2 : decimal doy or ndarray of decimal doys
     doy_width : float
@@ -365,8 +365,8 @@ def doyhour_distance_dt(dtimes1, dtimes2, circ):
     """Distance between two times treating the hour as a second dimension.
     Similar but not exactly like the distance on the surface of a torus.
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     dtimes1 : datetime object or ndarray of datetime objects
     dtimes2 : datetime object or ndarray of datetime objects
     circ : float

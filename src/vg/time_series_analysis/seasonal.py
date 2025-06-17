@@ -219,8 +219,8 @@ class Torus(Seasonal):
     def _construct_torus(self, values, hours=None, doys=None, years=None):
         """Returns a 3d array representation of the 1d input.
 
-        Parameter
-        ---------
+        Parameters
+        ----------
         values : 1d array
         """
         # hours, doys and years are constructed so that they can be

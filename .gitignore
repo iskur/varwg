@@ -40,6 +40,15 @@ wheels/
 *.egg
 MANIFEST
 
+# Documentation artifacts
+doc/_build/
+doc/generated/
+doc/_static/
+doc/savefig/
+doc/source/apidoc/
+doc/source/generated/
+doc/**/*.png
+
 # profiling
 *.prof
 
