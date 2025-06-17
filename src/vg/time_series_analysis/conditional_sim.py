@@ -39,8 +39,8 @@ def simulate(
     """Simulate a 1d time series with given autocovariance and honouring
     conditioning values at the conditioning indices.
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     autocov : callable or sequence of callables
         Autocovariance model returning a covariance for a given distance. For
         multivariate simulation, a sequence of length K of callables is needed.
@@ -158,8 +158,8 @@ class SimulateMulti(object):
         """Simulate a multivariate time series using Random Mixing with
         Singular Value Decomposition.
 
-        Parameter
-        ---------
+        Parameters
+        ----------
         T : int
             Number of simulated timesteps
         autocov : callable or sequence of callables
@@ -509,8 +509,8 @@ def disaggregate(
 ):
     """Disaggregate a time series using conditional simulation.
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     data : (T,) or (K, T) array
         T - number of time steps, K - number of variables
     autocov : callable or sequence of callables
@@ -577,8 +577,8 @@ def disaggregate_piecewice(
     `disaggregate` is slow for long time series. This version disaggregates
     in a piecewise fashion. Pieces are as long as the correlation length.
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     data : (T,) or (K, T) array
         T - number of time steps, K - number of variables
     autocov : ndarray, callable or sequence of callables

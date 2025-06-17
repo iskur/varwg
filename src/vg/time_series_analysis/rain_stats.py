@@ -9,8 +9,8 @@ from vg import helpers as my
 def trans_prob(rain, thresh=0.0001):
     """Estimates transition probabilities.
 
-    Parameter
-    --------
+    Parameters
+    ---------
     rain : 1d array
     thresh : float, optional
         threshold a value must exceed to be interpreted as rain [m]
@@ -36,8 +36,8 @@ def trans_prob(rain, thresh=0.0001):
 def spell_lengths(rain, thresh=0.001):
     """Calculate dry and wet spell lenghts.
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     rain : 1d array
     thresh : float, optional
         threshold a value must exceed to be interpreted as rain [m]
@@ -76,8 +76,8 @@ def plot_exceedance(
 ):
     """Plot exceedance probability.
 
-    Parameter
-    --------
+    Parameters
+    ---------
     obs : 1-dim ndarray
         observations
     sim : 1 or 2-dim ndarray, optional
@@ -193,8 +193,8 @@ def richardson_model_occ(T, trans_pp):
     """Simulate rain occurrence with Richardson's (1981) model (2 state, first
     order Markov Chain).
 
-    Parameter
-    ---------
+    Parameters
+    ----------
     T : int
         Length of simulated time series
     trans_pp : (2, 2) ndarray

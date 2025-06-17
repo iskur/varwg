@@ -35,8 +35,8 @@ class Spectral(object):
         """Simulate a univariate time series using FFT.
         This is an attempt to simplify Philips spectralsim to 1d.
 
-        Parameter
-        ---------
+        Parameters
+        ----------
         autocov : callable
             Autocovariance model returning a covariance for a given distance.
         T : int
@@ -191,8 +191,8 @@ class SpectralND(Spectral):
         scale=1.0,
     ):
         """
-        Parameter
-        ---------
+        Parameters
+        ----------
         cov : callable
             Autocovariance model returning a covariance for a given distance.
         domainshape : tuple of len ndim
@@ -297,8 +297,8 @@ class MultiSpectral(Spectral):
     ):
         """Simulate multivariate time series with different autocovariances.
 
-        Parameter
-        ---------
+        Parameters
+        ----------
         autocovs : sequence of callables of length K or ndarray
             Autocovariance models returning a covariance for a given distance.
             If an array is given, the autocovariances are estimated from that

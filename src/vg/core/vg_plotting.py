@@ -1,23 +1,24 @@
 import collections
-
-# from future.moves.dbm import dumb
-from dbm import dumb
 import os
-from tempfile import mkstemp
 import warnings
-import numpy as np
-from scipy import stats
-from matplotlib import gridspec, ticker
-import matplotlib.pyplot as plt
+
+from dbm import dumb
+from tempfile import mkstemp
+
 import matplotlib as mpl
-from vg.meteo.windrose import windrose, seasonal_windroses
-from vg.meteo import avrwind, meteox2y
-from vg.core import vg_base
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib import gridspec, ticker
+from scipy import stats
+
 import vg.time_series_analysis.seasonal_distributions as sd
 import vg.time_series_analysis.time_series as ts
-from vg.time_series_analysis import rain_stats
-from vg import times
 from vg import helpers as my
+from vg import times
+from vg.core import vg_base
+from vg.meteo import avrwind, meteox2y
+from vg.meteo.windrose import seasonal_windroses, windrose
+from vg.time_series_analysis import rain_stats
 
 try:
     from vg import config as conf
@@ -258,8 +259,8 @@ class VGPlotting(vg_base.VGBase):
     def plot_psd(self, var_names=None, hourly=False, *args, **kwds):
         """Plots power spectral density using matplotlib.pyplot.psd.
 
-        Parameter
-        ---------
+        Parameters
+        ----------
         var_names : sequence of str, optional
             Which variables to plot. None means plot all.
         hourly : boolean, optional
@@ -1774,8 +1775,8 @@ class VGPlotting(vg_base.VGBase):
 
         Climbing Mt. Allon.
 
-        Parameter
-        ---------
+        Parameters
+        ----------
         var_names : sequence of str, optional
             Which variables to plot. None means plot all.
         rain_thresh : None, True or float, optional
@@ -1937,8 +1938,8 @@ class VGPlotting(vg_base.VGBase):
     #     """Provides a 2d visualization with doys as horizontal and hours as
     #     vertical axis.
 
-    #     Parameter
-    #     ---------
+    #     Parameters
+    #     ----------
     #     var_names : sequence of str, optional
     #         Which variables to plot. None means plot all.
     #     """

@@ -2170,8 +2170,8 @@ class RainMix(_KDE, _Rain):
         Requires self-generated sample data to be initialized because
         of the KDE.
 
-        Parameter
-        ---------
+        Parameters
+        ----------
         distribution : Dist
         threshold : float, optional
             Threshold rain intensity

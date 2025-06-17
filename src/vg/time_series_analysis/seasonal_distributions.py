@@ -903,8 +903,8 @@ class SeasonalDist(seasonal.Seasonal):
         self, solution=None, n_classes=30, figsize=(23, 12), dists_alt=None
     ):
         """
-        Parameter
-        ---------
+        Parameters
+        ----------
         solution: None, "monthly_fitted" or ndarray
             If "monthly_fitted" don't use the fft approximation of
             seasonality, but monthly fit to the data.
