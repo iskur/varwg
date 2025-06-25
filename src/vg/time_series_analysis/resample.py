@@ -104,7 +104,7 @@ def _calibrate(**res_kwds):
 def _transform_theta_incr(
     theta_incr, cache_dir=None, verbose=False, recalibrate=False, **res_kwds
 ):
-    """Calibrate theta_incr in order to get a specific mean increase in
+    r"""Calibrate theta_incr in order to get a specific mean increase in
     temperature.
 
     Fits a curve of the following form:
