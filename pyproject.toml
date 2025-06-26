@@ -38,6 +38,7 @@ dev = [
   "ipython>=9.3.0",
   "numpydoc>=1.8.0",
   "pytest>=8.4.0",
+  "restructuredtext-lint>=1.4.0",
 ]
 
 [tool.pytest.ini_options]
