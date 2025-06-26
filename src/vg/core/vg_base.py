@@ -1450,8 +1450,7 @@ class VGBase(object):
         if ("abs_hum" in var_names) and ("abs_hum" not in self.var_names):
             if "rh" not in self.var_names and "theta" not in self.var_names:
                 raise RuntimeError(
-                    "Calculation of abs_hum in _negative_rain "
-                    "requires theta and rh"
+                    "Calculation of abs_hum in _negative_rain requires theta and rh"
                 )
             abs_hum = meteox2y.rel2abs_hum(
                 data_trans[self.var_names.index("rh")],
