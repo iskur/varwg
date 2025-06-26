@@ -1,8 +1,5 @@
 # VG: Vector Autoregressive Moving Average Weather generator
 
-::: contents
-:::
-
 ## What is VG?
 
 The weather generator VG is a single-site Vector-Autoregressive (Moving
@@ -38,17 +35,25 @@ Download the package, uncompress it and then install via:
 ## Documentation
 
 The documentation can be accessed online at
-<http://iskur.bitbucket.org>.
+<https://vg-doc.readthedocs.io>.
 
-The source package also ships with the sphinx-based documentation source
-in the `doc` folder. Having [sphinx](sphinx.pocoo.org) installed, it can
-be built by typing:
+<!-- The source package also ships with the sphinx-based documentation source -->
+<!-- in the `doc` folder. Having [sphinx](sphinx.pocoo.org) installed, it can -->
+<!-- be built by typing: -->
 
-    make html
+<!--     make html -->
 
-inside the `doc` folder.
+<!-- inside the `doc` folder. -->
 
 ## Release notes
+
+### 1.3
+
+- Prior to simulation, missing values can be infilled with the help of a VAR process.
+- Option to phase-randomize VAR-residuals for better reproduction of low-frequency variability.
+- Behind the scenes: VG is capable to be orchestrated by the soon-to-be released copula-based WeatherCop to produce multi-site data.
+
+Python 2 is no longer supported.
 
 ### 1.2
 
