@@ -81,8 +81,6 @@ Initial release.
 
 Code is hosted at: <https://github.com/iskur/vg/>
 
-\# Documentation: <http://iskur.bitbucket.org>
-
 ## License information
 
 See the file \"LICENSE\" for information on the history of this
