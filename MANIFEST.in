@@ -10,8 +10,3 @@ include src/vg/meteo/meteox2y_cy.pyx
 include src/vg/*.py
 recursive-include vg *.pyd
 recursive-include vg *.so
-
-include doc/Makefile doc/conf.py doc/index.rst
-recursive-include doc/source *
-exclude doc/source/generated
-recursive-include doc/sphinxext *
