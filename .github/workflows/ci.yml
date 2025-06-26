@@ -1,0 +1,28 @@
+name: Pre-Tag CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+
+    - name: Install test dependencies
+      run: |
+        uv pip install .[test]
+        uv pip install pytest
+
+    - name: Run tests
+      run: pytest
+
+    - name: Build package
+      run: uv build
