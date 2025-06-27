@@ -5,7 +5,7 @@ import os
 import pickle
 import shutil
 import warnings
-from collections import abc, defaultdict, namedtuple
+from collections import defaultdict, namedtuple
 from pathlib import Path
 
 import matplotlib.pyplot as plt
