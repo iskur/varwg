@@ -119,9 +119,9 @@ class SeasonalDist(seasonal.Seasonal):
                         lower = 1e-6
                     elif np.isneginf(lower):
                         lower = -1e3
-                    mask[param <= lower] = True
+                    mask[param < lower] = True
                     upper = min(upper, 1e3)
-                    mask[param >= upper] = True
+                    mask[param > upper] = True
                     # if np.any(mask):
                     #     __import__("pdb").set_trace()
                 return mask
