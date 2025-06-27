@@ -15,8 +15,8 @@ from tqdm import tqdm
 
 import vg
 import vg.time_series_analysis.seasonal_kde as skde
-from vg import ctimes, shelve, times
-from vg import helpers as my
+from vg.core import ctimes, times
+from vg import helpers as my, shelve
 from vg.meteo import avrwind, meteox2y
 from vg.time_series_analysis import (
     distributions,
