@@ -9,7 +9,7 @@ from vg.time_series_analysis import (
     seasonal_distributions as sdists,
     distributions as dists,
 )
-from vg.meteo import meteox2y
+from vg.meteo import meteox2y, dwd_opendata
 from vg import helpers as my
 from vg import shelve
 import vg
@@ -41,7 +41,6 @@ class Test(npt.TestCase):
     def setUp(self):
         self.verbose = True
         self.cache_dir = Path(tempfile.mkdtemp("vg_test"))
-        from lhglib.contrib.meteo import dwd_opendata
 
         theta_xr = dwd_opendata.load_station(
             "Konstanz", "air_temperature"
@@ -78,8 +77,6 @@ class Test(npt.TestCase):
 
     def test_rainmix(self):
         # prec_data = self.data[self.var_names.index("R")]
-        from lhglib.contrib.meteo import dwd_opendata
-
         prec_xr = dwd_opendata.load_station("Freiburg", "precipitation")
         prec_xr = (
             prec_xr.sel(time=slice("2000", "2016"))
@@ -146,7 +143,6 @@ class Test(npt.TestCase):
 
                 prec_sample = sdist.ppf(sol, vg.rng.uniform(0, 1, len(qq)))
                 import xarray as xr
-                from vg import helpers as my
 
                 prec_sample_xr = xr.DataArray(
                     prec_sample, coords=dict(time=dt), dims=["time"]
@@ -185,8 +181,6 @@ class Test(npt.TestCase):
             raise
 
     def test_rainmix_sun(self):
-        from vg import times
-        from lhglib.contrib.meteo import dwd_opendata
         import xarray as xr
 
         sun_xr = dwd_opendata.load_station("Konstanz", "sun").squeeze()
@@ -248,10 +242,10 @@ class Test(npt.TestCase):
         # plt.show()
 
     def test_cdf_table(self):
-        sdist_notable = sdists.SlidingDist(
-            sp_dists.exponnorm, self.theta_data, self.dt, verbose=self.verbose
-        )
-        sol_notable = sdist_notable.fit()
+        # sdist_notable = sdists.SlidingDist(
+        #     sp_dists.exponnorm, self.theta_data, self.dt, verbose=self.verbose
+        # )
+        # sol_notable = sdist_notable.fit()
         sdist_table = sdists.SlidingDist(
             sp_dists.exponnorm,
             self.theta_data,
