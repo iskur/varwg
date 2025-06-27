@@ -1,4 +1,5 @@
 import functools
+from itertools import chain
 import os
 import shutil
 import urllib.request as urequest
@@ -114,7 +115,7 @@ def get_description_name(variable_short, time="hourly"):
         case _:
             time_str = time
     var_str = variable_short.lower()
-    return f"DESCRIPTION_obsgermany-climate-{time_str}-{var_str}_en.pdf"
+    return f"DESCRIPTION_obsgermany_climate_{time_str}_{var_str}_en.pdf"
 
 
 def get_meta_url(variable, era="historical", time="hourly"):
@@ -130,8 +131,9 @@ def get_description_url(variable, era="historical", time="hourly"):
     data_url = get_data_url(era=None, time=time).format(
         variable=found_in[time][variable]
     )
-    variable_short = variable_shorts[time][variable]
-    pdf_filename = get_description_name(variable_short, time)
+    # variable_short = variable_shorts[time][variable]
+    # pdf_filename = get_description_name(variable_short, time)
+    pdf_filename = get_description_name(variable, time)
     return f"{data_url}/{pdf_filename}"
 
 
@@ -216,7 +218,12 @@ variable_cols = {
 }
 cols_variable = {val[0]: key for key, val in variable_cols.items()}
 cols_variable["F"] = "wind_speed"
-variable_omits_era = {key: False for key in variable_shorts_daily.keys()}
+variable_omits_era = {
+    key: False
+    for key in chain(
+        variable_shorts_daily.keys(), variable_shorts_hourly.keys()
+    )
+}
 variable_omits_era.update(
     {"solar_global": True, "solar": True, "solar_in": True}
 )

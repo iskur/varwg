@@ -6,6 +6,7 @@ import numpy as np
 import numpy.testing as npt
 
 import vg
+from vg import helpers as my
 
 config_template = vg.config_template
 vg.set_conf(config_template)
@@ -53,7 +54,7 @@ if not sim_file.exists():
 
 class TestVG(npt.TestCase):
     def setUp(self):
-        self.verbose = True
+        self.verbose = False
         met = vg.read_met(
             sim_file, verbose=self.verbose, with_conversions=True
         )[1]
@@ -142,26 +143,27 @@ class TestVG(npt.TestCase):
         try:
             npt.assert_almost_equal(non_rain_fresh, non_rain_pickle)
         except AssertionError as exc:
-            print(met_vg_pickle._diff(met_vg_fresh))
-            fig, axs = plt.subplots(
-                nrows=len(var_names) - 1, ncols=1, sharex=True
-            )
-            for var_i, var_name in enumerate(var_names[1:]):
-                ax = axs[var_i]
-                ax.plot(
-                    met_vg_fresh.times,
-                    non_rain_fresh[var_i],
-                    label="fresh",
+            if self.verbose:
+                print(met_vg_pickle._diff(met_vg_fresh))
+                fig, axs = plt.subplots(
+                    nrows=len(var_names) - 1, ncols=1, sharex=True
                 )
-                ax.plot(
-                    met_vg_pickle.times,
-                    non_rain_pickle[var_i],
-                    label="pickle",
-                )
-                ax.set_title(var_name)
-                ax.grid(True)
-            plt.show()
-            raise exc
+                for var_i, var_name in enumerate(var_names[1:]):
+                    ax = axs[var_i]
+                    ax.plot(
+                        met_vg_fresh.times,
+                        non_rain_fresh[var_i],
+                        label="fresh",
+                    )
+                    ax.plot(
+                        met_vg_pickle.times,
+                        non_rain_pickle[var_i],
+                        label="pickle",
+                    )
+                    ax.set_title(var_name)
+                    ax.grid(True)
+                plt.show()
+                raise exc
 
     def test_negative_rain(self):
         rain_mask_regr = self.vg_regr.rain_mask
@@ -181,8 +183,8 @@ class TestVG(npt.TestCase):
                     self.vg_dist.data_trans[var_i],
                 )
             except AssertionError as exc:
-                print(exc)
                 if self.verbose:
+                    print(exc)
                     fig, ax = plt.subplots(nrows=1, ncols=1)
                     ax.plot(self.vg_regr.data_trans[var_i], label="regr")
                     ax.plot(self.vg_dist.data_trans[var_i], label="dist")
@@ -215,18 +217,19 @@ class TestVG(npt.TestCase):
         try:
             npt.assert_almost_equal(regr_sol.real, dist_sol.real, decimal=3)
         except AssertionError as exc:
-            print(exc)
-            fig, axs = plt.subplots(
-                nrows=len(var_names), ncols=1, constrained_layout=True
-            )
-            for var_i, var_name in enumerate(var_names):
-                axs[var_i].plot(regr_sol[var_i].real, label="regr")
-                axs[var_i].plot(dist_sol[var_i].real, label="dist")
-                axs[var_i].set_title(var_name)
-            ax.legend(loc="best")
-            fig.suptitle("FFT parameters")
-            plt.show()
-            raise exc
+            if self.verbose:
+                print(exc)
+                fig, axs = plt.subplots(
+                    nrows=len(var_names), ncols=1, constrained_layout=True
+                )
+                for var_i, var_name in enumerate(var_names):
+                    axs[var_i].plot(regr_sol[var_i].real, label="regr")
+                    axs[var_i].plot(dist_sol[var_i].real, label="dist")
+                    axs[var_i].set_title(var_name)
+                ax.legend(loc="best")
+                fig.suptitle("FFT parameters")
+                plt.show()
+                raise exc
 
         try:
             npt.assert_almost_equal(
@@ -235,15 +238,16 @@ class TestVG(npt.TestCase):
                 decimal=1,
             )
         except AssertionError as exc:
-            print(exc)
-            fig, axs = plt.subplots(nrows=2, ncols=1)
-            axs[0].plot(rain_trans_regr[rain_mask])
-            axs[0].plot(rain_trans_dist[rain_mask])
-            axs[1].scatter(
-                rain_trans_regr[rain_mask], rain_trans_dist[rain_mask]
-            )
-            plt.show()
-            raise
+            if self.verbose:
+                print(exc)
+                fig, axs = plt.subplots(nrows=2, ncols=1)
+                axs[0].plot(rain_trans_regr[rain_mask])
+                axs[0].plot(rain_trans_dist[rain_mask])
+                axs[1].scatter(
+                    rain_trans_regr[rain_mask], rain_trans_dist[rain_mask]
+                )
+                plt.show()
+                raise
 
     def test_plain(self):
         self.assertEqual(self.met_vg.p, p)
@@ -253,32 +257,34 @@ class TestVG(npt.TestCase):
         try:
             assert np.all(np.isfinite(sim))
         except AssertionError as exc:
-            print(exc)
-            import matplotlib.pyplot as plt
+            if self.verbose:
+                print(exc)
+                import matplotlib.pyplot as plt
 
-            # plt.plot(sim[0])
-            self.met_vg.plot_meteogram_hourly()
-            # self.met_vg.plot_meteogram_daily()
-            plt.show()
-            raise
+                # plt.plot(sim[0])
+                self.met_vg.plot_meteogram_hourly()
+                # self.met_vg.plot_meteogram_daily()
+                plt.show()
+                raise
         try:
             npt.assert_almost_equal(sim, self.sample_sim, decimal=2)
         except AssertionError:
-            import matplotlib.pyplot as plt
+            if self.verbose:
+                import matplotlib.pyplot as plt
 
-            fig, axs = plt.subplots(
-                nrows=self.met_vg.K,
-                ncols=1,
-                sharex=True,
-                constrained_layout=True,
-            )
-            for k, ax in enumerate(axs):
-                ax.plot(self.sample_sim[k], label="sample")
-                ax.plot(sim[k], "--", label="sim")
-                ax.set_title(self.met_vg.var_names[k])
-            axs[0].legend(loc="best")
-            plt.show()
-            raise
+                fig, axs = plt.subplots(
+                    nrows=self.met_vg.K,
+                    ncols=1,
+                    sharex=True,
+                    constrained_layout=True,
+                )
+                for k, ax in enumerate(axs):
+                    ax.plot(self.sample_sim[k], label="sample")
+                    ax.plot(sim[k], "--", label="sim")
+                    ax.set_title(self.met_vg.var_names[k])
+                axs[0].legend(loc="best")
+                plt.show()
+                raise
 
     def test_seasonal(self):
         """Test only for exceptions, not for equality of results."""
@@ -359,7 +365,7 @@ class TestVG(npt.TestCase):
         # kwds = dict(start_str="01.01.1994 00:00:00",
         #             stop_str="02.01.2015 00:00:00")
         kwds = dict()
-        res_dict_nocy = vg.my.ADict(recalibrate=True, n_candidates=20)
+        res_dict_nocy = my.ADict(recalibrate=True, n_candidates=20)
         res_dict_cy = res_dict_nocy + dict(cy=True)
         theta_mean = np.mean(met_vg.data_raw[0] / met_vg.sum_interval)
         for res_dict in (res_dict_nocy, res_dict_cy):
