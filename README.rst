@@ -1,18 +1,10 @@
-VG: Vector Autoregressive Moving Average Weather generator
-##########################################################
-
-.. Contents::
+VG: vector-autoregressive weather generator
+###########################################
 
 What is VG?
 ***********
 
-The weather generator VG is a single-site Vector-Autoregressive
-(Moving Average) weather generator that was developed for hydrodynamic and
-ecologic modelling of lakes. It includes a number of possibilities to
-define climate scenarios. For example, changes in mean or in the variability of
-air temperature can be set. Correlations during simulations are preserved, so
-that these changes propagate from the air temperature to the other simulated
-variables.
+The weather generator VG is a single-site Vector-Autoregressive weather generator that was developed for hydrodynamic and ecologic modelling of lakes. It includes a number of possibilities to define climate scenarios. For example, changes in mean or in the variability of air temperature can be set. Correlations during simulations are preserved, so that these changes propagate from the air temperature (the default primary variable) to the other simulated variables.
 
 
 Installation
@@ -55,8 +47,7 @@ Documentation
 
 The documentation can be accessed online at http://iskur.bitbucket.org.
 
-The source package also ships with the sphinx-based documentation source in the
-``doc`` folder. Having sphinx_ installed, it can be build by typing::
+The source package also ships with the sphinx-based documentation source in the ``doc`` folder. Having sphinx_ installed, it can be build by typing::
 
     make html
 
