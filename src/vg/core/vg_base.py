@@ -15,7 +15,6 @@ from tqdm import tqdm
 
 import vg
 import vg.time_series_analysis.seasonal_kde as skde
-from vg.core import ctimes, times
 from vg import helpers as my, shelve
 from vg.meteo import avrwind, meteox2y
 from vg.time_series_analysis import (
@@ -102,7 +101,7 @@ def _parse_time(var_dict):
     This code is adjusted every time someone throws new data at me."""
     datetimes = None
     if "Date" in var_dict and "hour" in var_dict:
-        datetimes = times.str2datetime(
+        datetimes = vg.times.str2datetime(
             np.array(
                 [
                     "%s %s" % (date_str, hour_str)
@@ -116,40 +115,46 @@ def _parse_time(var_dict):
         del var_dict["Date"]
         del var_dict["hour"]
     if "Julian" in var_dict:
-        datetimes = times.cwr2datetime(var_dict["Julian"])
+        datetimes = vg.times.cwr2datetime(var_dict["Julian"])
         del var_dict["Julian"]
     elif "YrDayNum" in var_dict:
-        datetimes = times.cwr2datetime(var_dict["YrDayNum"])
+        datetimes = vg.times.cwr2datetime(var_dict["YrDayNum"])
         del var_dict["YrDayNum"]
     elif "jd" in var_dict:
-        datetimes = times.cwr2datetime(var_dict["jd"])
+        datetimes = vg.times.cwr2datetime(var_dict["jd"])
         del var_dict["jd"]
     if "chron" in var_dict:
-        datetimes = times.str2datetime(
+        datetimes = vg.times.str2datetime(
             var_dict["chron"], "(%m/%d/%y %H:%M:%S)"
         )
         del var_dict["chron"]
     elif "date" in var_dict:
-        datetimes = times.str2datetime(var_dict["date"])
+        datetimes = vg.times.str2datetime(var_dict["date"])
         del var_dict["date"]
     elif "time-iso" in var_dict:
-        datetimes = times.iso2datetime(var_dict["time-iso"])
+        datetimes = vg.times.iso2datetime(var_dict["time-iso"])
         del var_dict["time"]
     elif "time" in var_dict:
-        datetimes = times.str2datetime(var_dict["time"], "%Y-%m-%d %H:%M:%S")
+        datetimes = vg.times.str2datetime(
+            var_dict["time"], "%Y-%m-%d %H:%M:%S"
+        )
         del var_dict["time"]
     elif "times" in var_dict:
-        datetimes = times.str2datetime(var_dict["times"], "%Y-%m-%d %H:%M:%S")
+        datetimes = vg.times.str2datetime(
+            var_dict["times"], "%Y-%m-%d %H:%M:%S"
+        )
         del var_dict["times"]
     if "year" in var_dict and "doy" in var_dict:
-        datetimes = times.str2datetime(var_dict["year"], "%Y")
+        datetimes = vg.times.str2datetime(var_dict["year"], "%Y")
         datetimes += np.array(
             [datetime.timedelta(int(doy)) for doy in var_dict["doy"]]
         )
         del var_dict["year"], var_dict["doy"]
     if "Date" in var_dict and "Time" in var_dict:
         # as seen in Excel
-        datetimes = times.xls2datetime([int(day) for day in var_dict["Date"]])
+        datetimes = vg.times.xls2datetime(
+            [int(day) for day in var_dict["Date"]]
+        )
         datetimes += np.array(
             [
                 datetime.timedelta(hours=int(hour.split(":")[0]))
@@ -207,12 +212,14 @@ def read_met(
     from vg import times
 
     met = {
-        key: times.regularize(val, datetimes, nan=True, main_diff=main_diff)[0]
+        key: vg.times.regularize(
+            val, datetimes, nan=True, main_diff=main_diff
+        )[0]
         for key, val in list(met.items())
     }
     # get also the regularized datetimes
 
-    datetimes = times.regularize(
+    datetimes = vg.times.regularize(
         np.empty(len(datetimes)), datetimes, main_diff=main_diff
     )[1]
 
@@ -510,21 +517,21 @@ class VGBase(object):
     def data_doys(self):
         """Days of year of aggregated input data."""
         if self._data_doys is None:
-            self._data_doys = times.datetime2doy(self.times)
+            self._data_doys = vg.times.datetime2doy(self.times)
         return self._data_doys
 
     @property
     def data_doys_raw(self):
         """Days of year of raw (hourly) input data."""
         if self._data_doys_raw is None:
-            self._data_doys_raw = times.datetime2doy(self.times_orig)
+            self._data_doys_raw = vg.times.datetime2doy(self.times_orig)
         return self._data_doys_raw
 
     @property
     def sim_doys(self):
         """Days of year of aggregated output data."""
         if self._sim_doys is None or len(self.sim_times) != self._sim_doys_len:
-            self._sim_doys = times.datetime2doy(self.sim_times)
+            self._sim_doys = vg.times.datetime2doy(self.sim_times)
             self._sim_doys_len = len(self._sim_doys)
         return self._sim_doys
 
@@ -532,7 +539,7 @@ class VGBase(object):
     def dis_doys(self):
         """Days of year of disaggregated output data."""
         if self._dis_doys is None or len(self._dis_doys) != self._dis_doys_len:
-            self._dis_doys = times.datetime2doy(self.dis_times)
+            self._dis_doys = vg.times.datetime2doy(self.dis_times)
             self._dis_doys_len = len(self._dis_doys)
         return self._dis_doys
 
@@ -617,7 +624,7 @@ class VGBase(object):
         seasonal = doys_in is not None and doys_out is not None
         if seasonal:
             pool0 = np.where(
-                times.doy_distance(doys_out[0], doys_in) <= doy_tolerance
+                vg.times.doy_distance(doys_out[0], doys_in) <= doy_tolerance
             )[0]
             # pool_len = len(pool0)
 
@@ -643,7 +650,8 @@ class VGBase(object):
                     # pool = (pool0 + dst_point) % nn
                     doy_out = doys_out[dst_point % m]
                     pool = np.where(
-                        ctimes.doy_distance(doy_out, doys_in) <= doy_tolerance
+                        vg.ctimes.doy_distance(doy_out, doys_in)
+                        <= doy_tolerance
                     )[0]
                     pool = list(set(pool) & finite_ii)
                     src_point = pool[vg.rng.integers(len(pool))]
@@ -819,8 +827,8 @@ class VGBase(object):
         if event_dt is not None:
             # the event datetimes have to be mapped into the hourly
             # discretization
-            year_days_out = times.time_part(self.dis_times, "%Y%j")
-            year_days_events = times.time_part(event_dt, "%Y%j")
+            year_days_out = vg.times.time_part(self.dis_times, "%Y%j")
+            year_days_events = vg.times.time_part(event_dt, "%Y%j")
             event_ii = np.where(year_days_out == year_days_events[:, None])[1]
 
         # drawing from pool: use same indices for all to preserve dependencies
@@ -1056,15 +1064,15 @@ class VGBase(object):
                 self.start_date = self.sim_times[0]
         else:
             try:
-                self.start_date = times.str2datetime(start_str)
+                self.start_date = vg.times.str2datetime(start_str)
             except ValueError:
-                self.start_date = times.iso2datetime(start_str)
+                self.start_date = vg.times.iso2datetime(start_str)
         if stop_str is not None:
             # overwrite T setting
             try:
-                end_date = times.str2datetime(stop_str)
+                end_date = vg.times.str2datetime(stop_str)
             except ValueError:
-                end_date = times.iso2datetime(stop_str)
+                end_date = vg.times.iso2datetime(stop_str)
             t_diff_seconds = (end_date - self.start_date).total_seconds()
             T = int(t_diff_seconds / (60**2 * 24))
         # interval_secs = 60. ** 2 * output_resolution
@@ -1360,7 +1368,7 @@ class VGBase(object):
                 for x in wet_means_by_doy.T
             ]
         ).T
-        dry_doys = times.datetime2doy(self.times[~rain_mask])
+        dry_doys = vg.times.datetime2doy(self.times[~rain_mask])
         wet_means_by_doy = pd.DataFrame(
             wet_means_by_doy, index=np.arange(1, doy_i + 2)
         )
@@ -1380,7 +1388,7 @@ class VGBase(object):
                 for x in wet_stds_by_doy.T
             ]
         ).T
-        dry_doys = times.datetime2doy(self.times[~rain_mask])
+        dry_doys = vg.times.datetime2doy(self.times[~rain_mask])
         wet_stds_by_doy = pd.DataFrame(
             wet_stds_by_doy, index=np.arange(1, doy_i + 2)
         )
@@ -1399,7 +1407,7 @@ class VGBase(object):
                 for x in betas_by_doy.T
             ]
         ).T
-        dry_doys = times.datetime2doy(self.times[~rain_mask])
+        dry_doys = vg.times.datetime2doy(self.times[~rain_mask])
         betas_by_doy = pd.DataFrame(
             betas_by_doy, index=np.arange(1, doy_i + 2)
         )

@@ -14,7 +14,6 @@ import pandas as pd
 
 import vg
 from vg import helpers as my
-from vg import times
 from vg.core import vg_base, vg_plotting
 from vg.meteo import avrwind, meteox2y
 
@@ -105,13 +104,13 @@ def metfile2df(met_file):
             index_col=0,
             parse_dates=True,
             sep="\t",
-            date_parser=times.cwr2datetime,
+            date_parser=vg.times.cwr2datetime,
         )
         met_df = pd.read_csv(met_file, **pd_kwds).astype(float)
     except TypeError:
 
         def date_hour2datetime(date_str, hour_str):
-            return times.str2datetime(
+            return vg.times.str2datetime(
                 "%s %s" % (date_str, hour_str), "%d. %m %y %H"
             )
 
@@ -209,7 +208,7 @@ def sim_byvariable(values, times, p=2, aggregation="%w"):
     T = len(aggr_values)
     sim = models.VAR_LS_sim(B, sigma_u, T - p)
     retrans = dist.ppf(solution, distributions.norm.cdf(sim, 0, 1))
-    retrans = np.repeat(retrans, times.time_part_average.repeats)
+    retrans = np.repeat(retrans, vg.times.time_part_average.repeats)
     return retrans
 
 
@@ -274,7 +273,7 @@ def sw_diurnal(date, daily_sw_data, del_t=3600):
     nn = 86400.0 / del_t
     date_ = np.arange(date[0], date[-1] + 86400, del_t)
     swmax = pot_s_rad(
-        times.unix2str(date_, "%Y-%m-%dT%H:%M"),
+        vg.times.unix2str(date_, "%Y-%m-%dT%H:%M"),
         lat=conf.latitude,
         longt=conf.longitude,
     )
@@ -1326,7 +1325,7 @@ class VG(vg_plotting.VGPlotting):
             elif var_name.startswith("sun"):
 
                 def sun_hours(doys):
-                    dtimes = times.doy2datetime(doys)
+                    dtimes = vg.times.doy2datetime(doys)
                     sunrise, sunset = sunshine_riseset(
                         dtimes, longitude, latitude, tz_offset=None
                     )
@@ -1475,7 +1474,7 @@ class VG(vg_plotting.VGPlotting):
         if "R" not in met_dict:
             met_dict["R"] = np.zeros_like(met_dict["theta"])
         data = np.array(
-            [times.datetime2cwr(times_)]
+            [vg.times.datetime2cwr(times_)]
             + [
                 met_dict[var_name]
                 for var_name in (
@@ -1528,7 +1527,7 @@ class VG(vg_plotting.VGPlotting):
                 " in with 0's!!"
             )
             met["R"] = np.zeros_like(met[list(met.keys())[0]])
-        times_str = times.datetime2str(dtimes, "%Y-%m-%d %H:%M")
+        times_str = vg.times.datetime2str(dtimes, "%Y-%m-%d %H:%M")
         lines = [
             ",".join(
                 [time_str]
@@ -1596,7 +1595,7 @@ class VG(vg_plotting.VGPlotting):
         if np.max(rh) <= 1.5:
             met["rh"] *= 100
 
-        times_str = times.datetime2str(dtimes, "%Y-%m-%d %H:%M:%S")
+        times_str = vg.times.datetime2str(dtimes, "%Y-%m-%d %H:%M:%S")
         var_names = "U", "cloud_cover", "air_pressure", "theta", "rh", "wdir"
         # fmts = "%.2f", "%.6f", "%.0f", "%.3f", "%.6f"
         lines = [
@@ -1761,7 +1760,7 @@ class VG(vg_plotting.VGPlotting):
             dtimes = self.times[-self.p :]
         if data_past is None:
             data_past = self.data_raw[:, -self.p :]
-        past_doys = times.datetime2doy(dtimes)
+        past_doys = vg.times.datetime2doy(dtimes)
         data_past_trans = self._fit_seasonal(values=data_past, doys=past_doys)[
             0
         ]
@@ -1771,10 +1770,10 @@ class VG(vg_plotting.VGPlotting):
         prediction = prediction.reshape((-1, T, n_realizations))
 
         # calculate the output resolution in days
-        first_doy, second_doy = times.datetime2doy(self.times[:2])
+        first_doy, second_doy = vg.times.datetime2doy(self.times[:2])
         delta_doy = second_doy - first_doy
         prediction_doys = past_doys[-1] + delta_doy * np.arange(1, T + 1)
-        prediction_dtimes = times.doy2datetime(
+        prediction_dtimes = vg.times.doy2datetime(
             prediction_doys, year=dtimes[-1].year
         )
         prediction_doys = np.where(
@@ -1811,7 +1810,8 @@ class VG(vg_plotting.VGPlotting):
 
         fig, axes = plt.subplots(nrows=self.K, sharex=True, squeeze=True)
         fig.suptitle(
-            "Prediction made on %s" % times.datetime2str(times.datetime.now())
+            "Prediction made on %s"
+            % vg.times.datetime2str(vg.times.datetime.now())
         )
         for var_i, (ax, var_name) in enumerate(zip(axes, self.var_names)):
             ax.plot(
@@ -1860,7 +1860,9 @@ class VG(vg_plotting.VGPlotting):
                     )
         ti = plt.xticks()[0]
         la_ = [
-            times.datetime2str(times.ordinal2datetime(tii), "%d.%m. %H h")
+            vg.times.datetime2str(
+                vg.times.ordinal2datetime(tii), "%d.%m. %H h"
+            )
             for tii in ti
         ]
         plt.xticks(ti, la_, rotation=30)
@@ -2256,7 +2258,7 @@ class VG(vg_plotting.VGPlotting):
             n_events = 3 * int(len(self.sim_doys) / 365.0)
 
         rh_signal = np.copy(self.fitted_medians("rh", self.sim_doys))
-        months = times.time_part(self.sim_times, "%m")
+        months = vg.times.time_part(self.sim_times, "%m")
         summer_ii = np.where((months >= month_start) & (months <= month_end))[
             0
         ]

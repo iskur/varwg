@@ -2,8 +2,8 @@ import time
 import numpy as np
 import pandas as pd
 import numpy.testing as npt
+import vg
 from vg.meteo import meteox2y, meteox2y_cy
-from vg import times
 
 import xarray as xr
 
@@ -13,7 +13,7 @@ class Test(npt.TestCase):
         dtimes = pd.date_range("2000", "2001", freq="h")
         self.lat = 47.66
         self.lon = 9.18
-        self.doys = times.datetime2doy(dtimes)
+        self.doys = vg.times.datetime2doy(dtimes)
 
     def test_pot_s_rad(self):
         time0 = time.perf_counter()
