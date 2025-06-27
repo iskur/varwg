@@ -14,7 +14,6 @@ from scipy import stats
 import vg.time_series_analysis.seasonal_distributions as sd
 import vg.time_series_analysis.time_series as ts
 from vg import helpers as my
-from vg import times
 from vg.core import vg_base
 from vg.meteo import avrwind, meteox2y
 from vg.meteo.windrose import seasonal_windroses, windrose
@@ -352,7 +351,7 @@ class VGPlotting(vg_base.VGBase):
             var_ii = self.var_names.index(var_name)
             if hourly:
                 ax.scatter(
-                    times.datetime2doy(self.times_orig),
+                    vg.times.datetime2doy(self.times_orig),
                     self.met[var_name],
                     marker="o",
                     edgecolors=(0, 0, 1, opacity),
@@ -1589,12 +1588,12 @@ class VGPlotting(vg_base.VGBase):
             reuse_figs = True
         data = self.data_raw / self.sum_interval
         month_ii = [
-            times.time_part(self.times, "%m") == month
+            vg.times.time_part(self.times, "%m") == month
             for month in range(1, 13)
         ]
         if self.sim_sea is not None:
             sim_month_ii = [
-                times.time_part(self.sim_times, "%m") == month
+                vg.times.time_part(self.sim_times, "%m") == month
                 for month in range(1, 13)
             ]
         for var_name in var_names:
@@ -1648,12 +1647,12 @@ class VGPlotting(vg_base.VGBase):
         figs = []
         data = vg_base.met_as_array(self.met, var_names=var_names)
         month_ii = [
-            times.time_part(self.times_orig, "%m") == month
+            vg.times.time_part(self.times_orig, "%m") == month
             for month in range(1, 13)
         ]
         if self.sim_sea_dis is not None:
             sim_month_ii = [
-                times.time_part(self.dis_times, "%m") == month
+                vg.times.time_part(self.dis_times, "%m") == month
                 for month in range(1, 13)
             ]
         for var_name in var_names:
@@ -1814,19 +1813,20 @@ class VGPlotting(vg_base.VGBase):
 
         figs, axes = [], []
         month_iis = [
-            times.time_part(self.times_orig, "%m") == month
+            vg.times.time_part(self.times_orig, "%m") == month
             for month in range(1, 13)
         ]
         hour_iis = [
-            times.time_part(self.times_orig, "%H") == hour
+            vg.times.time_part(self.times_orig, "%H") == hour
             for hour in range(24)
         ]
         month_sim_iis = [
-            times.time_part(self.dis_times, "%m") == month
+            vg.times.time_part(self.dis_times, "%m") == month
             for month in range(1, 13)
         ]
         hour_sim_iis = [
-            times.time_part(self.dis_times, "%H") == hour for hour in range(24)
+            vg.times.time_part(self.dis_times, "%H") == hour
+            for hour in range(24)
         ]
 
         fig_kw.update(dict(sharex=True, sharey=True))

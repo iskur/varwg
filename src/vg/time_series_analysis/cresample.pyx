@@ -13,7 +13,6 @@ from scipy import optimize
 import matplotlib.pyplot as plt
 import cython
 import vg
-from vg import times, ctimes
 from vg import helpers as my
 from cython.parallel import prange, parallel
 
@@ -289,7 +288,7 @@ cpdef resample(data, dtimes, p=3, n_sim_steps=None, theta_incr=0.0,
             print(f"Setting {n_candidates=}")
     candidate_series = np.empty((K, n_sim_steps, n_candidates))
     chosen_indices = np.empty(n_sim_steps, dtype=int)
-    doys = times.datetime2doy(dtimes)
+    doys = vg.times.datetime2doy(dtimes)
     # this is the hardest part
     # want to have T-1 chunks of (K, p) - shape
     # time domain indices, roughly in the form:
@@ -305,7 +304,7 @@ cpdef resample(data, dtimes, p=3, n_sim_steps=None, theta_incr=0.0,
 
     sim = np.empty((data.shape[0], n_sim_steps))
     # start with something present in the data
-    doy_neighbors = np.where(ctimes.doy_distance(doys[0], doys[:-p]) <=
+    doy_neighbors = np.where(vg.ctimes.doy_distance(doys[0], doys[:-p]) <=
                              doy_tolerance)[0]
     start_i = vg.rng.choice(doy_neighbors)
     sim[:, :p] = data[:, start_i : start_i + p]
@@ -324,7 +323,7 @@ cpdef resample(data, dtimes, p=3, n_sim_steps=None, theta_incr=0.0,
     for t in range(p, n_sim_steps):
         now = sim[:, t - p:t]
         # find time steps not far in terms of doy
-        doy_distance = ctimes.doy_distance(doys[t % len(doys)], doys[:-p])
+        doy_distance = vg.ctimes.doy_distance(doys[t % len(doys)], doys[:-p])
         doy_neighbors = np.where(doy_distance <= doy_tolerance)[0]
         # which bias do we use here?
         if theta_incr is not None:

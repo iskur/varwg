@@ -45,8 +45,8 @@ import xarray as xr
 from scipy import stats
 from timezonefinder import TimezoneFinder
 
+import vg
 from vg import helpers as my
-from vg import times
 
 tzf = TimezoneFinder()
 
@@ -940,7 +940,7 @@ def pot_s_rad(
     lat = lat * np.pi / 180  # in rad
     try:
         # where we used to raise an exception
-        doys = times.datetime2doy(date)  # if date is datetime
+        doys = vg.times.datetime2doy(date)  # if date is datetime
     except (
         TypeError,
         AttributeError,
@@ -951,7 +951,9 @@ def pot_s_rad(
         try:
             # ...or two
             # if date is string
-            doys = times.datetime2doy(times.str2datetime(date, in_format))
+            doys = vg.times.datetime2doy(
+                vg.times.str2datetime(date, in_format)
+            )
         except (TypeError, IndexError):
             # those were the doys my friend, i thought they never end
             doys = date  # if date is already in doys
@@ -1008,7 +1010,7 @@ def pot_s_rad_daily(
     """daily average values of --> pot_s_rad"""
     # machen wir mal stundenweise:
     if not isinstance(date[0], datetime):
-        date = times.str2datetime(date, in_format)
+        date = vg.times.str2datetime(date, in_format)
     date_h = np.array(
         [dt__ + timedelta(hours=i) for dt__ in date for i in range(24)]
     )
@@ -1176,7 +1178,7 @@ def sunshine_riseset(dates, longitude, latitude, tz_offset=None):
     """Calculates sunrise and sunset hours."""
     if tz_offset is None:
         tz_offset = get_tz_offset(dates, longitude, latitude)
-    jdn = times.date2jdn(dates)
+    jdn = vg.times.date2jdn(dates)
 
     if tz_offset is None:
         tz_offset = get_tz_offset(dates, longitude, latitude)
@@ -1640,7 +1642,7 @@ def SPI_ar(obs_ar, weeks=1, reference=None):
 
 
 if __name__ == "__main__":
-    # doys = times.datetime2doy(times.str2datetime(500 * ["2011-09-28T11:27"]))
+    # doys = vg.times.datetime2doy(vg.times.str2datetime(500 * ["2011-09-28T11:27"]))
     # # pot_s_rad(doys)
     # sunshine_pot(doys)
     # from datetime import date

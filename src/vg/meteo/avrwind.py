@@ -1,9 +1,7 @@
-""" written by Raphael Lutz 2010
-"""
+"""written by Raphael Lutz 2010"""
 
 import numpy as np
 import datetime
-from vg import times
 
 
 def angle2component(angle, norm, wind=True):
@@ -392,7 +390,7 @@ def avrwind(
 
     else:
         if type(date_time[0]) == type(""):
-            date_time = times.str2datetime(date_time)
+            date_time = vg.times.str2datetime(date_time)
             format_ = "string"
         elif type(date_time[0]) == type(datetime.datetime(1900, 1, 1)):
             format_ = "datetime"
@@ -449,7 +447,7 @@ def avrwind(
                 time_block[1],
                 sec,
                 verbose,
-                times.datetime2str(return_time_act),
+                vg.times.datetime2str(return_time_act),
                 wind=wind_,
             )
             return_wind[0].append(tmp_wind[0])  # adds averaged date to output
