@@ -27,11 +27,13 @@ jobs:
     - name: Install test dependencies
       run: |
         source .venv/bin/activate
-        uv pip install dist/*.whl
         uv pip install --group test
+        uv pip install dist/*.whl
 
     - name: Run tests
-      run: .venv/bin/pytest
+      run: |
+        source .venv/bin/activate
+        .venv/bin/pytest
 
     - name: Build package
       run: uv build
