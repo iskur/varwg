@@ -20,9 +20,10 @@ from vg.meteo import avrwind, meteox2y
 
 # from vg.meteo.meteox2y_cy import pot_s_rad
 from vg.meteo.meteox2y import pot_s_rad, sunshine_riseset
-from vg.time_series_analysis import (
-    conditional_sim as csim,
-)
+
+# from vg.time_series_analysis import (
+#     conditional_sim as csim,
+# )
 from vg.time_series_analysis import (
     cresample,
     distributions,
@@ -1126,103 +1127,103 @@ class VG(vg_plotting.VGPlotting):
         )
         print(pd.concat([obs, sim, diff, diff_perc], axis=1).round(3))
 
-    def disaggregate_rm(self, refit=None):
-        """Random Mixing variant of disaggregation."""
-        if self.sim is None:
-            raise RuntimeError("Call simulate first.")
+    # def disaggregate_rm(self, refit=None):
+    #     """Random Mixing variant of disaggregation."""
+    #     if self.sim is None:
+    #         raise RuntimeError("Call simulate first.")
 
-        if self.verbose:
-            print("Disaggregating selected variables.")
+    #     if self.verbose:
+    #         print("Disaggregating selected variables.")
 
-        data_hourly_trans = self._fit_seasonal_hourly(refit=refit)
+    #     data_hourly_trans = self._fit_seasonal_hourly(refit=refit)
 
-        # infer the target covariance and autocovariance structure
-        # from the hourly untransformed data
-        data_hourly = vg_base.met_as_array(self.met, var_names=self.var_names)
-        # the nans mess up the calculation of the covariance matrix
-        data_hourly = data_hourly[:, np.all(np.isfinite(data_hourly), axis=0)]
-        if isinstance(self.sum_interval, abc.Iterable):
-            warnings.warn(
-                "Per-variable sum_interval is not supported " "anymore."
-            )
-            disagg_len = self.sum_interval[0]
-        else:
-            disagg_len = self.sum_interval
+    #     # infer the target covariance and autocovariance structure
+    #     # from the hourly untransformed data
+    #     data_hourly = vg_base.met_as_array(self.met, var_names=self.var_names)
+    #     # the nans mess up the calculation of the covariance matrix
+    #     data_hourly = data_hourly[:, np.all(np.isfinite(data_hourly), axis=0)]
+    #     if isinstance(self.sum_interval, abc.Iterable):
+    #         warnings.warn(
+    #             "Per-variable sum_interval is not supported " "anymore."
+    #         )
+    #         disagg_len = self.sum_interval[0]
+    #     else:
+    #         disagg_len = self.sum_interval
 
-        # disaggregate
-        dht = np.array(data_hourly_trans)
-        if "R" in self.var_names:
-            if self.verbose:
-                print("Transforming 'negative rain'")
-            # rain_old = np.copy(dht[0])
-            dht = self._negative_rain(
-                dht,
-                self.met["R"],
-                self.data_doys_raw,
-                # var_names=("theta", "ILWR", "u", "v")
-            )
+    #     # disaggregate
+    #     dht = np.array(data_hourly_trans)
+    #     if "R" in self.var_names:
+    #         if self.verbose:
+    #             print("Transforming 'negative rain'")
+    #         # rain_old = np.copy(dht[0])
+    #         dht = self._negative_rain(
+    #             dht,
+    #             self.met["R"],
+    #             self.data_doys_raw,
+    #             # var_names=("theta", "ILWR", "u", "v")
+    #         )
 
-            # fig, axs = plt.subplots(self.K, sharex=True)
-            # for val, ax in zip(dht, axs):
-            #     ax.plot(dtimes, val)
-            # axs[0].plot(dtimes, rain_old)
-            # plt.show()
-            sum_vars = self.var_names.index("R")
-        else:
-            sum_vars = None
-        cov = np.cov(dht[:, np.all(np.isfinite(dht), axis=0)])
-        self.data_hourly_trans = dht
+    #         # fig, axs = plt.subplots(self.K, sharex=True)
+    #         # for val, ax in zip(dht, axs):
+    #         #     ax.plot(dtimes, val)
+    #         # axs[0].plot(dtimes, rain_old)
+    #         # plt.show()
+    #         sum_vars = self.var_names.index("R")
+    #     else:
+    #         sum_vars = None
+    #     cov = np.cov(dht[:, np.all(np.isfinite(dht), axis=0)])
+    #     self.data_hourly_trans = dht
 
-        # self.plot_transformed_hourly()
-        # plt.show()
+    #     # self.plot_transformed_hourly()
+    #     # plt.show()
 
-        # generate the datetime information of the disaggregated time series.
-        # how many timesteps are there per day in the input data?
-        # we assume that the data is not finer than hours
-        hours_unique = np.unique([dtime.hour for dtime in self.times_orig])
-        # read timesteps per day (abbreviation, because it is used a lot as an
-        # index modifier below
-        tpd = len(hours_unique)
-        self.dis_times = self._gen_sim_times(
-            self.T_sim * tpd, output_resolution=1.0
-        )
+    #     # generate the datetime information of the disaggregated time series.
+    #     # how many timesteps are there per day in the input data?
+    #     # we assume that the data is not finer than hours
+    #     hours_unique = np.unique([dtime.hour for dtime in self.times_orig])
+    #     # read timesteps per day (abbreviation, because it is used a lot as an
+    #     # index modifier below
+    #     tpd = len(hours_unique)
+    #     self.dis_times = self._gen_sim_times(
+    #         self.T_sim * tpd, output_resolution=1.0
+    #     )
 
-        def trans(data, doys):
-            return seasonal_back(
-                self.dist_sol,
-                data,
-                self.var_names,
-                doys,
-                solution_template="%s_hourly",
-            )
+    #     def trans(data, doys):
+    #         return seasonal_back(
+    #             self.dist_sol,
+    #             data,
+    #             self.var_names,
+    #             doys,
+    #             solution_template="%s_hourly",
+    #         )
 
-        t_kwds = dict(doys=times.datetime2doy(self.dis_times))
-        self.sim_dis = csim.disaggregate_piecewice(
-            self.sim,
-            autocov=data_hourly_trans,
-            disagg_len=disagg_len,
-            cov=cov,
-            pool_size=25,
-            trans=trans,
-            t_kwds=t_kwds,
-            verbose=True,
-            sum_vars=sum_vars,
-        )
+    #     t_kwds = dict(doys=times.datetime2doy(self.dis_times))
+    #     self.sim_dis = csim.disaggregate_piecewice(
+    #         self.sim,
+    #         autocov=data_hourly_trans,
+    #         disagg_len=disagg_len,
+    #         cov=cov,
+    #         pool_size=25,
+    #         trans=trans,
+    #         t_kwds=t_kwds,
+    #         verbose=True,
+    #         sum_vars=sum_vars,
+    #     )
 
-        # retransform disaggregated variables
-        sim_sea_dis = seasonal_back(
-            self.dist_sol,
-            self.sim_dis,
-            self.var_names,
-            doys=times.datetime2doy(self.dis_times),
-            solution_template="%s_hourly",
-        )
-        # housekeeping
-        self.sim_sea_dis = sim_sea_dis
-        # some of the plotting routines depend on the availability of
-        # the variable names we disaggregated
-        self.var_names_dis = self.var_names
-        return self.dis_times, sim_sea_dis
+    #     # retransform disaggregated variables
+    #     sim_sea_dis = seasonal_back(
+    #         self.dist_sol,
+    #         self.sim_dis,
+    #         self.var_names,
+    #         doys=times.datetime2doy(self.dis_times),
+    #         solution_template="%s_hourly",
+    #     )
+    #     # housekeeping
+    #     self.sim_sea_dis = sim_sea_dis
+    #     # some of the plotting routines depend on the availability of
+    #     # the variable names we disaggregated
+    #     self.var_names_dis = self.var_names
+    #     return self.dis_times, sim_sea_dis
 
     def disaggregate(
         self,
