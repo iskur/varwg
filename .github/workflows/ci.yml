@@ -19,10 +19,15 @@ jobs:
     - name: Create uv virtualenv
       run: uv venv
 
+    - name: Build wheel
+      run: |
+        source .venv/bin/activate
+        uv build
+
     - name: Install test dependencies
       run: |
         source .venv/bin/activate
-        uv pip install .
+        uv pip install dist/*.whl
         uv pip install --group test
 
     - name: Run tests
