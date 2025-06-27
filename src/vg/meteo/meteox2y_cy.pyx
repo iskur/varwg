@@ -14,6 +14,7 @@ from timezonefinder import TimezoneFinder
 import pytz
 import bottleneck
 
+import vg
 from vg.ctimes import datetime2doy
 
 cimport numpy as np
