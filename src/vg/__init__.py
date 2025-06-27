@@ -12,7 +12,7 @@ import shelve
 from numpy.random import default_rng
 import matplotlib.pyplot as plt
 
-from .core.vg_core import VG
+from .core.vg_core import VG, read_met
 from .core import vg_core, vg_base, vg_plotting
 
 shelve.Pickler = Pickler
