@@ -48,7 +48,7 @@ extensions = [
 ]
 
 if USE_CYTHON:
-    ext_modules = cythonize(extensions)
+    ext_modules = cythonize(extensions, language_level="3", force=True)
     cmdclass = dict(build_ext=build_ext)
 else:
     ext_modules = extensions
