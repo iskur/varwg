@@ -17,6 +17,7 @@ dependencies = [
     "cartopy>=0.24.1",
     "dill>=0.4.0",
     "matplotlib>=3.10.3",
+    "numexpr>=2.11.0",
     "pandas>=2.3.0",
     "scipy>=1.15.3",
     "timezonefinder>=6.5.9",
@@ -33,7 +34,6 @@ dev = [
   "cython>=3.1.1",
   "docutils>=0.21.2",
   "ipython>=9.3.0",
-  "numexpr>=2.11.0",
   "numpydoc>=1.8.0",
   "pooch>=1.8.2",
   "restructuredtext-lint>=1.4.0",
@@ -43,6 +43,7 @@ test = [
   "pytest>=8.4.0",
   "cython>=3.1.1",
   "setuptools>=61",
+  "pooch>=1.8.2",
 ]
 
 [tool.pytest.ini_options]
