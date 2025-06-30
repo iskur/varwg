@@ -4,6 +4,7 @@ include distribute_setup.py
 include setup.py
 include src/vg/sample.met
 include src/vg/core/dyresm_header_template
+include src/vg/time_series_analysis/tests/e1.dat
 include src/vg/time_series_analysis/cresample.pyx
 include src/vg/ctimes.pyx
 include src/vg/meteo/meteox2y_cy.pyx
