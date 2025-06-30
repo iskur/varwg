@@ -24,10 +24,6 @@ dependencies = [
     "xarray>=2025.4.0",
 ]
 
-# [build-system]
-# requires = ["hatchling"]
-# build-backend = "hatchling.build"
-
 [build-system]
 requires = ["setuptools>=61", "cython", "numpy"]
 build-backend = "setuptools.build_meta"
@@ -41,6 +37,7 @@ dev = [
   "numpydoc>=1.8.0",
   "pooch>=1.8.2",
   "restructuredtext-lint>=1.4.0",
+  "tox>=4.27.0",
 ]
 test = [
   "pytest>=8.4.0",
