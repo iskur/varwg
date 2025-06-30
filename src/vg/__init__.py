@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 
 from .core.vg_core import VG, read_met
 from .core import vg_core, vg_base, vg_plotting
+from . import times, ctimes
 
 shelve.Pickler = Pickler
 shelve.Unpickler = Unpickler
