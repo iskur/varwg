@@ -33,4 +33,4 @@ jobs:
     - name: Run tests
       run: |
         source .venv/bin/activate
-        pytest --pyargs vg
+        .venv/bin/pytest --pyargs vg
