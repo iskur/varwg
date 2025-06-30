@@ -5,6 +5,7 @@ __all__ = [
     "smoothing",
     "times",
     "ctimes",
+    "ecdf",
 ]
 
 from dill import Pickler, Unpickler
