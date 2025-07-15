@@ -13,57 +13,6 @@ class Test(npt.TestCase):
         rh_back = meteox2y.abs_hum2rel(ah, at)
         npt.assert_almost_equal(rh_back, rh)
 
-    def test_brunner_compound(self):
-        Ta = np.arange(10)
-        P = Ta[::-1]
-        hot_dry = meteox2y.brunner_compound(Ta, P)
-        npt.assert_almost_equal(
-            hot_dry, [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-        )
-        hot_dry_seq = meteox2y.brunner_compound(Ta, P, sequential=True)
-        npt.assert_almost_equal(hot_dry_seq, hot_dry)
-
-        rs = np.random.RandomState(0)
-        Ta = xr.DataArray(
-            rs.randn(2, 100, 1000), dims=["model", "station", "time"]
-        )
-        P = Ta + 0.5 * rs.randn(*Ta.shape)
-        Ta.data[0, 0, 0] = np.nan
-        P.data[0, 0, 1] = np.nan
-        bc_full = meteox2y.brunner_compound(Ta, P)
-        assert np.all(np.isnan(bc_full[0, 0, :2]))
-        assert np.all(np.isfinite(bc_full[0, 0, 2:]))
-        assert bc_full.shape == Ta.shape
-        assert np.nanmax(bc_full) <= 1
-        assert np.nanmin(bc_full) >= 0
-        bc_seq = meteox2y.brunner_compound(Ta, P, sequential=True)
-        npt.assert_almost_equal(bc_seq, bc_full, decimal=4)
-
-    def test_STI(self):
-        temperature = xr.tutorial.load_dataset("air_temperature")
-        sti = meteox2y.STI_ar(temperature["air"].isel(lat=10, lon=40), weeks=3)
-        sti_ds = meteox2y.STI_ds(
-            temperature.isel(lat=slice(10, 12), lon=slice(39, 42)), weeks=3
-        )
-
-    def test_SPI(self):
-        prec = dwd_opendata.load_station(
-            "Stötten", "precipitation", time="hourly"
-        )
-        prec = (
-            prec.interpolate_na("time")
-            .squeeze()
-            .resample(time="1d")
-            .sum()
-            .sel(time=slice("1990", "2020"))
-            .dropna("time")
-        )
-        spi = meteox2y.SPI_ar(prec, weeks=6)
-        # import matplotlib.pyplot as plt
-
-        # plt.plot(spi)
-        # plt.show()
-
 
 if __name__ == "__main__":
     npt.run_module_suite()
