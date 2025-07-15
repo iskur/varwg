@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import numpy.testing as npt
 import vg
-from vg.meteo import meteox2y, meteox2y_cy
+from vg.meteo import meteox2y, meteox2y_cy, brunner
 
 import xarray as xr
 
@@ -61,7 +61,7 @@ class Test(npt.TestCase):
         npt.assert_almost_equal(
             hot_dry_cy, [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
         )
-        hot_dry_py = meteox2y.brunner_compound(Ta, P)
+        hot_dry_py = brunner.brunner_compound(Ta, P)
         npt.assert_almost_equal(hot_dry_cy, hot_dry_py)
 
         rs = np.random.RandomState(0)
@@ -69,9 +69,7 @@ class Test(npt.TestCase):
             rs.randn(2, 100, 10000), dims=["model", "station", "time"]
         )
         P = Ta + 0.5 * rs.randn(*Ta.shape)
-        bc_py = meteox2y.brunner_compound(
-            Ta, P, sequential=True, progress=True
-        )
+        bc_py = brunner.brunner_compound(Ta, P, sequential=True, progress=True)
         bc_cy = meteox2y_cy.brunner_compound(Ta, P, progress=True)
         npt.assert_almost_equal(bc_py, bc_cy)
 
