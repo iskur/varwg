@@ -16,13 +16,24 @@ jobs:
     - name: Install uv
       uses: astral-sh/setup-uv@v6
 
-    - name: Install package and test dependencies
+    - name: Create uv virtualenv
+      run: uv venv
+
+    - name: Build wheel
       run: |
-        uv pip install .[test]  # Assumes optional 'test' deps are listed in pyproject.toml
-        uv pip install pytest
+        source .venv/bin/activate
+        uv build
+
+    - name: Install test dependencies
+      run: |
+        source .venv/bin/activate
+        uv pip install --group test
+        uv pip install dist/*.whl
 
     - name: Run tests
-      run: pytest
+      run: |
+        source .venv/bin/activate
+        .venv/bin/pytest --pyargs vg
 
     - name: Build package
       run: uv build
