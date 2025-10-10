@@ -1,5 +1,8 @@
 # VG: Vector Autoregressive Moving Average Weather generator
 
+[![Python Version](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-BSD-green.svg)](LICENSE)
+
 ## What is VG?
 
 The weather generator VG is a single-site Vector-Autoregressive (Moving
@@ -12,25 +15,83 @@ temperature to the other simulated variables.
 
 ## Installation
 
-### Prerequisites
+### Using uv (recommended)
 
-- [numpy](http://numpy.scipy.org/)
-- [scipy](http://www.scipy.org/)
-- [matplotlib](http://matplotlib.sourceforge.net/)
-- [pandas](http://pandas.pydata.org/)
-- [tqdm]
+VG uses [uv](https://docs.astral.sh/uv/) for dependency management. To install:
 
-### Recommended additional software
+1. Install uv if you haven't already:
+   ```bash
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   ```
 
-- [ipython](http://ipython.org/)
-- [numexpr](http://code.google.com/p/numexpr/)
+2. Clone the repository and install:
+   ```bash
+   git clone https://github.com/iskur/vg.git
+   cd vg
+   uv sync
+   ```
 
-Instead of installing these dependencies manually, a python software
-distribution like anaconda can be used.
+### Using pip
 
-Download the package, uncompress it and then install via:
+Alternatively, you can install using pip:
 
-    python setup.py install
+```bash
+pip install git+https://github.com/iskur/vg.git
+```
+
+### Development installation
+
+For development with additional tools:
+
+```bash
+uv sync --group dev
+```
+
+## Quick Start
+
+After installation, you can use VG to generate synthetic weather data:
+
+```python
+import vg
+from pathlib import Path
+
+# Configure VG with default settings
+vg.set_conf(vg.config_template)
+
+# Define meteorological variables to simulate
+var_names = ("theta", "Qsw", "rh")  # Temperature, solar radiation, humidity
+
+# Initialize the weather generator with sample data
+sample_met = Path(vg.__file__).parent / "sample.met"
+met_vg = vg.VG(var_names, met_file=sample_met, refit=True, verbose=True)
+
+# Fit the seasonal VAR model
+met_vg.fit(p=3, seasonal=True)
+
+# Simulate 10 years of daily weather data
+sim_times, sim_data = met_vg.simulate(T=10*365)
+
+# Visualize results
+met_vg.plot_meteogram_daily()
+met_vg.plot_autocorr()
+```
+
+See the `scripts/` directory for more advanced examples.
+
+## Running Tests
+
+To run the test suite:
+
+```bash
+uv run pytest
+```
+
+Or install test dependencies and run:
+
+```bash
+uv sync --group test
+uv run pytest
+```
 
 ## Documentation
 
@@ -52,8 +113,10 @@ The documentation can be accessed online at
 - Prior to simulation, missing values can be infilled with the help of a VAR process.
 - Option to phase-randomize VAR-residuals for better reproduction of low-frequency variability.
 - Behind the scenes: VG is capable to be orchestrated by the soon-to-be released copula-based WeatherCop to produce multi-site data.
+- Migration to modern build system with pyproject.toml
+- Dependency management with uv
 
-Python 2 is no longer supported.
+**Requirements:** Python ≥ 3.13
 
 ### 1.2
 
