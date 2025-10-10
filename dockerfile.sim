@@ -1,0 +1,6 @@
+FROM vg-lib AS base
+
+# (optional) add your own code on top of it
+COPY scripts/deploy_simulation.py /app/
+
+CMD ["python", "deploy_simulation.py"]
