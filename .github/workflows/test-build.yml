@@ -1,13 +1,11 @@
-name: Test and Publish with uv
+name: Test Build (No Publish)
 
 on:
-  push:
-    tags:
-      - 'v*'  # Only trigger on version tags like v1.0.0
-  workflow_dispatch:  # Allows manual triggering from GitHub Actions tab
+  workflow_dispatch:  # Manual trigger only
+  pull_request:
 
 jobs:
-  test-and-publish:
+  test-build:
     runs-on: ubuntu-latest
 
     steps:
@@ -29,6 +27,9 @@ jobs:
     - name: Build package
       run: uv build
 
+    - name: List built artifacts
+      run: ls -lh dist/
+
     - name: Install package with test dependencies
       run: |
         uv pip install --system pytest
@@ -37,8 +38,8 @@ jobs:
     - name: Run tests
       run: pytest --pyargs vg -v
 
-    - name: Publish to PyPI
-      if: success()  # Only run if all previous steps succeeded
-      env:
-        UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-      run: uv publish
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: dist-packages
+        path: dist/
