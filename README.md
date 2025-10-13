@@ -65,8 +65,7 @@ vg.set_conf(vg.config_template)
 var_names = ("theta", "Qsw", "rh")  # Temperature, solar radiation, humidity
 
 # Initialize the weather generator with sample data
-sample_met = Path(vg.__file__).parent / "sample.met"
-met_vg = vg.VG(var_names, met_file=sample_met, refit=True, verbose=True)
+met_vg = vg.VG(var_names, met_file=vg.sample_met, refit=True, verbose=True)
 
 # Fit the seasonal VAR model
 met_vg.fit(p=3, seasonal=True)
