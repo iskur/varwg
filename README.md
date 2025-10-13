@@ -2,6 +2,9 @@
 
 [![Python Version](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-BSD-green.svg)](LICENSE)
+[![Documentation Status](https://readthedocs.org/projects/vg-doc/badge/?version=latest)](https://vg-doc.readthedocs.io)
+[![Managed with uv](https://img.shields.io/badge/managed_with-uv-blue)](https://github.com/astral-sh/uv)
+![Last Commit](https://img.shields.io/github/last-commit/iskur/vg)
 
 ## What is VG?
 
