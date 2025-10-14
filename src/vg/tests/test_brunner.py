@@ -1,5 +1,7 @@
+import os
 import numpy as np
 import numpy.testing as npt
+import pytest
 import xarray as xr
 from vg.meteo import brunner
 import dwd_opendata
@@ -46,6 +48,10 @@ class Test(npt.TestCase):
             temperature.isel(lat=slice(10, 12), lon=slice(39, 42)), weeks=3
         )
 
+    @pytest.mark.skipif(
+        os.getenv("CI") == "true",
+        reason="Requires network access to DWD FTP server"
+    )
     def test_SPI(self):
         prec = dwd_opendata.load_station(
             "Stötten", "precipitation", time="hourly"
