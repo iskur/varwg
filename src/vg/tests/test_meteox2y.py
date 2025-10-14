@@ -1,6 +1,7 @@
 import numpy as np
 import numpy.testing as npt
-from vg.meteo import meteox2y, dwd_opendata
+from vg.meteo import meteox2y
+import dwd_opendata
 import xarray as xr
 
 

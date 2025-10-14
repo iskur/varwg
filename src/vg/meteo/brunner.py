@@ -155,7 +155,7 @@ def SPI_ar(obs_ar, weeks=1, reference=None):
 
 
 if __name__ == "__main__":
-    from vg.meteo import dwd_opendata
+    import dwd_opendata
 
     theta = dwd_opendata.load_data(
         ("Stötten", "Konstanz"), "air_temperature", time="hourly"
