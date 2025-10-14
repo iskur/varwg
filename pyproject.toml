@@ -45,6 +45,7 @@ test = [
   "cython>=3.1.1",
   "setuptools>=61",
   "pooch>=1.8.2",
+  "dwd_opendata",
 ]
 
 [tool.pytest.ini_options]

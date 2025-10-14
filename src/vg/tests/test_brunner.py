@@ -2,7 +2,7 @@ import numpy as np
 import numpy.testing as npt
 import xarray as xr
 from vg.meteo import brunner
-from vg.meteo import dwd_opendata
+import dwd_opendata
 
 
 class Test(npt.TestCase):
