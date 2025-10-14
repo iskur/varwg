@@ -45,7 +45,7 @@ test = [
   "cython>=3.1.1",
   "setuptools>=61",
   "pooch>=1.8.2",
-  "dwd_opendata",
+  "dwd_opendata @ git+https://github.com/iskur/dwd_opendata.git",
 ]
 
 [tool.pytest.ini_options]
