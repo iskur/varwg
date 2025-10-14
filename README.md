@@ -110,41 +110,9 @@ The documentation can be accessed online at
 
 ## Release notes
 
-### 1.4
+See [CHANGELOG.md](CHANGELOG.md) for detailed release notes, or view [releases on GitHub](https://github.com/iskur/vg/releases).
 
-See [GitHub Releases](https://github.com/iskur/vg/releases) for detailed release notes.
-
-### 1.3
-
-- Prior to simulation, missing values can be infilled with the help of a VAR process.
-- Option to phase-randomize VAR-residuals for better reproduction of low-frequency variability.
-- Behind the scenes: VG is capable to be orchestrated by the soon-to-be released copula-based WeatherCop to produce multi-site data.
-- Migration to modern build system with pyproject.toml
-- Dependency management with uv
-
-**Requirements:** Python ≥ 3.13
-
-### 1.2
-
-- Scenarios can be guided through changes in a variable that is not
-  normally distributed.
-- Disaggregation recreates seasonal changes in daily cycles.
-- All scipy.stats.distributions can be used to fit variables.
-- Bugfixes when disaggregating in the presence of nans.
-
-### 1.1
-
-This release makes VG more tolerant to \"dirty\" input data.
-
-- Non-evenly spaced time series are allowed. WARNING: linear
-  interpolation is used to regularize the data set.
-- Gaps/NaNs are allowed. They are not filled in by linear interpolation,
-  but actively ignored by the estimators.
-- Disaggregation works on variables that have lower and/or upper bounds.
-
-### 1.0
-
-Initial release.
+**Current version: 1.4.0** - Python ≥ 3.13 required
 
 ## Web sites
 
