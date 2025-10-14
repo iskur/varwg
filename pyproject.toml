@@ -9,7 +9,8 @@ readme = "README.md"
 authors = [
   { name = "iskur", email = "32363199+iskur@users.noreply.github.com" }
 ]
-license = {text = "BSD"}
+license = "BSD-3-Clause"
+license-files = ["LICENSE.txt"]
 requires-python = ">=3.13"
 dependencies = [
     "bottleneck>=1.5.0",
@@ -37,6 +38,7 @@ dev = [
   "pooch>=1.8.2",
   "restructuredtext-lint>=1.4.0",
   "tox>=4.27.0",
+  "twine>=6.2.0",
 ]
 test = [
   "pytest>=8.4.0",
