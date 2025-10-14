@@ -110,6 +110,10 @@ The documentation can be accessed online at
 
 ## Release notes
 
+### 1.4
+
+See [GitHub Releases](https://github.com/iskur/vg/releases) for detailed release notes.
+
 ### 1.3
 
 - Prior to simulation, missing values can be infilled with the help of a VAR process.
