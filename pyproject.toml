@@ -29,6 +29,9 @@ dependencies = [
 requires = ["setuptools>=61", "cython", "numpy"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools.package-data]
+vg = ["*.met"]
+
 [dependency-groups]
 dev = [
   "cython>=3.1.1",
@@ -48,3 +51,6 @@ test = [
 
 [tool.pytest.ini_options]
 addopts = "--pdb"
+markers = [
+    "network: tests that require network access (deselect with '-m \"not network\"')",
+]

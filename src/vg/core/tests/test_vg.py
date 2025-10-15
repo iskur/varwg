@@ -1,9 +1,11 @@
 from pathlib import Path
+import os
 import tempfile
 
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.testing as npt
+import pytest
 
 import vg
 from vg import helpers as my
@@ -38,13 +40,12 @@ sim_file = data_dir / "test_out_sample.met"
 
 data_dir.mkdir(exist_ok=True)
 
+# Ensure sample.met file exists (should be bundled with package)
 if not met_file.exists():
-    # try to retrieve it from the VG repository on bitbucket
-    import urllib.request
-
-    url = "http://bitbucket.org/iskur/vg/raw/tip/vg/sample.met"
-    print("Downloading sample data for VG.")
-    urllib.request.urlretrieve(url, met_file)
+    raise FileNotFoundError(
+        f"Sample data file not found at {met_file}. "
+        "This file should be bundled with the package."
+    )
 
 if not sim_file.exists():
     from . import gen_test_data

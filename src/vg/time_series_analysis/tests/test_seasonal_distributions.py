@@ -3,6 +3,7 @@ import shutil
 import tempfile
 import numpy as np
 import numpy.testing as npt
+import pytest
 import matplotlib.pyplot as plt
 from scipy.stats import distributions as sp_dists
 from vg.time_series_analysis import (
@@ -37,6 +38,7 @@ def max_sunshine_hours(doys):
     return sun_hours * 60
 
 
+@pytest.mark.network
 class Test(npt.TestCase):
     def setUp(self):
         self.verbose = True

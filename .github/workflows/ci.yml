@@ -34,4 +34,4 @@ jobs:
     - name: Run tests
       run: |
         source .venv/bin/activate
-        .venv/bin/pytest --pyargs vg
+        .venv/bin/pytest --pyargs vg -m "not network"
