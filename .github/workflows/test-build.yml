@@ -32,11 +32,14 @@ jobs:
 
     - name: Install package with test dependencies
       run: |
-        uv pip install --system pytest
-        uv pip install --system dist/*.whl
+        source .venv/bin/activate
+        uv pip install --group test
+        uv pip install dist/*.whl
 
     - name: Run tests
-      run: pytest --pyargs vg -v -m "not network"
+      run: |
+        source .venv/bin/activate
+        .venv/bin/pytest --pyargs vg -v -m "not network"
 
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
