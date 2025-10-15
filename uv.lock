@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.13"
 
 [[package]]
@@ -1039,6 +1039,7 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/5e/4d/8694391d6b014bc49f8fd2eb8c05c94526b36fba8dc76d439f3d51948e46/timezonefinder-6.5.9.tar.gz", hash = "sha256:0d84c792a499fd098a35c701c3e3293423ba8d45c81b3eecd7c7cb72c7f1f415", size = 51435008, upload-time = "2025-03-25T11:28:14.495Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/53/6c/498b3f453b15d7ecf2ecf54a8f1cc7fbd1d3c3eed86a5182081ebc17b180/timezonefinder-6.5.9-cp313-cp313-manylinux_2_17_x86_64.manylinux_2_5_x86_64.manylinux1_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a7d1f30b550c24598459643285ef0f5469524ad7a32dd854199e7a2a463600ff", size = 51443403, upload-time = "2025-03-25T11:27:49.882Z" },
+    { url = "https://files.pythonhosted.org/packages/4e/5a/dfcd510203ccaf01099394850df7ee3733afffa57bfca3499b7f39484edf/timezonefinder-6.5.9-cp313-cp313-manylinux_2_5_x86_64.manylinux1_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:bfb175d470e6f6abbeb13bd3a638bb1a0aa4124e1a93d040e5d933cf69076c60", size = 51444549, upload-time = "2025-07-07T05:54:54.914Z" },
     { url = "https://files.pythonhosted.org/packages/8b/16/6ae92a93dd703c0485e4c0a76e28bc829f9c7eba548a1b2e17fb3342e4c3/timezonefinder-6.5.9-cp313-cp313-musllinux_1_1_x86_64.whl", hash = "sha256:4f36877ad3a988f329cbd3f04f7cadc56dce073ad4a7bda7397f46ac2a61f9a4", size = 51445432, upload-time = "2025-03-25T11:27:54.762Z" },
 ]
 
@@ -1110,6 +1111,7 @@ dependencies = [
     { name = "cartopy" },
     { name = "dill" },
     { name = "matplotlib" },
+    { name = "numexpr" },
     { name = "pandas" },
     { name = "scipy" },
     { name = "timezonefinder" },
@@ -1122,7 +1124,6 @@ dev = [
     { name = "cython" },
     { name = "docutils" },
     { name = "ipython" },
-    { name = "numexpr" },
     { name = "numpydoc" },
     { name = "pooch" },
     { name = "restructuredtext-lint" },
@@ -1141,6 +1142,7 @@ requires-dist = [
     { name = "cartopy", specifier = ">=0.24.1" },
     { name = "dill", specifier = ">=0.4.0" },
     { name = "matplotlib", specifier = ">=3.10.3" },
+    { name = "numexpr", specifier = ">=2.11.0" },
     { name = "pandas", specifier = ">=2.3.0" },
     { name = "scipy", specifier = ">=1.15.3" },
     { name = "timezonefinder", specifier = ">=6.5.9" },
@@ -1153,7 +1155,6 @@ dev = [
     { name = "cython", specifier = ">=3.1.1" },
     { name = "docutils", specifier = ">=0.21.2" },
     { name = "ipython", specifier = ">=9.3.0" },
-    { name = "numexpr", specifier = ">=2.11.0" },
     { name = "numpydoc", specifier = ">=1.8.0" },
     { name = "pooch", specifier = ">=1.8.2" },
     { name = "restructuredtext-lint", specifier = ">=1.4.0" },
