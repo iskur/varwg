@@ -40,6 +40,7 @@ class Test(npt.TestCase):
         bc_seq = meteox2y.brunner_compound(Ta, P, sequential=True)
         npt.assert_almost_equal(bc_seq, bc_full, decimal=4)
 
+    @pytest.mark.network
     def test_STI(self):
         temperature = xr.tutorial.load_dataset("air_temperature")
         sti = meteox2y.STI_ar(temperature["air"].isel(lat=10, lon=40), weeks=3)
