@@ -1,5 +1,6 @@
 import numpy as np
 import numpy.testing as npt
+import pytest
 from vg.meteo import meteox2y, dwd_opendata
 import xarray as xr
 
@@ -46,7 +47,9 @@ class Test(npt.TestCase):
             temperature.isel(lat=slice(10, 12), lon=slice(39, 42)), weeks=3
         )
 
+    @pytest.mark.network
     def test_SPI(self):
+        """Test SPI with live DWD download (network required)."""
         prec = dwd_opendata.load_station(
             "Stötten", "precipitation", time="hourly"
         )
@@ -59,10 +62,16 @@ class Test(npt.TestCase):
             .dropna("time")
         )
         spi = meteox2y.SPI_ar(prec, weeks=6)
-        # import matplotlib.pyplot as plt
 
-        # plt.plot(spi)
-        # plt.show()
+
+# Fixture-based tests (use bundled data, no network required)
+def test_SPI_fixture(stoetten_precipitation):
+    """Test SPI with bundled fixture data (no network required)."""
+    prec = stoetten_precipitation
+    spi = meteox2y.SPI_ar(prec, weeks=6)
+    # Basic validation
+    assert spi is not None
+    assert len(spi) == len(prec)
 
 
 if __name__ == "__main__":
