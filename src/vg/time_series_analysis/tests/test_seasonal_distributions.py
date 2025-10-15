@@ -263,5 +263,119 @@ class Test(npt.TestCase):
         # npt.assert_almost_equal(qq_notable, qq_table, decimal=5)
 
 
+# Fixture-based tests (use bundled data, no network required)
+def test_cdf_table_fixture(konstanz_temperature, tmp_path):
+    """Test CDF tabulation with fixture data (no network required)."""
+    theta_xr = konstanz_temperature
+    theta_data = theta_xr.values.squeeze()
+    dt = theta_xr.time.to_dataframe().index.to_pydatetime()
+    verbose = True
+
+    sdist_table = sdists.SlidingDist(
+        sp_dists.exponnorm,
+        theta_data,
+        dt,
+        tabulate_cdf=True,
+        verbose=verbose,
+    )
+    sol_table = sdist_table.fit()
+    qq_table = sdist_table.cdf(sol_table)
+    data_table = sdist_table.ppf(sol_table, quantiles=qq_table)
+    npt.assert_almost_equal(theta_data, data_table)
+
+
+def test_serialization_fixture(konstanz_temperature, tmp_path):
+    """Test serialization with fixture data (no network required)."""
+    theta_xr = konstanz_temperature
+    theta_data = theta_xr.values.squeeze()
+    dt = theta_xr.time.to_dataframe().index.to_pydatetime()
+    verbose = True
+
+    sdist_orig = sdists.SlidingDist(
+        sp_dists.exponnorm, theta_data, dt, verbose=verbose
+    )
+    sh = shelve.open(str(tmp_path / "seasonal_cache_file"), "c")
+    sh["theta"] = sdist_orig
+    sh.close()
+    sh = shelve.open(str(tmp_path / "seasonal_cache_file"), "c")
+    sdist_shelve = sh["theta"]
+    assert not my.recursive_diff(
+        None,
+        sdist_orig,
+        sdist_shelve,
+        verbose=True,
+        plot=True,
+        ignore_types=(sp_dists.rv_continuous,),
+    )
+
+
+def test_rainmix_fixture(freiburg_precipitation):
+    """Test rainmix with fixture data (no network required)."""
+    prec_xr = freiburg_precipitation
+    prec_data = np.squeeze(prec_xr.values)
+    dt = prec_xr.time.to_dataframe().index.to_pydatetime()
+    threshold = 0.001 * 24
+    verbose = False  # Disable verbose to avoid plotting on CI
+
+    dist = dists.RainMix(
+        dists.kumaraswamy,
+        threshold=threshold,
+    )
+    fixed_pars = dict(
+        u=(lambda x: np.ones_like(x)), l=(lambda x: np.zeros_like(x))
+    )
+    sdist = sdists.SlidingDist(
+        dist,
+        prec_data,
+        dt,
+        doy_width=15,
+        verbose=verbose,
+        fixed_pars=fixed_pars,
+        tabulate_cdf=True,
+    )
+    sol = sdist.fit()
+    qq = sdist.cdf(sol)
+    prec_recovered = sdist.ppf(sol, qq)
+    assert all(prec_recovered >= 0)
+    rain_mask = prec_data > threshold
+    npt.assert_allclose(
+        prec_recovered[rain_mask],
+        prec_data[rain_mask],
+    )
+
+
+def test_rainmix_sun_fixture(konstanz_sun):
+    """Test rainmix sun with fixture data (no network required)."""
+    import xarray as xr
+
+    sun_xr = konstanz_sun
+    sun_data = np.squeeze(sun_xr.values)
+    dt = sun_xr.time.to_dataframe().index.to_pydatetime()
+
+    dist = dists.RainMix(
+        dists.beta,
+        q_thresh_lower=0.8,
+        q_thresh_upper=0.975,
+    )
+    dist.debug = False  # Disable debug to avoid excessive output
+    fixed_pars = dict(u=max_sunshine_hours, l=(lambda x: np.zeros_like(x)))
+    sdist = sdists.SlidingDist(
+        dist,
+        sun_data,
+        dt,
+        doy_width=15,
+        verbose=False,  # Disable verbose to avoid plotting on CI
+        fixed_pars=fixed_pars,
+        tabulate_cdf=True,
+    )
+    sol = sdist.fit()
+    qq = sdist.cdf(sol)
+    sun_back = sdist.ppf(sol, qq)
+    over_thresh = sun_back > sdist.dist.thresh
+    npt.assert_allclose(
+        sun_back[over_thresh], sun_data[over_thresh], atol=0.0031
+    )
+
+
 if __name__ == "__main__":
     npt.run_module_suite()
