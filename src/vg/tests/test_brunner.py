@@ -98,7 +98,7 @@ def test_STI_coord_ordering_bug():
             "lat": [40.0, 41.0],
             "lon": [10.0, 11.0, 12.0],
             "time": times,
-        }
+        },
     )
 
     # Create dataset with coords in "reversed" order (time, lon, lat)
@@ -109,7 +109,7 @@ def test_STI_coord_ordering_bug():
             "time": times,
             "lon": [10.0, 11.0, 12.0],
             "lat": [40.0, 41.0],
-        }
+        },
     )
 
     # Both should work and produce the same result
