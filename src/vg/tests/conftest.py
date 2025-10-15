@@ -44,3 +44,12 @@ def freiburg_precipitation(fixture_dir):
     if not fixture_path.exists():
         pytest.skip(f"Fixture not found: {fixture_path}")
     return xr.open_dataarray(fixture_path)
+
+
+@pytest.fixture
+def air_temperature_tutorial(fixture_dir):
+    """Load air temperature tutorial dataset fixture (subset of xr.tutorial.load_dataset)."""
+    fixture_path = fixture_dir / "air_temperature_tutorial_subset.nc"
+    if not fixture_path.exists():
+        pytest.skip(f"Fixture not found: {fixture_path}")
+    return xr.open_dataset(fixture_path)

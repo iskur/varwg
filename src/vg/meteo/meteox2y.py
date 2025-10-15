@@ -1591,7 +1591,12 @@ def _measure_ar(
     )
     measure_coords = obs_ar.coords.copy()
     measure_coords["variable"] = varname
-    measure_ar = xr.DataArray(np.squeeze(measure_data), coords=measure_coords)
+    # Explicitly specify dims to avoid relying on coord ordering
+    # squeeze() removes the 'variable' dimension, so dims are obs_ar.dims without 'variable'
+    measure_dims = [dim for dim in obs_ar.dims if dim != "variable"]
+    measure_ar = xr.DataArray(
+        np.squeeze(measure_data), coords=measure_coords, dims=measure_dims
+    )
     return measure_ar
 
 
