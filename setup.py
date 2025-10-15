@@ -56,40 +56,5 @@ else:
 
 setup(
     name="vg",
-    # version="1.4",
-    # packages=["vg", "vg.core", "vg.meteo", "vg.time_series_analysis"],
-    # cmdclass=cmdclass,
     ext_modules=ext_modules,
-    # scripts=["distribute_setup.py"],
-    # setup_requires=["numpy", "nose"],
-    # python_requires=">=3.5",
-    # install_requires=[
-    #     "matplotlib",
-    #     "scipy",
-    #     "numpy",
-    #     "pandas",
-    #     "cython",
-    #     "tqdm",
-    #     "timezonefinder",
-    #     "PICOS",
-    #     "cvxopt",
-    #     "ipyparallel",
-    #     "bottleneck",
-    # ],
-    # package_data={
-    #     # If any package contains *.txt or *.rst files, include them:
-    #     "": ["*.txt", "*.dat", "*.met", "*.rst", "*.pyx", "*.c"],
-    #     # 'doc': ['*.html', '*.rst'],
-    # },
-    # include_package_data=True,
-    # metadata for upload to PyPI
-    #    author="Dirk Schlabing",
-    #    author_email="32363199+iskur@users.noreply.github.com",
-    #    description="A Vector Autoregressive Weather Generator",
-    #    license="BSD",
-    #    keywords=("weather generator vector-autoregressive time-series-analysis"),
-    #    long_description="""The weather generator VG is a single-site Vector-Autoregressive
-    # weather generator that was developed for hydrodynamic and ecologic
-    # modelling of lakes. It includes a number of possibilities to define
-    # what-if scenarios.""",
 )

@@ -1914,6 +1914,9 @@ class VGPlotting(vg_base.VGBase):
         return figs, axes
 
     def plot_candidates(self, figs=None, axss=None):
+        if not hasattr(self, "candidates"):
+            print("No candidates for plotting found.")
+            return None, None
         fig, axs = self._meteogram(
             self.sim_times,
             self.sim,

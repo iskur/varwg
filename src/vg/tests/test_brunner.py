@@ -2,8 +2,8 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 import xarray as xr
-from vg.meteo import meteox2y as brunner
-from vg.meteo import dwd_opendata
+from vg.meteo import brunner
+import dwd_opendata
 
 
 class Test(npt.TestCase):

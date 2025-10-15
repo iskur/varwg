@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'  # Only trigger on version tags like v1.0.0
+  workflow_dispatch:  # Allows manual triggering from GitHub Actions tab
 
 jobs:
   test-and-publish:
@@ -16,27 +17,25 @@ jobs:
     - name: Install uv
       uses: astral-sh/setup-uv@v6
 
-    - name: Create uv virtualenv
-      run: uv venv
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
 
-    - name: Build wheel
+    - name: Install build dependencies
       run: |
-        source .venv/bin/activate
-        uv build
-
-    - name: Install test dependencies
-      run: |
-        source .venv/bin/activate
-        uv pip install --group test
-        uv pip install dist/*.whl
-
-    - name: Run tests
-      run: |
-        source .venv/bin/activate
-        .venv/bin/pytest --pyargs vg
+        uv pip install --system cython numpy setuptools build
 
     - name: Build package
       run: uv build
+
+    - name: Install package with test dependencies
+      run: |
+        uv pip install --system pytest
+        uv pip install --system dist/*.whl
+
+    - name: Run tests
+      run: pytest --pyargs vg -v
 
     - name: Install package with test dependencies
       run: |

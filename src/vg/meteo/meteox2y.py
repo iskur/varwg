@@ -38,7 +38,6 @@ variables from measured meteorological values.
 import warnings
 from datetime import datetime, timedelta
 
-import bottleneck
 import numpy as np
 import pytz
 import xarray as xr
@@ -1656,33 +1655,4 @@ if __name__ == "__main__":
     # import doctest
 
     # doctest.testmod(optionflags=doctest.NORMALIZE_WHITESPACE)
-
-    from vg.meteo import dwd_opendata
-
-    theta = dwd_opendata.load_data(
-        ("Stötten", "Konstanz"), "temperature", time="hourly"
-    ).to_dataset("station")
-    theta = (
-        theta.interpolate_na("time")
-        .transpose(..., "time")
-        .squeeze()
-        .resample(time="1d")
-        .sum()
-        .sel(time=slice("1990", "2020"))
-        .dropna("time")
-    )
-    sti = STI_ds(theta, weeks=6)
-
-    # prec = dwd_opendata.load_data(
-    #     ("Stötten", "Konstanz"), "precipitation", time="hourly"
-    # ).to_dataset("station")
-    # prec = (
-    #     prec.interpolate_na("time")
-    #     .transpose(..., "time")
-    #     .squeeze()
-    #     .resample(time="1d")
-    #     .sum()
-    #     .sel(time=slice("1990", "2020"))
-    #     .dropna("time")
-    # )
-    # spi = SPI_ds(prec, weeks=6)
+    pass

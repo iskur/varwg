@@ -10,7 +10,8 @@ from vg.time_series_analysis import (
     seasonal_distributions as sdists,
     distributions as dists,
 )
-from vg.meteo import meteox2y, dwd_opendata
+from vg.meteo import meteox2y
+import dwd_opendata
 from vg import helpers as my
 from vg import shelve
 import vg
