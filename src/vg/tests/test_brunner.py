@@ -2,8 +2,8 @@ import numpy as np
 import numpy.testing as npt
 import pytest
 import xarray as xr
-from vg.meteo import brunner
-import dwd_opendata
+from vg.meteo import meteox2y as brunner
+from vg.meteo import dwd_opendata
 
 
 class Test(npt.TestCase):
@@ -49,6 +49,7 @@ class Test(npt.TestCase):
 
     @pytest.mark.network
     def test_SPI(self):
+        """Test SPI with live DWD download (network required)."""
         prec = dwd_opendata.load_station(
             "Stötten", "precipitation", time="hourly"
         )
@@ -61,7 +62,13 @@ class Test(npt.TestCase):
             .dropna("time")
         )
         spi = brunner.SPI_ar(prec, weeks=6)
-        # import matplotlib.pyplot as plt
 
-        # plt.plot(spi)
-        # plt.show()
+
+# Fixture-based tests (use bundled data, no network required)
+def test_SPI_fixture(stoetten_precipitation):
+    """Test SPI with bundled fixture data (no network required)."""
+    prec = stoetten_precipitation
+    spi = brunner.SPI_ar(prec, weeks=6)
+    # Basic validation
+    assert spi is not None
+    assert len(spi) == len(prec)
