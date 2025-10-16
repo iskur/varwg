@@ -38,6 +38,7 @@ variables from measured meteorological values.
 import warnings
 from datetime import datetime, timedelta
 
+import bottleneck
 import numpy as np
 import pytz
 import xarray as xr
