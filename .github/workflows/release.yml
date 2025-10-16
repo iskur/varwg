@@ -37,6 +37,14 @@ jobs:
     - name: Run tests
       run: pytest --pyargs vg -v
 
+    - name: Install package with test dependencies
+      run: |
+        uv pip install --system pytest
+        uv pip install --system dist/*.whl
+
+    - name: Run tests
+      run: pytest --pyargs vg -v -m "not network"
+
     - name: Publish to PyPI
       if: success()  # Only run if all previous steps succeeded
       env:
