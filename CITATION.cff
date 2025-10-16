@@ -1,0 +1,48 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite both the software and the reference paper."
+type: software
+title: "VG: Vector Autoregressive Moving Average Weather Generator"
+version: 1.4.0
+date-released: 2025-01-15
+repository-code: "https://github.com/iskur/vg"
+url: "https://vg-doc.readthedocs.io"
+license: BSD-3-Clause
+authors:
+  - family-names: "Schlabing"
+    given-names: "Dirk"
+    orcid: "https://orcid.org/0000-0000-0000-0000"  # Update with actual ORCID if available
+  - family-names: "Frassl"
+    given-names: "Marieke A."
+  - family-names: "Eder"
+    given-names: "Magdalena"
+  - family-names: "Rinke"
+    given-names: "Karsten"
+  - family-names: "Bárdossy"
+    given-names: "András"
+keywords:
+  - weather generator
+  - climate scenarios
+  - vector autoregression
+  - stochastic modeling
+  - lake modeling
+  - environmental modeling
+references:
+  - type: article
+    authors:
+      - family-names: "Schlabing"
+        given-names: "Dirk"
+      - family-names: "Frassl"
+        given-names: "Marieke A."
+      - family-names: "Eder"
+        given-names: "Magdalena"
+      - family-names: "Rinke"
+        given-names: "Karsten"
+      - family-names: "Bárdossy"
+        given-names: "András"
+    title: "Use of a weather generator for simulating climate change effects on ecosystems: A case study on Lake Constance"
+    journal: "Environmental Modelling & Software"
+    volume: 61
+    start: 326
+    end: 338
+    year: 2014
+    doi: "10.1016/j.envsoft.2014.06.028"
