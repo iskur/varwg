@@ -1,8 +1,5 @@
-import numpy as np
 import numpy.testing as npt
 from vg.meteo import meteox2y
-import dwd_opendata
-import xarray as xr
 
 
 class Test(npt.TestCase):
@@ -13,7 +10,3 @@ class Test(npt.TestCase):
         ah = meteox2y.rel2abs_hum(rh, at)
         rh_back = meteox2y.abs_hum2rel(ah, at)
         npt.assert_almost_equal(rh_back, rh)
-
-
-if __name__ == "__main__":
-    npt.run_module_suite()
