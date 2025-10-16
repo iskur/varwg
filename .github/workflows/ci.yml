@@ -3,7 +3,17 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'CITATION.cff'
+      - 'LICENSE'
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'CITATION.cff'
+      - 'LICENSE'
   workflow_dispatch:  # Allow manual triggers
 
 jobs:
