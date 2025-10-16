@@ -56,7 +56,6 @@ After installation, you can use VG to generate synthetic weather data:
 
 ```python
 import vg
-from pathlib import Path
 
 # Configure VG with default settings
 vg.set_conf(vg.config_template)
