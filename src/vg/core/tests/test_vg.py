@@ -54,12 +54,39 @@ if not sim_file.exists():
 
 
 class TestVG(npt.TestCase):
+    """VG test suite with class-level caching for performance.
+
+    Uses class-level cached VG instances that are created once and reused
+    across all tests, instead of being recreated in setUp() for every test.
+    This reduces test time from ~26 minutes to much faster.
+    """
+
+    # Class-level cache for expensive VG instances
+    _cached_vg_regr = None
+    _cached_vg_dist = None
+    _cached_vg_sim = None
+    _cached_sample_sim = None
+    _cached_data_dir = None
+
+    verbose = False
+    refit = True
+
     def setUp(self):
-        self.verbose = False
+        """Set up test fixtures, using class-level cache when available."""
+        # Use class-level cached instances if available
+        if TestVG._cached_vg_regr is not None:
+            self.met_vg = TestVG._cached_vg_regr
+            self.vg_regr = TestVG._cached_vg_regr
+            self.vg_dist = TestVG._cached_vg_dist
+            self.vg_sim = TestVG._cached_vg_sim
+            self.sample_sim = TestVG._cached_sample_sim
+            self.data_dir = TestVG._cached_data_dir
+            return
+
+        # First time: create and cache expensive VG instances
         met = vg.read_met(
             sim_file, verbose=self.verbose, with_conversions=True
         )[1]
-        self.refit = True
         self.sample_sim = np.array([met[var_name] for var_name in var_names])
         self.data_dir = tempfile.mkdtemp("vg_temporary_test")
         kwds = dict(
@@ -77,9 +104,18 @@ class TestVG(npt.TestCase):
         self.vg_regr = self.met_vg
         self.vg_dist = vg.VG(var_names, rain_method="distance", **kwds)
         self.vg_sim = vg.VG(var_names, rain_method="simulation", **kwds)
+
+        # Fit all instances (expensive operation, done only once)
         self.met_vg.fit(**fit_kwds)
         self.vg_dist.fit(**fit_kwds)
         self.vg_sim.fit(**fit_kwds)
+
+        # Cache for future tests
+        TestVG._cached_vg_regr = self.met_vg
+        TestVG._cached_vg_dist = self.vg_dist
+        TestVG._cached_vg_sim = self.vg_sim
+        TestVG._cached_sample_sim = self.sample_sim
+        TestVG._cached_data_dir = self.data_dir
 
     # def tearDown(self):
     #     shutil.rmtree(self.data_dir)
@@ -390,11 +426,7 @@ class TestVG(npt.TestCase):
             # npt.assert_almost_equal(sim_diff, theta_incr, decimal=0)
 
     def test_theta_incr(self):
-        # import config_konstanz
-        # vg.core.vg_core.conf = vg.conf = vg.vg_base.conf = config_konstanz
-        # met_vg = vg.VG(("theta", "ILWR", "Qsw", "rh", "u", "v"),
-        #                refit=True,
-        #                verbose=self.verbose)
+        """Test theta increment with 20-year simulation."""
         self.met_vg.fit(p=3, seasonal=True)
         theta_incr = 4
         mean_arrival = 7
@@ -417,10 +449,10 @@ class TestVG(npt.TestCase):
         )
 
     def test_theta_incr_nonnormal(self):
+        """Test theta increment for non-normal variables."""
         vg.reseed(seed)
         met_vg = vg.VG(
             ("R", "theta", "ILWR"),
-            # rain_method="regression",
             rain_method="simulation",
             refit=self.refit,
             verbose=self.verbose,
