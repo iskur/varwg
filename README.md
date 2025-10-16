@@ -1,4 +1,4 @@
-# VG: Vector Autoregressive Moving Average Weather generator
+# VG: Vector Autoregressive Weather generator
 
 [![Python Version](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-BSD-green.svg)](LICENSE)
@@ -8,13 +8,7 @@
 
 ## What is VG?
 
-The weather generator VG is a single-site Vector-Autoregressive (Moving
-Average) weather generator that was developed for hydrodynamic and
-ecologic modelling of lakes. It includes a number of possibilities to
-define climate scenarios. For example, changes in mean or in the
-variability of air temperature can be set. Correlations during
-simulations are preserved, so that these changes propagate from the air
-temperature to the other simulated variables.
+The weather generator VG is a single-site Vector-Autoregressive weather generator that was developed for hydrodynamic and ecologic modelling of lakes. It includes a number of possibilities to define climate scenarios. For example, changes in mean or in the variability of air temperature can be set. Correlations during simulations are preserved, so that these changes propagate from the air temperature to the other simulated variables.
 
 ## Installation
 
