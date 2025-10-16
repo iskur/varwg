@@ -3,8 +3,18 @@ name: Pre-Tag CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'CITATION.cff'
+      - 'LICENSE'
   pull_request:
-    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'CITATION.cff'
+      - 'LICENSE'
+  workflow_dispatch:  # Allow manual triggers
 
 jobs:
   test-build:
