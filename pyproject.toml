@@ -56,3 +56,25 @@ addopts = "--pdb"
 markers = [
     "network: tests that require network access (deselect with '-m \"not network\"')",
 ]
+
+[tool.cibuildwheel]
+# Build for common platforms
+build = "cp313-*"
+skip = "pp* *-musllinux_*"
+
+# Run basic import test for each built wheel
+test-command = "python -c \"import vg; import vg.ctimes; import vg.time_series_analysis.cresample; import vg.meteo.meteox2y_cy; print('All extensions loaded successfully')\""
+test-requires = ["numpy", "pandas", "scipy", "xarray", "bottleneck", "numexpr", "dill", "matplotlib", "timezonefinder"]
+
+# Platform-specific settings
+[tool.cibuildwheel.linux]
+archs = ["x86_64", "aarch64"]
+before-build = "pip install cython numpy setuptools"
+
+[tool.cibuildwheel.windows]
+archs = ["AMD64"]
+before-build = "pip install cython numpy setuptools"
+
+[tool.cibuildwheel.macos]
+archs = ["x86_64", "arm64"]
+before-build = "pip install cython numpy setuptools"
