@@ -43,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Infrastructure
 - Multi-platform wheel distribution via cibuildwheel
-- Pre-built wheels for Python 3.13 on Linux (x86_64, aarch64), Windows (AMD64), macOS (x86_64, arm64)
+- Pre-built wheels for Python 3.13 on Linux (x86_64), Windows (AMD64), macOS (x86_64, arm64)
 - Installation no longer requires C compiler on supported platforms
 - Added `.github/workflows/build-wheels.yml` for automated multi-platform builds
 
