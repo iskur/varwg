@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.4.0] - 2025-10-14
+## [1.4.0] - 2025-10-17
 
 ### Added
 - Ridge regularization with unbiased parameter estimation option for better model stability
@@ -40,6 +40,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 - Python 2 compatibility code
 - Monty simulation scripts
+
+### Infrastructure
+- Multi-platform wheel distribution via cibuildwheel
+- Pre-built wheels for Python 3.13 on Linux (x86_64), Windows (AMD64), macOS (x86_64, arm64)
+- Installation no longer requires C compiler on supported platforms
+- Added `.github/workflows/build-wheels.yml` for automated multi-platform builds
 
 ## [1.3.0]
 

@@ -12,37 +12,31 @@ The weather generator VG is a single-site Vector-Autoregressive weather generato
 
 ## Installation
 
-### Using uv (recommended)
-
-VG uses [uv](https://docs.astral.sh/uv/) for dependency management. To install:
-
-1. Install uv if you haven't already:
-   ```bash
-   curl -LsSf https://astral.sh/uv/install.sh | sh
-   ```
-
-2. Clone the repository and install:
-   ```bash
-   git clone https://github.com/iskur/vg.git
-   cd vg
-   uv sync
-   ```
-
-### Using pip
-
-Alternatively, you can install using pip:
+### From PyPI (Recommended)
 
 ```bash
-pip install git+https://github.com/iskur/vg.git
+pip install vg
 ```
 
-### Development installation
+Pre-built wheels are available for:
+- **Linux**: x86_64
+- **Windows**: AMD64
+- **macOS**: x86_64 (Intel), arm64 (Apple Silicon)
 
-For development with additional tools:
+No compiler needed! If a wheel isn't available for your platform, pip will automatically build from source (requires C compiler and Cython).
+
+### From Source
 
 ```bash
-uv sync --group dev
+git clone https://github.com/iskur/vg.git
+cd vg
+pip install -e .
 ```
+
+Building from source requires:
+- C compiler (gcc/clang/MSVC)
+- Cython >= 3.1.1
+- NumPy >= 1.26.0
 
 ## Quick Start
 

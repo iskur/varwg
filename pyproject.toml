@@ -56,3 +56,27 @@ addopts = "--pdb"
 markers = [
     "network: tests that require network access (deselect with '-m \"not network\"')",
 ]
+
+[tool.cibuildwheel]
+# Build for common platforms
+build = "cp313-*"
+skip = "pp* *-musllinux_*"
+
+# Skip testing during build to avoid installing heavy dependencies (cartopy->pyproj->proj)
+# Extensions are validated by successful compilation; smoke tests run in CI workflow
+test-skip = "*"
+
+# Platform-specific settings
+[tool.cibuildwheel.linux]
+archs = ["x86_64"]
+before-build = "pip install cython numpy setuptools"
+# Note: aarch64 requires QEMU emulation and significantly increases build time
+# Can be added later if ARM Linux support is needed
+
+[tool.cibuildwheel.windows]
+archs = ["AMD64"]
+before-build = "pip install cython numpy setuptools"
+
+[tool.cibuildwheel.macos]
+archs = ["x86_64", "arm64"]
+before-build = "pip install cython numpy setuptools"

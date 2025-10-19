@@ -17,7 +17,13 @@ if sys.platform == "win32":
     library_dirs = ["."]
     extra_compile_args = []
     extra_link_args = []
+elif sys.platform == "darwin":
+    # macOS clang doesn't support -fopenmp by default
+    library_dirs = []
+    extra_compile_args = []
+    extra_link_args = []
 else:
+    # Linux with OpenMP support
     library_dirs = []
     extra_compile_args = ["-fopenmp"]
     extra_link_args = ["-fopenmp"]
