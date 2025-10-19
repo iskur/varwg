@@ -19,7 +19,7 @@ pip install vg
 ```
 
 Pre-built wheels are available for:
-- **Linux**: x86_64, aarch64
+- **Linux**: x86_64
 - **Windows**: AMD64
 - **macOS**: x86_64 (Intel), arm64 (Apple Silicon)
 

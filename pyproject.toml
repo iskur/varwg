@@ -68,8 +68,10 @@ test-skip = "*"
 
 # Platform-specific settings
 [tool.cibuildwheel.linux]
-archs = ["x86_64", "aarch64"]
+archs = ["x86_64"]
 before-build = "pip install cython numpy setuptools"
+# Note: aarch64 requires QEMU emulation and significantly increases build time
+# Can be added later if ARM Linux support is needed
 
 [tool.cibuildwheel.windows]
 archs = ["AMD64"]
