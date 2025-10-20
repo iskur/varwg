@@ -10,6 +10,10 @@
 
 VARWG is a single-site Vector-Autoregressive weather generator that was developed for hydrodynamic and ecologic modelling of lakes. It includes a number of possibilities to define climate scenarios. For example, changes in mean or in the variability of air temperature can be set. Correlations during simulations are preserved, so that these changes propagate from the air temperature to the other simulated variables.
 
+## About the Name Change
+
+The project was renamed from **VG** to **VARWG** because there is already a different package named `vg` on PyPI. To avoid conflicts and ensure the package is properly discoverable on PyPI, we adopted the more descriptive name **VARWG** (Vector-Autoregressive Weather Generator). For backward compatibility, the old `VG` class name is still available as an alias, so existing code will continue to work without modifications.
+
 ## Installation
 
 ### From PyPI (Recommended)
