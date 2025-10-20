@@ -45,7 +45,7 @@ def var_names_greek(var_names):
     return [conf.ygreek[var_name] for var_name in var_names]
 
 
-class VGPlotting(base.VGBase):
+class VGPlotting(base.Base):
     """To be used indirectly (by the VG class) or directly to plot
     meteorological data (met_files, pandas dataframe).
 
@@ -72,7 +72,7 @@ class VGPlotting(base.VGBase):
         fit_kwds=None,
         **met_kwds,
     ):
-        # signal for VGBase to not do the seasonal fitting, which takes time
+        # signal for Base to not do the seasonal fitting, which takes time
         # and the reason to initiate VGPlotting might be that you just plot
         # something quickly
         self.seasonal_fitting = seasonal_fitting
@@ -136,7 +136,7 @@ class VGPlotting(base.VGBase):
             self.seasonal_fitting = True
             self.fit_seasonal(refit="all")
             return self.dist_sol
-        return base.VGBase.__getattribute__(self, name)
+        return base.Base.__getattribute__(self, name)
 
     @property
     def ylabels(self):

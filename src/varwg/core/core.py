@@ -414,7 +414,7 @@ class VG(plotting.VGPlotting):
         # VGPlotting overwrites __getattribute__ to do a seasonal fitting
         # only if it is (implicitly) requested. That behaviour is only usefull
         # when creating a VGPlotting instance
-        return base.VGBase.__getattribute__(self, name)
+        return base.Base.__getattribute__(self, name)
 
     def __str__(self):
         return f"VG({self.station_name}, {self.rain_method})"
