@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 # cython: infer_types=False
 
@@ -12,8 +13,8 @@ from scipy import optimize
 
 import matplotlib.pyplot as plt
 import cython
-import vg
-from vg import helpers as my
+import varwg as vg
+from varwg import helpers as my
 from cython.parallel import prange, parallel
 
 
@@ -358,8 +359,8 @@ cpdef resample(data, dtimes, p=3, n_sim_steps=None, theta_incr=0.0,
 
 
 if __name__ == "__main__":
-    import vg
-    vg.conf = vg.vg_base.conf = vg.config_konstanz_disag
+    import varwg as vg
+    vg.conf = varwg.core.base.conf = vg.config_konstanz_disag
     met_vg = vg.VG((
         # "R",
         "theta", "Qsw",
