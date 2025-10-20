@@ -1673,6 +1673,10 @@ class Base(object):
         return data_trans
 
 
+# Backward compatibility alias
+VGBase = Base
+
+
 if __name__ == "__main__":
     varwg.reseed(0)
     warnings.simplefilter("error", RuntimeWarning)

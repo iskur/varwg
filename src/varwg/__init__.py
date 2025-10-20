@@ -19,8 +19,10 @@ from .core.core import VarWG, read_met
 from .core import core, base, plotting
 from . import times, ctimes
 
-# Backward compatibility alias
+# Backward compatibility aliases
 VG = VarWG
+VGBase = base.VGBase
+VGPlotting = plotting.VGPlotting
 
 # Path to sample meteorological data file
 sample_met = Path(__file__).parent / "sample.met"
