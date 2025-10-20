@@ -30,20 +30,20 @@ else:
 
 extensions = [
     Extension(
-        "vg.time_series_analysis.cresample",
-        ["src/vg/time_series_analysis/cresample" + ext],
+        "varwg.time_series_analysis.cresample",
+        ["src/varwg/time_series_analysis/cresample" + ext],
         include_dirs=[np.get_include()],
         library_dirs=library_dirs,
     ),
     Extension(
-        "vg.ctimes",
-        ["src/vg/ctimes" + ext],
+        "varwg.ctimes",
+        ["src/varwg/ctimes" + ext],
         include_dirs=[np.get_include()],
         library_dirs=library_dirs,
     ),
     Extension(
-        "vg.meteo.meteox2y_cy",
-        ["src/vg/meteo/meteox2y_cy" + ext],
+        "varwg.meteo.meteox2y_cy",
+        ["src/varwg/meteo/meteox2y_cy" + ext],
         include_dirs=[np.get_include()],
         # extra_compile_args=['-fopenmp'],
         # extra_link_args=['-fopenmp'],
@@ -61,6 +61,6 @@ else:
     cmdclass = {}
 
 setup(
-    name="vg",
+    name="varwg",
     ext_modules=ext_modules,
 )

@@ -9,7 +9,7 @@ on:
     paths:
       - 'setup.py'
       - 'pyproject.toml'
-      - 'src/vg/**/*.pyx'
+      - 'src/varwg/**/*.pyx'
       - '.github/workflows/build-wheels.yml'
 
 jobs:
