@@ -349,7 +349,7 @@ class TestVG(npt.TestCase):
         # use the constance data set here.  the self-generated data is
         # strange.... (hint: look what you have done there!)
         # import config_konstanz as conf
-        # varwg.core.vg_core.conf = varwg.conf = vg.base.conf = conf
+        # varwg.core.core.conf = varwg.conf = vg.base.conf = conf
         met_vg = varwg.VG(
             ("theta", "ILWR", "Qsw", "rh", "u", "v"),
             refit=self.refit,
@@ -391,7 +391,7 @@ class TestVG(npt.TestCase):
 
     def test_theta_incr(self):
         # import config_konstanz
-        # varwg.core.vg_core.conf = varwg.conf = vg.base.conf = config_konstanz
+        # varwg.core.core.conf = varwg.conf = vg.base.conf = config_konstanz
         # met_vg = varwg.VG(("theta", "ILWR", "Qsw", "rh", "u", "v"),
         #                refit=True,
         #                verbose=self.verbose)
