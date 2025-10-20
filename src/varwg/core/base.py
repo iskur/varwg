@@ -1681,7 +1681,7 @@ if __name__ == "__main__":
 
     import varwg
 
-    varwg.conf = varwg.base.conf = varwg.vg_plotting.conf = conf
+    varwg.conf = varwg.base.conf = varwg.core.plotting.conf = conf
     met_vg = varwg.VG(
         ("R", "theta", "ILWR", "Qsw", "rh", "u", "v"),
         # refit="R",

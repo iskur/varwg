@@ -16,7 +16,7 @@ from numpy.random import default_rng
 import matplotlib.pyplot as plt
 
 from .core.core import VG, read_met
-from .core import core, base, vg_plotting
+from .core import core, base, plotting
 from . import times, ctimes
 
 # Path to sample meteorological data file
@@ -35,4 +35,4 @@ def reseed(seed):
 
 def set_conf(conf_obj):
     global conf
-    conf = core.conf = base.conf = vg_plotting.conf = conf_obj
+    conf = core.conf = base.conf = plotting.conf = conf_obj
