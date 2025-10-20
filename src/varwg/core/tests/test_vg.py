@@ -586,8 +586,8 @@ class TestVG(npt.TestCase):
     #     # import matplotlib.pyplot as plt
     #     # # import config_konstanz_disag as conf
     #     # import config_konstanz as conf
-    #     # from varwg import vg_plotting
-    #     # varwg.conf = vg.base.conf = vg.vg_plotting.conf = conf
+    #     # from varwg.core import plotting
+    #     # varwg.conf = vg.base.conf = vg.plotting.conf = conf
     #     # varwg.reseed(seed)
     #     # met_vg = varwg.VG(("R", "theta", "ILWR",
     #     #                 # "Qsw", "rh", "u", "v"
