@@ -1963,6 +1963,10 @@ class Plotting(base.Base):
     #         axes += [axs]
 
 
+# Backward compatibility alias
+VGPlotting = Plotting
+
+
 if __name__ == "__main__":
     import varwg
 
