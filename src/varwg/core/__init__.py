@@ -1,1 +1,1 @@
-__all__ = ["vg_core", "vg_plotting", "tests"]
+__all__ = ["core", "vg_plotting", "tests"]
