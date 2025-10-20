@@ -15,9 +15,12 @@ import shelve
 from numpy.random import default_rng
 import matplotlib.pyplot as plt
 
-from .core.core import VG, read_met
+from .core.core import VarWG, read_met
 from .core import core, base, plotting
 from . import times, ctimes
+
+# Backward compatibility alias
+VG = VarWG
 
 # Path to sample meteorological data file
 sample_met = Path(__file__).parent / "sample.met"
