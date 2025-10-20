@@ -9,7 +9,7 @@ on:
     paths:
       - 'setup.py'
       - 'pyproject.toml'
-      - 'src/vg/**/*.pyx'
+      - 'src/varwg/**/*.pyx'
       - '.github/workflows/build-wheels.yml'
 
 jobs:
@@ -28,6 +28,9 @@ jobs:
       uses: pypa/cibuildwheel@v2.21.3
       env:
         CIBW_BUILD_VERBOSITY: 1
+        # Fallback if quay.io is down
+        # CIBW_MANYLINUX_X86_64_IMAGE: docker.io/pypa/manylinux2014_x86_64
+        
 
     - name: Upload wheels as artifacts
       uses: actions/upload-artifact@v4

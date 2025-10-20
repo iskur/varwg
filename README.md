@@ -1,21 +1,25 @@
-# VG: Vector Autoregressive Weather generator
+# VARWG: Vector Autoregressive Weather Generator
 
 [![Python Version](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-BSD-green.svg)](LICENSE)
-[![Documentation Status](https://readthedocs.org/projects/vg-doc/badge/?version=latest)](https://vg-doc.readthedocs.io)
+[![Documentation Status](https://readthedocs.org/projects/varwg/badge/?version=latest)](https://varwg.readthedocs.io)
 [![Managed with uv](https://img.shields.io/badge/managed_with-uv-blue)](https://github.com/astral-sh/uv)
-![Last Commit](https://img.shields.io/github/last-commit/iskur/vg)
+![Last Commit](https://img.shields.io/github/last-commit/iskur/varwg)
 
-## What is VG?
+## What is VARWG?
 
-The weather generator VG is a single-site Vector-Autoregressive weather generator that was developed for hydrodynamic and ecologic modelling of lakes. It includes a number of possibilities to define climate scenarios. For example, changes in mean or in the variability of air temperature can be set. Correlations during simulations are preserved, so that these changes propagate from the air temperature to the other simulated variables.
+VARWG is a single-site Vector-Autoregressive weather generator that was developed for hydrodynamic and ecologic modelling of lakes. It includes a number of possibilities to define climate scenarios. For example, changes in mean or in the variability of air temperature can be set. Correlations during simulations are preserved, so that these changes propagate from the air temperature to the other simulated variables.
+
+## About the Name Change
+
+The project was renamed from **VG** to **VARWG** because there is already a different package named `vg` on PyPI. To avoid conflicts and ensure the package is properly discoverable on PyPI, we adopted the more descriptive name **VARWG** (Vector-Autoregressive Weather Generator). For backward compatibility, the old `VG` class name is still available as an alias, so existing code will continue to work without modifications.
 
 ## Installation
 
 ### From PyPI (Recommended)
 
 ```bash
-pip install vg
+pip install varwg
 ```
 
 Pre-built wheels are available for:
@@ -28,8 +32,8 @@ No compiler needed! If a wheel isn't available for your platform, pip will autom
 ### From Source
 
 ```bash
-git clone https://github.com/iskur/vg.git
-cd vg
+git clone https://github.com/iskur/varwg.git
+cd varwg
 pip install -e .
 ```
 
@@ -40,12 +44,12 @@ Building from source requires:
 
 ## Quick Start
 
-After installation, you can use VG to generate synthetic weather data:
+After installation, you can use VARWG to generate synthetic weather data:
 
 ```python
-import vg
+import varwg as vg
 
-# Configure VG with default settings
+# Configure VARWG with default settings
 vg.set_conf(vg.config_template)
 
 # Define meteorological variables to simulate
@@ -85,7 +89,7 @@ uv run pytest
 ## Documentation
 
 The documentation can be accessed online at
-<https://vg-doc.readthedocs.io>.
+<https://varwg.readthedocs.io>.
 
 <!-- The source package also ships with the sphinx-based documentation source -->
 <!-- in the `doc` folder. Having [sphinx](sphinx.pocoo.org) installed, it can -->
@@ -97,17 +101,17 @@ The documentation can be accessed online at
 
 ## Release notes
 
-See [CHANGELOG.md](CHANGELOG.md) for detailed release notes, or view [releases on GitHub](https://github.com/iskur/vg/releases).
+See [CHANGELOG.md](CHANGELOG.md) for detailed release notes, or view [releases on GitHub](https://github.com/iskur/varwg/releases).
 
 **Current version: 1.4.0** - Python ≥ 3.13 required
 
 ## Web sites
 
-Code is hosted at: <https://github.com/iskur/vg/>
+Code is hosted at: <https://github.com/iskur/varwg/>
 
 ## Citation
 
-If you use VG in your research, please cite:
+If you use VARWG in your research, please cite:
 
 **Schlabing, D., Frassl, M. A., Eder, M., Rinke, K., & Bárdossy, A. (2014).** Use of a weather generator for simulating climate change effects on ecosystems: A case study on Lake Constance. *Environmental Modelling & Software*, 61, 326-338. https://doi.org/10.1016/j.envsoft.2014.06.028
 
@@ -126,9 +130,9 @@ If you use VG in your research, please cite:
 }
 ```
 
-## Publications Using VG
+## Publications Using VARWG
 
-The following publications have used VG for weather generation:
+The following publications have used VARWG for weather generation:
 
 - **Kobler, U. G., Wüest, A., & Schmid, M. (2018).** Effects of Lake–Reservoir Pumped-Storage Operations on Temperature and Water Quality. *Sustainability*, 10(6), 1968. https://doi.org/10.3390/su10061968
 
@@ -138,7 +142,7 @@ The following publications have used VG for weather generation:
 
 - **Eder, M. (2013).** *Climate sensitivity of a large lake*. PhD Thesis, University of Stuttgart, http://dx.doi.org/10.18419/opus-509.
 
-*If you've published work using VG, please let us know by [opening an issue](https://github.com/iskur/vg/issues) so we can add it to this list!*
+*If you've published work using VARWG, please let us know by [opening an issue](https://github.com/iskur/varwg/issues) so we can add it to this list!*
 
 ## License information
 

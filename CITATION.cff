@@ -1,11 +1,11 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite both the software and the reference paper."
 type: software
-title: "VG: Vector Autoregressive Moving Average Weather Generator"
+title: "VARWG: Vector Autoregressive Weather Generator"
 version: 1.4.0
 date-released: 2025-01-15
-repository-code: "https://github.com/iskur/vg"
-url: "https://vg-doc.readthedocs.io"
+repository-code: "https://github.com/iskur/varwg"
+url: "https://varwg.readthedocs.io"
 license: BSD-3-Clause
 authors:
   - family-names: "Schlabing"
