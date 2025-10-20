@@ -317,7 +317,7 @@ def read_met(
     return datetimes, met
 
 
-class VGBase(object):
+class Base(object):
     """Handle everything except plotting."""
 
     def __init__(
