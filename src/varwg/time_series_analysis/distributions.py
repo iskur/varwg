@@ -2760,7 +2760,7 @@ if __name__ == "__main__":
     import config_konstanz as conf
 
     import varwg
-    from varwg import base, vg_plotting
+    from varwg.core import base, plotting
 
     varwg.set_conf(conf)
     # times_hourly, met = varwg.read_met(varwg.conf.met_file)
