@@ -283,7 +283,7 @@ def sw_diurnal(date, daily_sw_data, del_t=3600):
     return date_, data_
 
 
-class VG(plotting.Plotting):
+class VarWG(plotting.Plotting):
     """A Vector-Autoregressive weather generator.
 
     >>> my_vg = VG(("theta", "Qsw", "ILWR", "rh", "u", "v"))
@@ -379,7 +379,7 @@ class VG(plotting.Plotting):
         self.station_name = station_name
         if conf_update is not None:
             self._conf_update(conf_update)
-        super(VG, self).__init__(
+        super(VarWG, self).__init__(
             var_names,
             met_file=met_file,
             sum_interval=sum_interval,
