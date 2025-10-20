@@ -14,7 +14,7 @@ import pandas as pd
 
 import varwg
 from varwg import helpers as my
-from varwg.core import base, vg_plotting
+from varwg.core import base, plotting
 from varwg.meteo import avrwind, meteox2y
 
 # from varwg.meteo.meteox2y_cy import pot_s_rad
@@ -283,7 +283,7 @@ def sw_diurnal(date, daily_sw_data, del_t=3600):
     return date_, data_
 
 
-class VG(vg_plotting.VGPlotting):
+class VG(plotting.VGPlotting):
     """A Vector-Autoregressive weather generator.
 
     >>> my_vg = VG(("theta", "Qsw", "ILWR", "rh", "u", "v"))
@@ -406,7 +406,7 @@ class VG(vg_plotting.VGPlotting):
         for name, value in conf_update.items():
             setattr(conf, name, value)
             setattr(base.conf, name, value)
-            setattr(vg_plotting.conf, name, value)
+            setattr(plotting.conf, name, value)
             if hasattr(self, name):
                 setattr(self, name, value)
 
@@ -2280,9 +2280,9 @@ if __name__ == "__main__":
     # import config_konstanz_disag as conf
     import config_konstanz as conf
 
-    from varwg.core import vg_plotting
+    from varwg.core import plotting
 
-    base.conf = vg_plotting.conf = conf
+    base.conf = plotting.conf = conf
     met_vg = VG(
         ("R", "theta", "ILWR", "Qsw", "rh", "u", "v"),
         # non_rain=("theta", "Qsw", "rh"),
