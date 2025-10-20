@@ -283,7 +283,7 @@ def sw_diurnal(date, daily_sw_data, del_t=3600):
     return date_, data_
 
 
-class VG(plotting.VGPlotting):
+class VG(plotting.Plotting):
     """A Vector-Autoregressive weather generator.
 
     >>> my_vg = VG(("theta", "Qsw", "ILWR", "rh", "u", "v"))
@@ -411,9 +411,9 @@ class VG(plotting.VGPlotting):
                 setattr(self, name, value)
 
     def __getattribute__(self, name):
-        # VGPlotting overwrites __getattribute__ to do a seasonal fitting
+        # Plotting overwrites __getattribute__ to do a seasonal fitting
         # only if it is (implicitly) requested. That behaviour is only usefull
-        # when creating a VGPlotting instance
+        # when creating a Plotting instance
         return base.Base.__getattribute__(self, name)
 
     def __str__(self):
