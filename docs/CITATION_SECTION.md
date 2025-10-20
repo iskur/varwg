@@ -1,6 +1,6 @@
 ## Citation
 
-If you use VG in your research, please cite:
+If you use VarWG in your research, please cite:
 
 **Schlabing, D., Frassl, M. A., Eder, M., Rinke, K., & Bárdossy, A. (2014).** Use of a weather generator for simulating climate change effects on ecosystems: A case study on Lake Constance. *Environmental Modelling & Software*, 61, 326-338. https://doi.org/10.1016/j.envsoft.2014.06.028
 
@@ -19,9 +19,9 @@ If you use VG in your research, please cite:
 }
 ```
 
-## Publications Using VG
+## Publications Using VarWG
 
-The following publications have used VG for weather generation:
+The following publications have used VarWG for weather generation:
 
 - **Kobler, U. G., Wüest, A., & Schmid, M. (2018).** Effects of Lake–Reservoir Pumped-Storage Operations on Temperature and Water Quality. *Sustainability*, 10(6), 1968. https://doi.org/10.3390/su10061968
 
@@ -33,4 +33,4 @@ The following publications have used VG for weather generation:
 
 ---
 
-*If you've published work using VG, please let us know by [opening an issue](https://github.com/iskur/vg/issues) so we can add it to this list!*
+*If you've published work using VarWG, please let us know by [opening an issue](https://github.com/iskur/varwg/issues) so we can add it to this list!*
