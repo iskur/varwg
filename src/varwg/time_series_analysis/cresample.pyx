@@ -357,39 +357,3 @@ cpdef resample(data, dtimes, p=3, n_sim_steps=None, theta_incr=0.0,
         return sim, chosen_indices, candidate_series
     return sim, chosen_indices
 
-
-if __name__ == "__main__":
-    import varwg as vg
-    vg.conf = varwg.core.base.conf = vg.config_konstanz_disag
-    met_vg = vg.VG((
-        # "R",
-        "theta", "Qsw",
-        "ILWR", "rh", "u", "v"
-                    ),
-                   verbose=False)
-    met_vg.fit(p=3)
-    simt, sim = met_vg.simulate(res_kwds=dict(recalibrate=False,
-                                              cy=False,
-                                              n_candidates=20),
-                                theta_incr=0.)
-
-    theta_incrs = np.linspace(-10, 10, 21)
-    data_mean = np.mean(met_vg.data_raw[0]) / 24.
-    delta_means = []
-    for theta_incr in theta_incrs:
-        simt, sim = met_vg.simulate(res_kwds=dict(cy=False,
-                                                  n_candidates=20),
-                                    theta_incr=theta_incr)
-        delta_means += [np.mean(sim[0]) - data_mean]
-        print(theta_incr, delta_means[-1])
-
-    fig, ax = plt.subplots(subplot_kw=dict(aspect="equal"))
-    ax.plot(theta_incrs, delta_means, "-x")
-    ax.plot(theta_incrs, theta_incrs, color="gray")
-    plt.show()
-    
-    # simt, sim = met_vg.simulate(T=365, resample=True, theta_incr=2)
-    # met_vg.plot_autocorr()
-    # from vg.time_series_analysis import time_series as ts
-    # ts.plot_auto_corr([data, res], 14, var_names=met_vg.var_names)
-    # ts.plt.show()

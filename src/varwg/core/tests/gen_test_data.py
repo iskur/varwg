@@ -5,7 +5,7 @@ import tempfile
 
 import varwg
 from pathlib import Path
-from varwg.core.tests import test_vg
+from varwg.core.tests import test_core as test_vg
 
 config_template = varwg.config_template
 varwg.set_conf(config_template)
@@ -27,7 +27,7 @@ def main():
     cache_dir = tempfile.mkdtemp("vg_test_data_gen")
 
     varwg.reseed(test_vg.seed)
-    met_vg: vg.VG = varwg.VG(
+    met_vg = varwg.VG(
         test_vg.var_names,
         met_file=test_in_data_filepath,
         cache_dir=cache_dir,

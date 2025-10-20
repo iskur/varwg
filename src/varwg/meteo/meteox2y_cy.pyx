@@ -14,8 +14,8 @@ from timezonefinder import TimezoneFinder
 import pytz
 import bottleneck
 
-import vg
-from vg.ctimes import datetime2doy
+import varwg
+from varwg.ctimes import datetime2doy
 
 cimport numpy as np
 
@@ -69,7 +69,7 @@ def pot_s_rad(date, lat, longt, in_format='%Y-%m-%dT%H:%M', tz_mer=15.0,
     >>> date_str = np.array(["2011-09-28T11:27"])
     >>> pot_s_rad(date_str)
     array([ 855.35624182])
-    >>> from vg import times
+    >>> from varwg import times
     >>> dt = times.str2datetime(date_str, "%Y-%m-%dT%H:%M")
     >>> pot_s_rad(dt)
     array([ 855.35624182])
@@ -102,7 +102,7 @@ def pot_s_rad(date, lat, longt, in_format='%Y-%m-%dT%H:%M', tz_mer=15.0,
             # ...or two
             # if date is string
             doys = np.array(
-                datetime2doy(list(vg.times.str2datetime(date, in_format))))
+                datetime2doy(list(varwg.times.str2datetime(date, in_format))))
         except (TypeError, IndexError):
             # those were the doys my friend, i thought they never end
             doys = date  # if date is already in doys
