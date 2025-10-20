@@ -45,7 +45,7 @@ def var_names_greek(var_names):
     return [conf.ygreek[var_name] for var_name in var_names]
 
 
-class VGPlotting(base.Base):
+class Plotting(base.Base):
     """To be used indirectly (by the VG class) or directly to plot
     meteorological data (met_files, pandas dataframe).
 
@@ -73,10 +73,10 @@ class VGPlotting(base.Base):
         **met_kwds,
     ):
         # signal for Base to not do the seasonal fitting, which takes time
-        # and the reason to initiate VGPlotting might be that you just plot
+        # and the reason to initiate Plotting might be that you just plot
         # something quickly
         self.seasonal_fitting = seasonal_fitting
-        super(VGPlotting, self).__init__(
+        super(Plotting, self).__init__(
             var_names,
             met_file=met_file,
             sum_interval=sum_interval,
@@ -96,12 +96,12 @@ class VGPlotting(base.Base):
         )
 
     def plot_all(self, *args, **kwds):
-        """Executes every method of VGPlotting that starts with "plot_".
+        """Executes every method of Plotting that starts with "plot_".
         There are quite a number of those. You have been warned.
         """
         methods = {
             attr: getattr(self, attr)
-            for attr in dir(VGPlotting)
+            for attr in dir(Plotting)
             if (attr.startswith("plot_") and attr != "plot_all")
         }
         return_values = []
@@ -126,7 +126,7 @@ class VGPlotting(base.Base):
         db = dumb.open(self.seasonal_cache_file, "n")
         db.close()
         os.close(f_handle)
-        self.data_trans, self.dist_sol = super(VGPlotting, self)._fit_seasonal(
+        self.data_trans, self.dist_sol = super(Plotting, self)._fit_seasonal(
             refit, values, doys
         )
 
