@@ -143,3 +143,4 @@ venv.bak/
 # profiling output
 profile.json
 uv.lock
+.aider*
