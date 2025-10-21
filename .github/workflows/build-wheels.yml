@@ -71,6 +71,8 @@ jobs:
     needs: [build_wheels, build_sdist]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      id-token: write
 
     steps:
     - name: Download all artifacts
@@ -82,8 +84,12 @@ jobs:
     - name: List distributions to upload
       run: ls -lh dist/
 
+    - name: Verify wheel integrity
+      run: |
+        python3 -m pip install twine
+        python3 -m twine check dist/*
+
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
-        password: ${{ secrets.PYPI_API_TOKEN }}
         skip-existing: true
