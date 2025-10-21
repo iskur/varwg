@@ -31,11 +31,16 @@ jobs:
         # Fallback if quay.io is down
         # CIBW_MANYLINUX_X86_64_IMAGE: docker.io/pypa/manylinux2014_x86_64
 
+    - name: Set up Python for verification
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+
     - name: Verify wheel integrity after build
       run: |
-        python3 -m pip install twine
+        python -m pip install twine
         ls -lh ./wheelhouse/*.whl
-        python3 -m twine check ./wheelhouse/*.whl
+        python -m twine check ./wheelhouse/*.whl
 
     - name: Upload wheels as artifacts
       uses: actions/upload-artifact@v4
