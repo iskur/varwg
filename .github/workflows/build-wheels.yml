@@ -25,12 +25,17 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Build wheels
-      uses: pypa/cibuildwheel@v2.21.3
+      uses: pypa/cibuildwheel@v2.22.0
       env:
         CIBW_BUILD_VERBOSITY: 1
         # Fallback if quay.io is down
         # CIBW_MANYLINUX_X86_64_IMAGE: docker.io/pypa/manylinux2014_x86_64
-        
+
+    - name: Verify wheel integrity after build
+      run: |
+        python3 -m pip install twine
+        ls -lh ./wheelhouse/*.whl
+        python3 -m twine check ./wheelhouse/*.whl
 
     - name: Upload wheels as artifacts
       uses: actions/upload-artifact@v4
@@ -83,11 +88,6 @@ jobs:
 
     - name: List distributions to upload
       run: ls -lh dist/
-
-    - name: Verify wheel integrity
-      run: |
-        python3 -m pip install twine
-        python3 -m twine check dist/*
 
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
