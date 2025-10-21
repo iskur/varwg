@@ -37,6 +37,7 @@ jobs:
         python-version: '3.13'
 
     - name: Verify wheel integrity after build
+      shell: bash
       run: |
         python -m pip install twine
         ls -lh ./wheelhouse/*.whl
