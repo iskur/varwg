@@ -105,7 +105,27 @@ jobs:
       run: |
         python -m pip install twine
         python -m twine check dist/*.whl dist/*.tar.gz
-        echo "✓ All distributions verified successfully"
+
+        # Thoroughly test ZIP structure of all wheels
+        python << 'EOF'
+        import zipfile
+        from pathlib import Path
+
+        for wheel in sorted(Path('dist').glob('*.whl')):
+            try:
+                with zipfile.ZipFile(wheel, 'r') as zf:
+                    # testzip() returns None if OK, or name of first bad file
+                    bad_file = zf.testzip()
+                    if bad_file:
+                        print(f"✗ {wheel.name}: BAD FILE {bad_file}")
+                        exit(1)
+                    print(f"✓ {wheel.name}: ZIP structure valid ({len(zf.namelist())} files)")
+            except Exception as e:
+                print(f"✗ {wheel.name}: {e}")
+                exit(1)
+
+        print("✓ All distributions verified successfully")
+        EOF
 
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
