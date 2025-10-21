@@ -95,6 +95,18 @@ jobs:
     - name: List distributions to upload
       run: ls -lh dist/
 
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+
+    - name: Verify wheels after download
+      shell: bash
+      run: |
+        python -m pip install twine
+        python -m twine check dist/*.whl dist/*.tar.gz
+        echo "✓ All distributions verified successfully"
+
     - name: Publish to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
