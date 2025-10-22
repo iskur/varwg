@@ -2,7 +2,7 @@
 
 [![Python Version](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-BSD-green.svg)](LICENSE)
-[![Documentation Status](https://readthedocs.org/projects/varwg/badge/?version=latest)](https://varwg.readthedocs.io)
+[![Documentation Status](https://readthedocs.org/projects/varwg/badge/?version=latest)](https://vg-doc.readthedocs.io)
 [![Managed with uv](https://img.shields.io/badge/managed_with-uv-blue)](https://github.com/astral-sh/uv)
 ![Last Commit](https://img.shields.io/github/last-commit/iskur/varwg)
 
@@ -89,7 +89,7 @@ uv run pytest
 ## Documentation
 
 The documentation can be accessed online at
-<https://varwg.readthedocs.io>.
+<https://vg-doc.readthedocs.io>.
 
 <!-- The source package also ships with the sphinx-based documentation source -->
 <!-- in the `doc` folder. Having [sphinx](sphinx.pocoo.org) installed, it can -->
