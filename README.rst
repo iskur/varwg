@@ -1,10 +1,10 @@
-VG: vector-autoregressive weather generator
-###########################################
+VARWG: Vector Autoregressive Weather Generator
+##############################################
 
-What is VG?
-***********
+What is VARWG?
+**************
 
-The weather generator VG is a single-site Vector-Autoregressive weather generator that was developed for hydrodynamic and ecologic modelling of lakes. It includes a number of possibilities to define climate scenarios. For example, changes in mean or in the variability of air temperature can be set. Correlations during simulations are preserved, so that these changes propagate from the air temperature (the default primary variable) to the other simulated variables.
+VARWG is a single-site Vector-Autoregressive weather generator that was developed for hydrodynamic and ecologic modelling of lakes. It includes a number of possibilities to define climate scenarios. For example, changes in mean or in the variability of air temperature can be set. Correlations during simulations are preserved, so that these changes propagate from the air temperature (the default primary variable) to the other simulated variables.
 
 
 Installation
@@ -70,7 +70,7 @@ Release notes
 1.1
 ===
 
-This release makes VG more tolerant to "dirty" input data.
+This release makes VARWG more tolerant to "dirty" input data.
 
 - Non-evenly spaced time series are allowed. WARNING: linear interpolation is 
   used to regularize the data set.
@@ -86,7 +86,7 @@ Initial release.
 Web sites
 *********
 
-Code is hosted at: https://github.com/iskur/vg/
+Code is hosted at: https://github.com/iskur/varwg/
 
 # Documentation: http://iskur.bitbucket.org
 

@@ -1424,7 +1424,7 @@ wheels = [
 ]
 
 [[package]]
-name = "vg"
+name = "varwg"
 version = "1.4.0"
 source = { editable = "." }
 dependencies = [
