@@ -53,7 +53,7 @@ test = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--pdb"
+# addopts = "--pdb"
 markers = [
     "network: tests that require network access (deselect with '-m \"not network\"')",
 ]
