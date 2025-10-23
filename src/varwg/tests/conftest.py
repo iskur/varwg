@@ -1,12 +1,23 @@
 """Shared pytest fixtures for VG tests."""
+
 import pytest
 from pathlib import Path
 import xarray as xr
 import matplotlib.pyplot as plt
-from pytest_examples import find_examples, CodeExample, EvalExample
+from pytest_examples import find_examples
 
-# Project root: src/varwg/tests/conftest.py -> 4 levels up
-PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+
+def find_project_root(marker_files=(".git", "pyproject.toml", "setup.py")):
+    current = Path(__file__).resolve().parent
+
+    for parent in [current, *current.parents]:
+        if any((parent / marker).exists() for marker in marker_files):
+            return parent
+
+    raise FileNotFoundError("Project root not found")
+
+
+PROJECT_ROOT = find_project_root()
 
 
 @pytest.fixture
@@ -78,11 +89,11 @@ def save_example_plots(plot_output_dir):
         fig = plt.figure(fig_num)
         # Try to save with a descriptive name if available
         filename = fig.get_label() or f"figure_{i}.png"
-        if not filename.endswith('.png'):
+        if not filename.endswith(".png"):
             filename = f"{filename}.png"
-        fig.savefig(plot_output_dir / filename, dpi=150, bbox_inches='tight')
+        fig.savefig(plot_output_dir / filename, dpi=150, bbox_inches="tight")
 
-    plt.close('all')
+    plt.close("all")
 
 
 def pytest_generate_tests(metafunc):
