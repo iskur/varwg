@@ -69,6 +69,12 @@ met_vg.plot_meteogram_daily()
 met_vg.plot_autocorr()
 ```
 
+#### Daily Meteogram
+![Daily Meteogram](docs/plots/meteogram_daily.png)
+
+#### Autocorrelation
+![Autocorrelation](docs/plots/autocorr.png)
+
 See the `scripts/` directory for more advanced examples.
 
 ## Running Tests

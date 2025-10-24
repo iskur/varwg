@@ -1,0 +1,98 @@
+name: Generate README Plots
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'README.md'
+      - 'src/varwg/**'
+      - 'pyproject.toml'
+      - '.github/workflows/generate-readme-plots.yml'
+  pull_request:
+    paths:
+      - 'README.md'
+      - 'src/varwg/**'
+      - 'pyproject.toml'
+  workflow_dispatch:  # Allow manual triggers
+
+jobs:
+  generate-plots:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v6
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
+
+    - name: Create uv virtualenv
+      run: uv venv
+
+    - name: Install build dependencies
+      run: |
+        source .venv/bin/activate
+        uv pip install --system cython numpy setuptools
+
+    - name: Install package with test dependencies
+      run: |
+        source .venv/bin/activate
+        uv sync --group test
+        uv pip install -e .
+
+    - name: Generate README plots
+      run: |
+        source .venv/bin/activate
+        uv run pytest src/varwg/tests/test_readme.py -v
+
+    - name: Commit generated plots (if changed)
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Actions"
+
+        if git diff --quiet docs/plots/; then
+          echo "No changes to plots"
+        else
+          git add docs/plots/*.png
+          git commit -m "docs: Regenerate README plots
+
+🤖 Generated with pytest-examples during CI
+
+Co-Authored-By: GitHub Actions <noreply@github.com>"
+          git push
+        fi
+
+    - name: Comment on PR with plot regeneration status
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const plotDir = './docs/plots';
+
+          let plotList = '✨ **Generated plots:**\n';
+          if (fs.existsSync(plotDir)) {
+            const files = fs.readdirSync(plotDir).filter(f => f.endsWith('.png'));
+            if (files.length > 0) {
+              files.forEach(f => {
+                plotList += `- \`${f}\`\n`;
+              });
+            } else {
+              plotList = 'No plots generated.';
+            }
+          }
+
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: plotList
+          });
