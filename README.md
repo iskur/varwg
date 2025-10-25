@@ -56,7 +56,7 @@ varwg.set_conf(varwg.config_template)
 var_names = ("theta", "Qsw", "rh")  # Temperature, solar radiation, humidity
 
 # Initialize the weather generator with sample data
-met_varwg = varwg.VG(var_names, met_file=varwg.sample_met, refit=True, verbose=True)
+met_varwg = varwg.VarWG(var_names, met_file=varwg.sample_met, refit=True, verbose=True)
 
 # Fit the seasonal VAR model
 met_varwg.fit(p=3, seasonal=True)
