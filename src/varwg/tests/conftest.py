@@ -88,7 +88,9 @@ def save_example_plots(plot_output_dir):
     for i, fig_num in enumerate(plt.get_fignums()):
         fig = plt.figure(fig_num)
         # Try to save with a descriptive name if available
-        filename = fig.get_label() or f"figure_{i}.png"
+        filename = (
+            getattr(fig, "name", False) or fig.get_label() or f"figure_{i}.png"
+        )
         if not filename.endswith(".png"):
             filename = f"{filename}.png"
         fig.savefig(plot_output_dir / filename, dpi=150, bbox_inches="tight")
