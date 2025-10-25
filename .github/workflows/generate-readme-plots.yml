@@ -62,11 +62,7 @@ jobs:
           echo "No changes to plots"
         else
           git add docs/plots/*.png
-          git commit -m "docs: Regenerate README plots
-
-🤖 Generated with pytest-examples during CI
-
-Co-Authored-By: GitHub Actions <noreply@github.com>"
+          git commit -m "docs: Regenerate README plots"
           git push
         fi
 
