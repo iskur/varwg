@@ -912,8 +912,8 @@ class Plotting(base.Base):
     def _plot_seasonal_fit(
         self,
         var_names=None,
-        plot_quantiles=True,
-        plot_fourier=True,
+        plot_quantiles=False,
+        plot_fourier=False,
         plot_monthly=False,
         plot_seasonality=False,
         hourly=False,
@@ -1396,9 +1396,7 @@ class Plotting(base.Base):
                 figs[-1].name = "corr_sim_daily_trans"
 
         if hourly:
-            met_array = base.met_as_array(
-                self.met, var_names=self.var_names
-            )
+            met_array = base.met_as_array(self.met, var_names=self.var_names)
             figs, axs = append_fa(
                 ts.corr_img(
                     met_array, 0, "Measured hourly", greek_short, *args, **kwds
@@ -1521,9 +1519,7 @@ class Plotting(base.Base):
         plt.suptitle(suptitle)
 
         if self.sim_sea_dis is not None:
-            met_array = base.met_as_array(
-                self.met, var_names=self.var_names
-            )
+            met_array = base.met_as_array(self.met, var_names=self.var_names)
             kwds["max_lags"] *= max(self.sum_interval)
             fig1, axs1 = ts.plot_cross_corr(met_array, figsize=figsize, **kwds)
             fig1, axs1 = ts.plot_cross_corr(

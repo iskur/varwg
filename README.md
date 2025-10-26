@@ -47,27 +47,28 @@ Building from source requires:
 After installation, you can use VARWG to generate synthetic weather data:
 
 ```python
-import varwg as vg
+import varwg
 
 # Configure VARWG with default settings
-vg.set_conf(vg.config_template)
+varwg.set_conf(varwg.config_template)
 
 # Define meteorological variables to simulate
 var_names = ("theta", "Qsw", "rh")  # Temperature, solar radiation, humidity
 
 # Initialize the weather generator with sample data
-met_vg = vg.VG(var_names, met_file=vg.sample_met, refit=True, verbose=True)
+met_varwg = varwg.VarWG(var_names, met_file=varwg.sample_met, refit=True, verbose=True)
 
 # Fit the seasonal VAR model
-met_vg.fit(p=3, seasonal=True)
+met_varwg.fit(p=3, seasonal=True)
 
 # Simulate 10 years of daily weather data
-sim_times, sim_data = met_vg.simulate(T=10*365)
+sim_times, sim_data = met_varwg.simulate(T=10*365)
 
 # Visualize results
-met_vg.plot_meteogram_daily()
-met_vg.plot_autocorr()
+met_varwg.plot_meteogram_daily()
 ```
+
+![Daily Meteogram](docs/plots/meteogram_sim_daily.png)
 
 See the `scripts/` directory for more advanced examples.
 

@@ -1589,7 +1589,6 @@ class SlidingDistHourly(SlidingDist, seasonal.Torus):
 
 
 if __name__ == "__main__":
-    import os
     import varwg
 
     met_vg = varwg.VG(
@@ -1611,39 +1610,3 @@ if __name__ == "__main__":
     )
     prim_i = met_vg.primary_var_ii[0]
     data_mean = np.mean(met_vg.data_raw[prim_i]) / 24
-
-    #     # conf = varwg.config_konstanz_disag
-#     import config_konstanz_disag as conf
-#     from varwg.core import vg_plotting
-
-#     varwg.set_conf(conf)
-#     # from scipy.stats import distributions as sp_dists
-#     dt_hourly, met = varwg.read_met(os.path.join(varwg.conf.data_dir, varwg.conf.met_file))
-#     rh = met["rh"]
-#     finite_mask = np.isfinite(rh)
-#     rh = rh[finite_mask]
-#     dt_hourly = dt_hourly[finite_mask]
-#     dist = vg.distributions.Censored(vg.distributions.norm)
-#     rh_dist = SlidingDistHourly(
-#         dist, rh, dt_hourly, fixed_pars=varwg.conf.par_known_hourly["rh"], verbose=True
-#     )
-#     solution = rh_dist.fit()
-#     # rh_dist.plot_monthly_fit(solution)
-#     # rh_dist.plot_monthly_params()
-#     rh_dist.plot_fourier_fit()
-#     rh_dist.scatter_pdf()
-#     #    for order in range(5):
-#     #        theta_dist.plot_fourier_fit(order)
-#     #    print theta_dist.chi2_test()
-#     plt.show()
-# #    rh, dtimes = vg.my.sumup(met["Qsw"], 24, dtimes_)
-# #    rh_dist = SlidingDist(vg.distributions.beta, rh, dtimes, 15, 10,
-# #                          fixed_pars=varwg.conf.par_known["Qsw"])
-# #    rh_dist.fit()
-# # rh_dist.plot_fourier_fit(order=10)
-# # rh_dist.scatter_pdf()
-
-
-# #    vg.plt.plot(qsw_dist.sliding_pars)
-# #    qsw_dist.plot_seasonality_fit()
-# #    vg.plt.show()
