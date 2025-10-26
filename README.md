@@ -66,12 +66,9 @@ sim_times, sim_data = met_varwg.simulate(T=10*365)
 
 # Visualize results
 met_varwg.plot_meteogram_daily()
-met_varwg.plot_daily_fit("theta")
 ```
 
 ![Daily Meteogram](docs/plots/meteogram_sim_daily.png)
-
-![Scatter pdf](docs/plots/scatter_pdf_theta_daily.png)
 
 See the `scripts/` directory for more advanced examples.
 
