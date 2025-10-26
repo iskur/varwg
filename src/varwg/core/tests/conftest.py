@@ -1,4 +1,4 @@
-"""Pytest fixtures for VG tests."""
+"""Pytest fixtures for VarWG tests."""
 
 from pathlib import Path
 import tempfile
@@ -6,7 +6,7 @@ import tempfile
 import numpy as np
 import pytest
 
-import vg
+import varwg
 
 # Test configuration
 seed = 0
@@ -23,9 +23,9 @@ var_names = (
 )
 
 # File paths
-script_home = Path(vg.__file__).parent
+script_home = Path(varwg.__file__).parent
 met_file = script_home / "sample.met"
-data_dir = Path(vg.core.__file__).parent / "tests" / "data"
+data_dir = Path(varwg.core.__file__).parent / "tests" / "data"
 sim_file = data_dir / "test_out_sample.met"
 
 
@@ -42,13 +42,13 @@ def test_data_dir():
 @pytest.fixture(scope="session")
 def sample_sim():
     """Load sample simulation data once per session."""
-    met = vg.read_met(sim_file, verbose=False, with_conversions=True)[1]
+    met = varwg.read_met(sim_file, verbose=False, with_conversions=True)[1]
     return np.array([met[var_name] for var_name in var_names])
 
 
 @pytest.fixture(scope="session")
-def vg_kwds(test_data_dir):
-    """Common VG initialization keywords."""
+def varwg_kwds(test_data_dir):
+    """Common VarWG initialization keywords."""
     return dict(
         refit=True,
         data_dir=test_data_dir,
@@ -61,34 +61,34 @@ def vg_kwds(test_data_dir):
 
 
 @pytest.fixture(scope="session")
-def vg_regr(vg_kwds):
-    """Session-scoped VG instance with regression rain method."""
-    vg.reseed(seed)
-    met_vg = vg.VG(var_names, rain_method="regression", **vg_kwds)
-    met_vg.fit(**fit_kwds)
-    return met_vg
+def varwg_regr(varwg_kwds):
+    """Session-scoped VarWG instance with regression rain method."""
+    varwg.reseed(seed)
+    met_varwg = varwg.VarWG(var_names, rain_method="regression", **varwg_kwds)
+    met_varwg.fit(**fit_kwds)
+    return met_varwg
 
 
 @pytest.fixture(scope="session")
-def vg_dist(vg_kwds):
-    """Session-scoped VG instance with distance rain method."""
-    met_vg = vg.VG(var_names, rain_method="distance", **vg_kwds)
-    met_vg.fit(**fit_kwds)
-    return met_vg
+def varwg_dist(varwg_kwds):
+    """Session-scoped VarWG instance with distance rain method."""
+    met_varwg = varwg.VarWG(var_names, rain_method="distance", **varwg_kwds)
+    met_varwg.fit(**fit_kwds)
+    return met_varwg
 
 
 @pytest.fixture(scope="session")
-def vg_sim(vg_kwds):
-    """Session-scoped VG instance with simulation rain method."""
-    met_vg = vg.VG(var_names, rain_method="simulation", **vg_kwds)
-    met_vg.fit(**fit_kwds)
-    return met_vg
+def varwg_sim(varwg_kwds):
+    """Session-scoped VarWG instance with simulation rain method."""
+    met_varwg = varwg.VarWG(var_names, rain_method="simulation", **varwg_kwds)
+    met_varwg.fit(**fit_kwds)
+    return met_varwg
 
 
 @pytest.fixture
-def vg_regr_fresh(vg_kwds):
-    """Function-scoped VG instance for tests that need to call fit() with different params."""
-    vg.reseed(seed)
-    met_vg = vg.VG(var_names, rain_method="regression", **vg_kwds)
-    met_vg.fit(**fit_kwds)
-    return met_vg
+def varwg_regr_fresh(varwg_kwds):
+    """Function-scoped VarWG instance for tests that need to call fit() with different params."""
+    varwg.reseed(seed)
+    met_varwg = varwg.VarWG(var_names, rain_method="regression", **varwg_kwds)
+    met_varwg.fit(**fit_kwds)
+    return met_varwg
