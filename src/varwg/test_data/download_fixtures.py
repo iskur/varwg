@@ -1,17 +1,17 @@
 """Download DWD test fixtures for offline testing."""
+
 from pathlib import Path
 import xarray as xr
-from varwg.meteo import dwd_opendata
+import dwd_opendata
 
 FIXTURE_DIR = Path(__file__).parent
 FIXTURE_DIR.mkdir(exist_ok=True)
 
+
 def download_stoetten_precipitation():
     """Download Stötten precipitation data for test_brunner and test_meteox2y."""
     print("Downloading Stötten precipitation...")
-    prec = dwd_opendata.load_station(
-        "Stötten", "precipitation", time="hourly"
-    )
+    prec = dwd_opendata.load_station("Stötten", "precipitation", time="hourly")
     prec = (
         prec.interpolate_na("time")
         .squeeze()
@@ -21,7 +21,10 @@ def download_stoetten_precipitation():
         .dropna("time")
     )
     prec.to_netcdf(FIXTURE_DIR / "stoetten_precipitation_daily_1990_2020.nc")
-    print(f"Saved to {FIXTURE_DIR / 'stoetten_precipitation_daily_1990_2020.nc'}")
+    print(
+        f"Saved to {FIXTURE_DIR / 'stoetten_precipitation_daily_1990_2020.nc'}"
+    )
+
 
 def download_konstanz_temperature():
     """Download Konstanz air temperature for test_seasonal_distributions."""
@@ -36,7 +39,10 @@ def download_konstanz_temperature():
         .interpolate_na("time")
     )
     theta_xr.to_netcdf(FIXTURE_DIR / "konstanz_temperature_daily_2000_2016.nc")
-    print(f"Saved to {FIXTURE_DIR / 'konstanz_temperature_daily_2000_2016.nc'}")
+    print(
+        f"Saved to {FIXTURE_DIR / 'konstanz_temperature_daily_2000_2016.nc'}"
+    )
+
 
 def download_konstanz_sun():
     """Download Konstanz sun data for test_seasonal_distributions."""
@@ -51,6 +57,7 @@ def download_konstanz_sun():
     sun_xr.to_netcdf(FIXTURE_DIR / "konstanz_sun_daily_2000_2016.nc")
     print(f"Saved to {FIXTURE_DIR / 'konstanz_sun_daily_2000_2016.nc'}")
 
+
 def download_freiburg_precipitation():
     """Download Freiburg precipitation for test_seasonal_distributions."""
     print("Downloading Freiburg precipitation...")
@@ -61,8 +68,13 @@ def download_freiburg_precipitation():
         .sum()
         .interpolate_na("time")
     )
-    prec_xr.to_netcdf(FIXTURE_DIR / "freiburg_precipitation_daily_2000_2016.nc")
-    print(f"Saved to {FIXTURE_DIR / 'freiburg_precipitation_daily_2000_2016.nc'}")
+    prec_xr.to_netcdf(
+        FIXTURE_DIR / "freiburg_precipitation_daily_2000_2016.nc"
+    )
+    print(
+        f"Saved to {FIXTURE_DIR / 'freiburg_precipitation_daily_2000_2016.nc'}"
+    )
+
 
 if __name__ == "__main__":
     download_stoetten_precipitation()
