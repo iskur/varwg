@@ -31,6 +31,64 @@ jobs:
         # Fallback if quay.io is down
         # CIBW_MANYLINUX_X86_64_IMAGE: docker.io/pypa/manylinux2014_x86_64
 
+    - name: Rebuild RECORD files in macOS wheels (fix delocate-wheel CRC issue)
+      shell: bash
+      run: |
+        python3 << 'EOF'
+        import hashlib
+        import zipfile
+        import io
+        from pathlib import Path
+
+        def rebuild_wheel_record(wheel_path):
+            """Rebuild RECORD file in wheel to fix CRC mismatches from delocate-wheel."""
+            print(f"Processing {wheel_path.name}...")
+
+            # Read all files from the wheel
+            files_data = {}
+            record_path = None
+            with zipfile.ZipFile(wheel_path, 'r') as zf:
+                for info in zf.infolist():
+                    if info.filename.endswith('.dist-info/RECORD'):
+                        record_path = info.filename
+                    if not info.is_dir() and not info.filename.endswith('.dist-info/RECORD'):
+                        files_data[info.filename] = zf.read(info.filename)
+
+            if not record_path:
+                print(f"  No RECORD file found, skipping")
+                return
+
+            # Build new RECORD content
+            record_lines = []
+            for filepath in sorted(files_data.keys()):
+                data = files_data[filepath]
+                hash_digest = hashlib.sha256(data).digest()
+                hash_b64 = __import__('base64').urlsafe_b64encode(hash_digest).decode('ascii').rstrip('=')
+                record_lines.append(f"{filepath},sha256={hash_b64},{len(data)}")
+
+            # RECORD itself has no hash
+            record_lines.append(f"{record_path},,")
+            record_content = '\n'.join(record_lines) + '\n'
+
+            # Recreate wheel with new RECORD
+            with zipfile.ZipFile(wheel_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                for filepath, data in sorted(files_data.items()):
+                    zf.writestr(filepath, data)
+                zf.writestr(record_path, record_content)
+
+            print(f"  Fixed RECORD file ({len(record_lines)} entries)")
+
+        # Process macOS wheels
+        wheelhouse = Path('wheelhouse')
+        processed = 0
+        for wheel in sorted(wheelhouse.glob('*macosx*.whl')):
+            rebuild_wheel_record(wheel)
+            processed += 1
+
+        if processed == 0:
+            print("No macOS wheels found to process")
+        EOF
+
     - name: Set up Python for verification
       uses: actions/setup-python@v5
       with:
