@@ -186,9 +186,9 @@ par_known.update(
             # the .725 is unfortunately a complicated
             # subject it seems as it should also be a
             # function of t
-            "u": np.vectorize(
-                lambda x: 0.725 * max_qsw(x + 1 if x < 366 else 1)
-            ),
+            "u": lambda doys: 0.725 * np.array([
+                max_qsw(int(d + 1 if d < 366 else 1))[0] for d in np.atleast_1d(doys)
+            ]),
         },
         "rh": {
             "lc": array_gen(-0.001),
