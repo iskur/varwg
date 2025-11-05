@@ -91,16 +91,16 @@ from varwg.time_series_analysis import _kde as kde
 #     owens_t = np.vectorize(lambda h, a: owens.t(h, a))
 
 # some special functions vectorized to be able to handle arrays as input
-gamma_func = np.vectorize(lambda x: special.gamma(x))
-gammaln = np.vectorize(lambda x: special.gammaln(x))
-gammainc = np.vectorize(lambda a, x: special.gammainc(a, x))
-gammaincinv = np.vectorize(lambda a, qq: special.gammaincinv(a, qq))
-digamma = np.vectorize(lambda a: special.digamma(a))
-hyp1f1 = np.vectorize(lambda a, b, x: special.hyp1f1(a, b, x))
-nctdtr = np.vectorize(lambda x1, x2, x3: special.nctdtr(x1, x2, x3))
-nctdtrit = np.vectorize(lambda x1, x2, x3: special.nctdtrit(x1, x2, x3))
-stdtr = np.vectorize(lambda df, x: special.stdtr(df, x))
-stdtrit = np.vectorize(lambda df, qq: special.stdtrit(df, qq))
+gamma_func = np.vectorize(lambda x: special.gamma(x), otypes=[float])
+gammaln = np.vectorize(lambda x: special.gammaln(x), otypes=[float])
+gammainc = np.vectorize(lambda a, x: special.gammainc(a, x), otypes=[float])
+gammaincinv = np.vectorize(lambda a, qq: special.gammaincinv(a, qq), otypes=[float])
+digamma = np.vectorize(lambda a: special.digamma(a), otypes=[float])
+hyp1f1 = np.vectorize(lambda a, b, x: special.hyp1f1(a, b, x), otypes=[float])
+nctdtr = np.vectorize(lambda x1, x2, x3: special.nctdtr(x1, x2, x3), otypes=[float])
+nctdtrit = np.vectorize(lambda x1, x2, x3: special.nctdtrit(x1, x2, x3), otypes=[float])
+stdtr = np.vectorize(lambda df, x: special.stdtr(df, x), otypes=[float])
+stdtrit = np.vectorize(lambda df, qq: special.stdtrit(df, qq), otypes=[float])
 
 sqrt2 = np.sqrt(2)
 
