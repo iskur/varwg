@@ -144,3 +144,6 @@ venv.bak/
 profile.json
 uv.lock
 .aider*
+
+# git worktrees
+.worktrees/
