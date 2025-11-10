@@ -15,7 +15,7 @@ def _random_phases(
         # phase randomization with same random phases in all
         # variables and stations
         phases_len = T_data // 2 - 1 + T_data % 2
-        phases_pos = varwg.rng.uniform(0, 2 * np.pi, phases_len)
+        phases_pos = varwg.get_rng().uniform(0, 2 * np.pi, phases_len)
 
         if mask_fun is not None:
             # e.g.: do not touch phases that are close to the annual
@@ -174,7 +174,7 @@ def randomize2d_old(
     randomized = []
     zero_phases = np.zeros(K)[:, None]
     while T_total < T:
-        phases_lh = varwg.rng.uniform(
+        phases_lh = varwg.get_rng().uniform(
             0, 2 * np.pi, T_data // 2 if T_data % 2 == 1 else T_data // 2 - 1
         )
         phases_lh = np.array(K * [phases_lh])
