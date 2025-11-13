@@ -654,11 +654,11 @@ class Base(object):
                         <= doy_tolerance
                     )[0]
                     pool = list(set(pool) & finite_ii)
-                    src_point = pool[varwg.rng.integers(len(pool))]
+                    src_point = pool[varwg.get_rng().integers(len(pool))]
                     while src_point >= (nn - autocorr_len):
-                        src_point = pool[varwg.rng.integers(len(pool))]
+                        src_point = pool[varwg.get_rng().integers(len(pool))]
                 else:
-                    src_point = varwg.rng.choice(finite_ii[:-autocorr_len])
+                    src_point = varwg.get_rng().choice(finite_ii[:-autocorr_len])
                 # src_point -= self.start_hour_of_src
                 # hour of day from 0 to 23 in destination
                 hour_of_dst = mod0(dst_point, tpd)
@@ -1542,7 +1542,7 @@ class Base(object):
                 A = np.linalg.cholesky(sigma_u)
             except np.linalg.LinAlgError:
                 sigma_u.ravel()[:: self.K + 1] += (
-                    varwg.rng.normal(self.K) * 1e-6
+                    varwg.get_rng().normal(self.K) * 1e-6
                 )
                 A = np.linalg.cholesky(sigma_u)
             varwg.reseed(0)
