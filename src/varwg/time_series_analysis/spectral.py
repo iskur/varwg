@@ -131,8 +131,8 @@ class Spectral(object):
 
     @property
     def sim(self):
-        real = varwg.rng.normal(size=np.ravel(self.size))
-        imag = varwg.rng.normal(size=np.ravel(self.size))
+        real = varwg.get_rng().normal(size=np.ravel(self.size))
+        imag = varwg.get_rng().normal(size=np.ravel(self.size))
         epsilon = real + 1j * imag
         rand = epsilon * self.sqrt_fft_covs
         return (np.real(self.ifft_func(rand)) * self.npoints)[
@@ -173,7 +173,7 @@ class Spectral(object):
                     (self.pool, gen_n(n - self.pool_size))
                 )
                 self.pool_size = n
-            return self.pool[varwg.rng.integers(self.pool_size, size=n)]
+            return self.pool[varwg.get_rng().integers(self.pool_size, size=n)]
 
 
 class SpectralND(Spectral):

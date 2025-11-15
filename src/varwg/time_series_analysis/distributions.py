@@ -320,7 +320,7 @@ class Dist(metaclass=DistMeta):
 
     def sample(self, *args, **kwds):
         size = np.atleast_1d(args[0])
-        qq = varwg.rng.random(size)
+        qq = varwg.get_rng().random(size)
         return self.ppf(qq, *args[1:], **self._clean_kwds(kwds))
 
     @my.asscalar
@@ -2067,7 +2067,7 @@ class _KDE(object):
             kernel_width = kde.silvermans_rule(kernel_data)
         if np.isnan(kernel_width):
             kernel_data += (
-                upper_eval * 1e-6 * varwg.rng.normal(size=len(kernel_data))
+                upper_eval * 1e-6 * varwg.get_rng().normal(size=len(kernel_data))
             )
             kernel_width = kde.silvermans_rule(kernel_data)
         dens_kde_eval = kde.kernel_density(
@@ -2362,7 +2362,7 @@ class RainMix(_KDE, _Rain):
         qq = np.zeros_like(x, dtype=float)
         n_non_rain = (~rain_mask).sum()
         if n_non_rain > 0:
-            qq[~rain_mask] = (1 - rain_prob[~rain_mask]) * varwg.rng.random(
+            qq[~rain_mask] = (1 - rain_prob[~rain_mask]) * varwg.get_rng().random(
                 n_non_rain
             )
 
@@ -2716,7 +2716,7 @@ class Rain(_Rain):
         qq[rain_mask] = p0 + rain_prob[rain_mask] * self.dist.cdf(
             x[rain_mask] - self.thresh, *args, **kwds_rain
         )
-        qq[non_rain_mask] = varwg.rng.uniform(size=non_rain_mask.sum()) * (
+        qq[non_rain_mask] = varwg.get_rng().uniform(size=non_rain_mask.sum()) * (
             1 - rain_prob[non_rain_mask]
         )
         qq[~finite_mask] = np.nan
