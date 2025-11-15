@@ -39,5 +39,26 @@ def reseed(seed):
 
 
 def set_conf(conf_obj):
+    """Set the global configuration object for all VarWG modules.
+
+    Parameters
+    ----------
+    conf_obj : module
+        A configuration module with attributes like 'dists', 'latitude', etc.
+
+    Raises
+    ------
+    ValueError
+        If conf_obj is missing critical attributes required by VarWG.
+    """
+    # Validate that conf_obj has required attributes
+    required_attrs = ['dists', 'dists_kwds', 'latitude', 'longitude']
+    missing = [attr for attr in required_attrs if not hasattr(conf_obj, attr)]
+    if missing:
+        raise ValueError(
+            f"Configuration object missing required attributes: {missing}. "
+            f"Provided: {type(conf_obj).__name__} from {getattr(conf_obj, '__file__', 'unknown')}"
+        )
+
     global conf
     conf = core.conf = base.conf = plotting.conf = conf_obj
