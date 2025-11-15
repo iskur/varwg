@@ -15,6 +15,7 @@ import varwg.time_series_analysis.seasonal_distributions as sd
 import varwg.time_series_analysis.time_series as ts
 from varwg import helpers as my
 from varwg.core import base
+from varwg import times
 from varwg.meteo import avrwind, meteox2y
 from varwg.meteo.windrose import seasonal_windroses, windrose
 from varwg.time_series_analysis import rain_stats
@@ -351,7 +352,7 @@ class Plotting(base.Base):
             var_ii = self.var_names.index(var_name)
             if hourly:
                 ax.scatter(
-                    varwg.times.datetime2doy(self.times_orig),
+                    times.datetime2doy(self.times_orig),
                     self.met[var_name],
                     marker="o",
                     edgecolors=(0, 0, 1, opacity),
@@ -1584,12 +1585,12 @@ class Plotting(base.Base):
             reuse_figs = True
         data = self.data_raw / self.sum_interval
         month_ii = [
-            varwg.times.time_part(self.times, "%m") == month
+            times.time_part(self.times, "%m") == month
             for month in range(1, 13)
         ]
         if self.sim_sea is not None:
             sim_month_ii = [
-                varwg.times.time_part(self.sim_times, "%m") == month
+                times.time_part(self.sim_times, "%m") == month
                 for month in range(1, 13)
             ]
         for var_name in var_names:
@@ -1643,12 +1644,12 @@ class Plotting(base.Base):
         figs = []
         data = base.met_as_array(self.met, var_names=var_names)
         month_ii = [
-            varwg.times.time_part(self.times_orig, "%m") == month
+            times.time_part(self.times_orig, "%m") == month
             for month in range(1, 13)
         ]
         if self.sim_sea_dis is not None:
             sim_month_ii = [
-                varwg.times.time_part(self.dis_times, "%m") == month
+                times.time_part(self.dis_times, "%m") == month
                 for month in range(1, 13)
             ]
         for var_name in var_names:
@@ -1809,20 +1810,19 @@ class Plotting(base.Base):
 
         figs, axes = [], []
         month_iis = [
-            varwg.times.time_part(self.times_orig, "%m") == month
+            times.time_part(self.times_orig, "%m") == month
             for month in range(1, 13)
         ]
         hour_iis = [
-            varwg.times.time_part(self.times_orig, "%H") == hour
+            times.time_part(self.times_orig, "%H") == hour
             for hour in range(24)
         ]
         month_sim_iis = [
-            varwg.times.time_part(self.dis_times, "%m") == month
+            times.time_part(self.dis_times, "%m") == month
             for month in range(1, 13)
         ]
         hour_sim_iis = [
-            varwg.times.time_part(self.dis_times, "%H") == hour
-            for hour in range(24)
+            times.time_part(self.dis_times, "%H") == hour for hour in range(24)
         ]
 
         fig_kw.update(dict(sharex=True, sharey=True))

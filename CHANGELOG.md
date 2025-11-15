@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2025-11-07
+
+### Added
+- Config validation in `set_conf()`
+
+### Changed
+- Output type specifications in `np.vectorize` calls
+- Renamed VG to VarWG in test fixtures
+- Removed `src/vg/test_data` directory
+
+### Fixed
+- RECORD file corruption in macOS wheels
+
+### Infrastructure
+- Updated macOS versions in CI workflow
+
 ## [1.4.0] - 2025-10-17
 
 ### Added
