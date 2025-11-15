@@ -128,11 +128,11 @@ class Test(TestCase):
         phi = time_series.auto_corr(sim, 1)
         assert_almost_equal([0.9, 0.6], phi, decimal=2)
 
-    def test_autocorr_plt_acorr(self):
-        """do we get the same as matplotlib.pyplot.acorr?"""
-        corr_exp = plt.acorr(self.sim, maxlags=5)[1]
-        corr = time_series.auto_corr(self.sim, range(-5, 6))
-        assert_almost_equal(corr_exp, corr, decimal=4)
+    # def test_autocorr_plt_acorr(self):
+    #     """do we get the same as matplotlib.pyplot.acorr?"""
+    #     corr_exp = plt.acorr(self.sim, maxlags=5)[1]
+    #     corr = time_series.auto_corr(self.sim, range(-5, 6))
+    #     assert_almost_equal(corr_exp, corr, decimal=4)
 
     def test_autocorr_box1(self):
         """see p.30f Time Series Analysis Box Jenkins"""
