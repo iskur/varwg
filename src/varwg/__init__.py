@@ -38,6 +38,8 @@ shelve.Unpickler = Unpickler
 _thread_rng = threading.local()
 
 # Keep old rng for backwards compatibility (deprecated)
+# WARNING: Direct use of varwg.rng is deprecated and not thread-safe.
+# Use varwg.get_rng() instead for thread-safe random number generation.
 rng = default_rng()
 
 

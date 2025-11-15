@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Thread-local random number generator via `varwg.get_rng()` for thread-safe concurrent simulations
+- Thread-safe file locking for shelve cache operations
+- Comprehensive thread-safety tests in `test_thread_local_rng.py`
+
+### Changed
+- All internal RNG usage migrated to thread-local `get_rng()` function
+- `varwg.reseed()` now operates on thread-local RNG (only affects current thread)
+- Updated Cython code in `cresample.pyx` to use thread-local RNG
+
+### Deprecated
+- Direct use of `varwg.rng` is deprecated and not thread-safe; use `varwg.get_rng()` instead
+
+### Fixed
+- Thread-safety issues in concurrent simulation scenarios
+- Shelve cache race conditions with file-level locking
+
 ## [1.4.1] - 2025-11-07
 
 ### Added

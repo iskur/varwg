@@ -4,6 +4,7 @@ import os
 import re
 import shlex
 import sys
+import threading
 import warnings
 from pickle import UnpicklingError
 
@@ -43,6 +44,9 @@ PY2 = sys.version_info.major == 2
 cache_filename = "seasonal_solutions_{version}.sh".format(
     version="py2" if PY2 else "py3"
 )
+
+# Thread-safe cache file access lock
+_cache_lock = threading.Lock()
 
 
 def detrend(values):
@@ -992,31 +996,32 @@ class Base(object):
     def _prepare_fixed_data(self):
         """Convert the data to standard-normal an put it into (K,T)-array form."""
         if self.fixed_variables:
-            sh = shelve.open(self.seasonal_cache_file, "c")
-            fixed_data = np.nan * np.empty((self.K, self.T_sim))
-            for var_name, values in list(self.fixed_variables.items()):
-                var_ii = self.var_names.index(var_name)
-                if values is None:
-                    # fix the input data the model was fitted on
-                    values = self.data_raw[var_ii]
-                solution_key = var_name
+            with _cache_lock:
+                sh = shelve.open(self.seasonal_cache_file, "c")
+                fixed_data = np.nan * np.empty((self.K, self.T_sim))
+                for var_name, values in list(self.fixed_variables.items()):
+                    var_ii = self.var_names.index(var_name)
+                    if values is None:
+                        # fix the input data the model was fitted on
+                        values = self.data_raw[var_ii]
+                    solution_key = var_name
 
-                # the fitting was originially done for daily sums of hourly
-                # values, but we can have different aggregation lengths
-                sum_interval = self.sum_interval_dict[var_name]
-                if sum_interval != 24:
-                    solution_key += "_%d" % sum_interval
-                seas_class, dist_class, solution = sh[solution_key]
-                dist = seas_class(
-                    dist_class,
-                    values,
-                    self.times,
-                    fixed_pars=conf.par_known[var_name],
-                )
-                quantiles = np.squeeze(dist.cdf(solution))
-                transformed = distributions.norm.ppf(quantiles)
-                fixed_data[var_ii] = transformed
-            sh.close()
+                    # the fitting was originially done for daily sums of hourly
+                    # values, but we can have different aggregation lengths
+                    sum_interval = self.sum_interval_dict[var_name]
+                    if sum_interval != 24:
+                        solution_key += "_%d" % sum_interval
+                    seas_class, dist_class, solution = sh[solution_key]
+                    dist = seas_class(
+                        dist_class,
+                        values,
+                        self.times,
+                        fixed_pars=conf.par_known[var_name],
+                    )
+                    quantiles = np.squeeze(dist.cdf(solution))
+                    transformed = distributions.norm.ppf(quantiles)
+                    fixed_data[var_ii] = transformed
+                sh.close()
             return fixed_data
         else:
             return None
@@ -1146,119 +1151,120 @@ class Base(object):
             refit = tuple()
         elif refit == "all" or refit is True:
             refit = self.var_names
-        sh = shelve.open(str(self.seasonal_cache_file), "c")
-        try:
-            keys = list(sh.keys())
-        except Exception:
-            print("Cache file corrupted, refitting...")
-            os.remove(self.seasonal_cache_file)
+        with _cache_lock:
             sh = shelve.open(str(self.seasonal_cache_file), "c")
-            keys = []
-        if values is None:
-            values = self.data_raw
-        if doys is None:
-            doys = self.data_doys
-        data_trans = np.empty_like(values)
-        dist_sol = {}
-        for var_ii, var in enumerate(values):
-            var_name = self.var_names[var_ii]
+            try:
+                keys = list(sh.keys())
+            except Exception:
+                print("Cache file corrupted, refitting...")
+                os.remove(self.seasonal_cache_file)
+                sh = shelve.open(str(self.seasonal_cache_file), "c")
+                keys = []
+            if values is None:
+                values = self.data_raw
+            if doys is None:
+                doys = self.data_doys
+            data_trans = np.empty_like(values)
+            dist_sol = {}
+            for var_ii, var in enumerate(values):
+                var_name = self.var_names[var_ii]
 
-            # py2/3 incompatibilities...
-            solution_key = str(var_name)
+                # py2/3 incompatibilities...
+                solution_key = str(var_name)
 
-            # the fitting was originially done for daily sums of
-            # hourly values we can have different aggregation lengths
-            # so we trigger a fitting if we come across one of these
-            sum_interval = self.sum_interval_dict[var_name]
-            plain_solution_key = solution_key
-            if sum_interval != 24:
-                solution_key += "_%d" % sum_interval
+                # the fitting was originially done for daily sums of
+                # hourly values we can have different aggregation lengths
+                # so we trigger a fitting if we come across one of these
+                sum_interval = self.sum_interval_dict[var_name]
+                plain_solution_key = solution_key
+                if sum_interval != 24:
+                    solution_key += "_%d" % sum_interval
 
-            kwds = (
-                conf.dists_kwds[var_name]
-                if var_name in conf.dists_kwds
-                else {}
-            )
-
-            if solution_key not in keys or plain_solution_key in refit:
-                # if self.verbose:
-                #     print("\tFitting a distribution to ", var_name)
-                dist, solution = self._fit_distribution(
-                    sh, var, var_name, solution_key, **kwds
+                kwds = (
+                    conf.dists_kwds[var_name]
+                    if var_name in conf.dists_kwds
+                    else {}
                 )
-            else:
-                try:
-                    dist, dist_class, solution = sh[solution_key]
-                    if self.verbose:
-                        print(
-                            f"\tRecovered previous fit ({dist}) "
-                            f"from shelve for: {var_name}"
-                        )
-                except (UnpicklingError, EOFError) as exc:
-                    if self.verbose:
-                        print(exc)
-                    self._fit_distribution(
+
+                if solution_key not in keys or plain_solution_key in refit:
+                    # if self.verbose:
+                    #     print("\tFitting a distribution to ", var_name)
+                    dist, solution = self._fit_distribution(
                         sh, var, var_name, solution_key, **kwds
                     )
-                    dist, dist_class, solution = sh[solution_key]
-                try:
-                    supplements = sh[solution_key + "suppl"]
-                except KeyError:
-                    supplements = None
-                    sh[solution_key + "suppl"] = None
-                if kwds.get("tabulate_cdf", False):
-                    if isinstance(dist_class, tuple):
-                        dist_class = dist_class[1]
-                    cdf_table_key = (
-                        solution_key + f"cdf_table_{dist_class.name}"
-                    )
-                    try:
-                        cdf_table = sh[cdf_table_key]
-                    except KeyError:
-                        cdf_table = None
                 else:
-                    cdf_table = None
+                    try:
+                        dist, dist_class, solution = sh[solution_key]
+                        if self.verbose:
+                            print(
+                                f"\tRecovered previous fit ({dist}) "
+                                f"from shelve for: {var_name}"
+                            )
+                    except (UnpicklingError, EOFError) as exc:
+                        if self.verbose:
+                            print(exc)
+                        self._fit_distribution(
+                            sh, var, var_name, solution_key, **kwds
+                        )
+                        dist, dist_class, solution = sh[solution_key]
+                    try:
+                        supplements = sh[solution_key + "suppl"]
+                    except KeyError:
+                        supplements = None
+                        sh[solution_key + "suppl"] = None
+                    if kwds.get("tabulate_cdf", False):
+                        if isinstance(dist_class, tuple):
+                            dist_class = dist_class[1]
+                        cdf_table_key = (
+                            solution_key + f"cdf_table_{dist_class.name}"
+                        )
+                        try:
+                            cdf_table = sh[cdf_table_key]
+                        except KeyError:
+                            cdf_table = None
+                    else:
+                        cdf_table = None
 
-                # var_ = var
-                # if (
-                #     issubclass(seas_class, skde.SeasonalKDE)
-                #     or seas_class == "empirical"
-                # ):
-                #     dist = seas_class(
-                #         var_,
-                #         self.times,
-                #         solution,
-                #         fixed_pars=conf.par_known[var_name],
-                #         **kwds,
-                #     )
-                # else:
-                #     if dist_class is None:
-                #         dist_class = conf.dists[var_name]
-                #     dist = seas_class(
-                #         dist_class,
-                #         var_,
-                #         self.times,
-                #         solution=solution,
-                #         fixed_pars=conf.par_known[var_name],
-                #         supplements=supplements,
-                #         cdf_table=cdf_table,
-                #         **kwds,
-                #     )
+                    # var_ = var
+                    # if (
+                    #     issubclass(seas_class, skde.SeasonalKDE)
+                    #     or seas_class == "empirical"
+                    # ):
+                    #     dist = seas_class(
+                    #         var_,
+                    #         self.times,
+                    #         solution,
+                    #         fixed_pars=conf.par_known[var_name],
+                    #         **kwds,
+                    #     )
+                    # else:
+                    #     if dist_class is None:
+                    #         dist_class = conf.dists[var_name]
+                    #     dist = seas_class(
+                    #         dist_class,
+                    #         var_,
+                    #         self.times,
+                    #         solution=solution,
+                    #         fixed_pars=conf.par_known[var_name],
+                    #         supplements=supplements,
+                    #         cdf_table=cdf_table,
+                    #         **kwds,
+                    #     )
 
-            # if self.verbose:
-            #     print(
-            #         "\tp-value of chi2 goodness-of-fit %.4f" % dist.chi2_test()
-            #     )
-            quantiles = dist.cdf(
-                solution,
-                x=var,
-                doys=doys,
-                # pdb=(pdb and (var_name != "R"))
-            )
-            assert len(quantiles) == len(var)
-            data_trans[var_ii] = distributions.norm.ppf(quantiles)
-            dist_sol[var_name] = dist, solution
-        sh.close()
+                # if self.verbose:
+                #     print(
+                #         "\tp-value of chi2 goodness-of-fit %.4f" % dist.chi2_test()
+                #     )
+                quantiles = dist.cdf(
+                    solution,
+                    x=var,
+                    doys=doys,
+                    # pdb=(pdb and (var_name != "R"))
+                )
+                assert len(quantiles) == len(var)
+                data_trans[var_ii] = distributions.norm.ppf(quantiles)
+                dist_sol[var_name] = dist, solution
+            sh.close()
 
         if filter_nans:
             # we have outrageous outliers from time to time
@@ -1280,75 +1286,76 @@ class Base(object):
         # Fit hourly distributions to the data, if necesarry, and
         # qq-transform it to standard-norm.
         data_hourly_trans = []
-        sh = shelve.open(str(self.seasonal_cache_file), "c")
-        # sh.keys() is very slow
-        fft_order = 20
-        for var_name in self.var_names:
-            # shelve has problems with unicode keys
-            solution_key = str("%s_hourly" % var_name)
-            values = self.met[var_name]
-            dtimes = self.times_orig
+        with _cache_lock:
+            sh = shelve.open(str(self.seasonal_cache_file), "c")
+            # sh.keys() is very slow
+            fft_order = 20
+            for var_name in self.var_names:
+                # shelve has problems with unicode keys
+                solution_key = str("%s_hourly" % var_name)
+                values = self.met[var_name]
+                dtimes = self.times_orig
 
-            fixed_pars = conf.par_known_hourly[var_name]
-            hour_neighbors = 12 if var_name == "R" else 4
-            seas_class = conf.seasonal_classes_hourly[var_name]
-            if solution_key not in sh or var_name in refit:
-                if self.verbose:
-                    print("\tFitting an hourly distribution to ", var_name)
-                if seas_class in (skde.SeasonalKDE, skde.SeasonalHourlyKDE):
-                    # fit hourly distributions
-                    hourly_dist = skde.SeasonalHourlyKDE(
-                        values,
-                        dtimes,
-                        fixed_pars=fixed_pars,
-                        hour_neighbors=hour_neighbors,
-                        verbose=self.verbose,
-                    )
-                    # for the time being, let's use scotts_rule of
-                    # thumb and not the full blown leave_one_out
-                    # maximum likelihood bandwidth estimation
-                    solution = hourly_dist.fit(thumb=True)
+                fixed_pars = conf.par_known_hourly[var_name]
+                hour_neighbors = 12 if var_name == "R" else 4
+                seas_class = conf.seasonal_classes_hourly[var_name]
+                if solution_key not in sh or var_name in refit:
+                    if self.verbose:
+                        print("\tFitting an hourly distribution to ", var_name)
+                    if seas_class in (skde.SeasonalKDE, skde.SeasonalHourlyKDE):
+                        # fit hourly distributions
+                        hourly_dist = skde.SeasonalHourlyKDE(
+                            values,
+                            dtimes,
+                            fixed_pars=fixed_pars,
+                            hour_neighbors=hour_neighbors,
+                            verbose=self.verbose,
+                        )
+                        # for the time being, let's use scotts_rule of
+                        # thumb and not the full blown leave_one_out
+                        # maximum likelihood bandwidth estimation
+                        solution = hourly_dist.fit(thumb=True)
+                    else:
+                        hourly_dist = sd.SlidingDistHourly(
+                            conf.dists_hourly[var_name],
+                            values,
+                            dtimes,
+                            fixed_pars=fixed_pars,
+                            verbose=self.verbose,
+                            fft_order=fft_order,
+                        )
+                        solution = hourly_dist.fit()
+                    sh[solution_key] = solution
+                    sh.sync()
                 else:
-                    hourly_dist = sd.SlidingDistHourly(
-                        conf.dists_hourly[var_name],
-                        values,
-                        dtimes,
-                        fixed_pars=fixed_pars,
-                        verbose=self.verbose,
-                        fft_order=fft_order,
-                    )
-                    solution = hourly_dist.fit()
-                sh[solution_key] = solution
-                sh.sync()
-            else:
-                if self.verbose:
-                    print(
-                        "\tRecover previous hourly fit from shelve for: "
-                        + var_name
-                    )
-                solution = sh[solution_key]
-                if seas_class in (skde.SeasonalKDE, skde.SeasonalHourlyKDE):
-                    hourly_dist = skde.SeasonalHourlyKDE(
-                        values,
-                        dtimes,
-                        solution=solution,
-                        fixed_pars=fixed_pars,
-                        hour_neighbors=hour_neighbors,
-                    )
-                else:
-                    hourly_dist = sd.SlidingDistHourly(
-                        conf.dists_hourly[var_name],
-                        values,
-                        dtimes,
-                        solution=solution,
-                        fixed_pars=fixed_pars,
-                        fft_order=fft_order,
-                    )
-            qq = hourly_dist.cdf(solution, values, self.data_doys_raw)
-            values_trans = distributions.norm.ppf(qq)
-            data_hourly_trans += [values_trans]
-            self.dist_sol[solution_key] = hourly_dist, solution
-        sh.close()
+                    if self.verbose:
+                        print(
+                            "\tRecover previous hourly fit from shelve for: "
+                            + var_name
+                        )
+                    solution = sh[solution_key]
+                    if seas_class in (skde.SeasonalKDE, skde.SeasonalHourlyKDE):
+                        hourly_dist = skde.SeasonalHourlyKDE(
+                            values,
+                            dtimes,
+                            solution=solution,
+                            fixed_pars=fixed_pars,
+                            hour_neighbors=hour_neighbors,
+                        )
+                    else:
+                        hourly_dist = sd.SlidingDistHourly(
+                            conf.dists_hourly[var_name],
+                            values,
+                            dtimes,
+                            solution=solution,
+                            fixed_pars=fixed_pars,
+                            fft_order=fft_order,
+                        )
+                qq = hourly_dist.cdf(solution, values, self.data_doys_raw)
+                values_trans = distributions.norm.ppf(qq)
+                data_hourly_trans += [values_trans]
+                self.dist_sol[solution_key] = hourly_dist, solution
+            sh.close()
         return data_hourly_trans
 
     def dist_sol_hourly(self, var_name):
