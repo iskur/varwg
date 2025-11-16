@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Thread-safety issues in concurrent simulation scenarios
 - Shelve cache race conditions with file-level locking
+- Import error in plotting module (fixed `varwg.times` references)
 
 ## [1.4.1] - 2025-11-07
 
