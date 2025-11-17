@@ -182,7 +182,7 @@ cdef inline double[::1] get_diffs(double[:, :, :] data_chunked,
     K = data_chunked.shape[0]
     p = data_chunked.shape[1]
     n_chunks = data_chunked.shape[2]
-    diffs = np.zeros(n_chunks, dtype=np.double)
+    diffs = np.zeros(n_chunks, dtype=np.float64)
     cdef double[::1] diffs_view = diffs
     for i in prange(K, nogil=True, schedule="guided"):
         for t in range(p):
@@ -204,7 +204,7 @@ cdef inline double[::1] get_diffs(double[:, :, :] data_chunked,
 #     K = data_chunked.shape[0]
 #     p = data_chunked.shape[1]
 #     n_chunks = data_chunked.shape[2]
-#     diffs = np.full(n_candidates, np.inf, dtype=np.double)
+#     diffs = np.full(n_candidates, np.inf, dtype=np.float64)
 #     cdef double[::1] diffs_view = diffs
 #     candidate_indices = np.arange(n_candidates)
 #     cdef long[::1] candidate_indices_view = candidate_indices

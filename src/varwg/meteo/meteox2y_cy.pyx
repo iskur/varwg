@@ -19,7 +19,7 @@ from varwg.ctimes import datetime2doy
 
 cimport numpy as np
 
-ctypedef np.double_t DTYPE_t
+ctypedef np.float64_t DTYPE_t
 
 tzf = TimezoneFinder()
 

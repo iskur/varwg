@@ -37,7 +37,7 @@ cpdef double[::1] datetime2doy(list dt):
 cpdef doy_distance(double doy0, double[::1] doys):
     cdef int t, T = len(doys)
     cdef double dist
-    dists = np.empty(T, dtype=np.double)
+    dists = np.empty(T, dtype=np.float64)
     cdef double[::1] dist_view = dists
     for t in prange(T, nogil=True, schedule="guided"):
         dist = (doy0 - doys[t]) % 365.
