@@ -324,7 +324,7 @@ def recursive_diff(
     if name is None:
         name = str(obj1)
     if ignore_types is None:
-        ignore_types = (scipy.interpolate.interpolate.interp1d, np.vectorize)
+        ignore_types = (scipy.interpolate.interp1d, np.vectorize)
     if diff is None:
         diff = {}
     r_kwds = dict(ignore_types=ignore_types, plot=plot, verbose=verbose)
