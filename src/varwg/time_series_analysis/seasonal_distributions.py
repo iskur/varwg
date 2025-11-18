@@ -523,7 +523,6 @@ class SeasonalDist(seasonal.Seasonal):
             )
         else:
             # normalize quantiles and shift the target distribution
-            # normalize quantiles
             stdn = distributions.norm.ppf(quantiles)
             bias = distributions.norm.ppf(self.cdf(trig_pars).mean())
             with warnings.catch_warnings():
