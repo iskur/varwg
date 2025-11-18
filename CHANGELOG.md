@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.2] - 2025-11-18
+
 ### Added
 - Thread-local random number generator via `varwg.get_rng()` for thread-safe concurrent simulations
 - Thread-safe file locking for shelve cache operations
@@ -24,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Thread-safety issues in concurrent simulation scenarios
 - Shelve cache race conditions with file-level locking
 - Import error in plotting module (fixed `varwg.times` references)
+- Mean-shifting bug in Z-transform for weathercop compatibility
 
 ## [1.4.1] - 2025-11-07
 
