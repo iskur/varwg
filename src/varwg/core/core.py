@@ -171,29 +171,36 @@ def seasonal_back(
     for var_name in var_names_back:
         var_i = var_names.index(var_name)
         var = norm_data[var_i]
-        # for var_i, (var_name, var) in enumerate(zip(var_names, norm_data)):
         distribution, solution = dist_sol[solution_template % var_name]
-        if hasattr(distribution, "dist") and isinstance(
-            distribution.dist, distributions.Normal
-        ):
-            # in this case, we do not need a qenuine qq-transform, the normal
-            # inverse Z transform suffices, AND is immune to producing nans
-            # for "extreme" values in the standard-normal world!
-            if doys is not None:
-                _T = (2 * np.pi / 365 * doys)[np.newaxis, :]
-            else:
-                _T = None
-            mus, sigmas = distribution.trig2pars(solution, _T)
-            data[var_i] = var * sigmas + mus
-        else:
-            quantiles = distributions.norm.cdf(var)
-            doys_ = doys if pass_doys else None
-            data[var_i] = distribution.ppf(
-                solution,
-                quantiles,
-                doys=doys_,
-                mean_shift=(mean_shifts.get(var_name, None)),
-            )
+
+        # is_normal = hasattr(distribution, "dist") and isinstance(
+        #     distribution.dist, distributions.Normal
+        # )
+        # if is_normal:
+        #     # in this case, we do not need a qenuine qq-transform, the normal
+        #     # inverse Z transform suffices, AND is immune to producing nans
+        #     # for "extreme" values in the standard-normal world!
+        #     mus, sigmas = distribution.trig2pars(solution, doys=doys)
+        #     data[var_i] = var * sigmas + mus
+        # else:
+        #     quantiles = distributions.norm.cdf(var)
+        #     doys_ = doys if pass_doys else None
+        #     data[var_i] = distribution.ppf(
+        #         solution,
+        #         quantiles,
+        #         doys=doys_,
+        #         mean_shift=mean_shift_for_var,
+        #     )
+
+        quantiles = distributions.norm.cdf(var)
+        doys_ = doys if pass_doys else None
+        data[var_i] = distribution.ppf(
+            solution,
+            quantiles,
+            doys=doys_,
+            mean_shift=mean_shifts.get(var_name, None),
+        )
+
     return data
 
 
@@ -2262,7 +2269,9 @@ class VarWG(plotting.Plotting):
         summer_ii = np.where((months >= month_start) & (months <= month_end))[
             0
         ]
-        durations = varwg.rng.integers(duration_min, duration_max + 1, n_events)
+        durations = varwg.rng.integers(
+            duration_min, duration_max + 1, n_events
+        )
         for event_i in range(n_events):
             i = varwg.rng.choice(summer_ii)
             duration = durations[event_i]

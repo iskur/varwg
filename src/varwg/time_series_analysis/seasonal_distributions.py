@@ -1351,14 +1351,15 @@ class SlidingDist(SeasonalDist):
             table[doy_i, :, 1] = self.dist._fix_x(xx)
         return table
 
-    def trig2pars(self, trig_pars, _T=None, fft_order=None):
+    def trig2pars(self, trig_pars, _T=None, doys=None, fft_order=None):
         fft_order = self.fft_order if fft_order is None else fft_order
-        if _T is None:
-            try:
-                _T = self._T
-            except AttributeError:
-                _T = self._T = (2 * np.pi / 365 * self.doys)[np.newaxis, :]
-        doys = np.atleast_1d(365 * np.squeeze(_T) / (2 * np.pi))
+        if doys is None:
+            if _T is None:
+                try:
+                    _T = self._T
+                except AttributeError:
+                    _T = self._T = (2 * np.pi / 365 * self.doys)[np.newaxis, :]
+            doys = np.atleast_1d(365 * np.squeeze(_T) / (2 * np.pi))
         doys_ii = self.doys2doys_ii(doys)
         fourier_pars = self.fourier_approx(fft_order, trig_pars)
         return np.array([fourier_pars[:, doy_i] for doy_i in doys_ii]).T
