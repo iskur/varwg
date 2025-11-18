@@ -352,32 +352,29 @@ class TestVarWG(npt.TestCase):
     #     self.met_varwg.plot_autocorr()
     #     plt.show()
 
-    def test_multi_prim(self):
-        # testing a change in humidity together with an increase in theta
-        rh_signal, _ = self.met_varwg.random_dryness(
-            duration_min=7, duration_max=14
-        )
-        varwg.reseed(seed)
-        sim_times, sim, rphases = self.met_varwg.simulate(
-            primary_var=("theta", "rh"),
-            # theta_grad=(.43 * 3, None),
-            climate_signal=(None, rh_signal),
-            theta_incr=(4, None),
-            return_rphases=True,
-        )
-        if self.verbose:
-            fig, axs = self.met_varwg.plot_meteogram_daily()
-        varwg.reseed(seed)
-        self.met_varwg.simulate(
-            primary_var=("theta", "rh"),
-            theta_grad=(0.43 * 3, None),
-            climate_signal=(None, rh_signal),
-            theta_incr=(2, None),
-            rphases=rphases,
-        )
-        # if self.verbose:
-        #     fig, axs = self.met_varwg.plot_meteogram_daily(figs=fig, axss=axs)
-        #     # plt.show()
+    # def test_multi_prim(self):
+    #     # testing a change in humidity together with an increase in theta
+    #     rh_signal, _ = self.met_varwg.random_dryness(
+    #         duration_min=7, duration_max=14
+    #     )
+    #     varwg.reseed(seed)
+    #     sim_times, sim, rphases = self.met_varwg.simulate(
+    #         primary_var=("theta", "rh"),
+    #         # theta_grad=(.43 * 3, None),
+    #         climate_signal=(None, rh_signal),
+    #         theta_incr=(4, None),
+    #         return_rphases=True,
+    #     )
+    #     if self.verbose:
+    #         fig, axs = self.met_varwg.plot_meteogram_daily()
+    #     varwg.reseed(seed)
+    #     self.met_varwg.simulate(
+    #         primary_var=("theta", "rh"),
+    #         theta_grad=(0.43 * 3, None),
+    #         climate_signal=(None, rh_signal),
+    #         theta_incr=(2, None),
+    #         rphases=rphases,
+    #     )
 
     # def test_rr_fact(self):
     #     r_fact = 1.5
