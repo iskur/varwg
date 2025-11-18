@@ -171,20 +171,22 @@ def seasonal_back(
     for var_name in var_names_back:
         var_i = var_names.index(var_name)
         var = norm_data[var_i]
-        # for var_i, (var_name, var) in enumerate(zip(var_names, norm_data)):
         distribution, solution = dist_sol[solution_template % var_name]
-        if hasattr(distribution, "dist") and isinstance(
+        mean_shift = mean_shifts.get(var_name, None)
+
+        is_normal = hasattr(distribution, "dist") and isinstance(
             distribution.dist, distributions.Normal
-        ):
+        )
+        if is_normal:
             # in this case, we do not need a qenuine qq-transform, the normal
             # inverse Z transform suffices, AND is immune to producing nans
             # for "extreme" values in the standard-normal world!
-            if doys is not None:
-                _T = (2 * np.pi / 365 * doys)[np.newaxis, :]
+            mus, sigmas = distribution.trig2pars(solution, doys=doys)
+            if mean_shift:
+                data[var_i] = (var - var.mean()) * sigmas + mus
+                data[var_i] += mean_shift
             else:
-                _T = None
-            mus, sigmas = distribution.trig2pars(solution, _T)
-            data[var_i] = var * sigmas + mus
+                data[var_i] = var * sigmas + mus
         else:
             quantiles = distributions.norm.cdf(var)
             doys_ = doys if pass_doys else None
@@ -192,7 +194,7 @@ def seasonal_back(
                 solution,
                 quantiles,
                 doys=doys_,
-                mean_shift=(mean_shifts.get(var_name, None)),
+                mean_shift=mean_shifts.get(var_name, None),
             )
     return data
 
