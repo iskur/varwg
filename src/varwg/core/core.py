@@ -172,35 +172,30 @@ def seasonal_back(
         var_i = var_names.index(var_name)
         var = norm_data[var_i]
         distribution, solution = dist_sol[solution_template % var_name]
+        mean_shift = mean_shifts.get(var_name, None)
 
-        # is_normal = hasattr(distribution, "dist") and isinstance(
-        #     distribution.dist, distributions.Normal
-        # )
-        # if is_normal:
-        #     # in this case, we do not need a qenuine qq-transform, the normal
-        #     # inverse Z transform suffices, AND is immune to producing nans
-        #     # for "extreme" values in the standard-normal world!
-        #     mus, sigmas = distribution.trig2pars(solution, doys=doys)
-        #     data[var_i] = var * sigmas + mus
-        # else:
-        #     quantiles = distributions.norm.cdf(var)
-        #     doys_ = doys if pass_doys else None
-        #     data[var_i] = distribution.ppf(
-        #         solution,
-        #         quantiles,
-        #         doys=doys_,
-        #         mean_shift=mean_shift_for_var,
-        #     )
-
-        quantiles = distributions.norm.cdf(var)
-        doys_ = doys if pass_doys else None
-        data[var_i] = distribution.ppf(
-            solution,
-            quantiles,
-            doys=doys_,
-            mean_shift=mean_shifts.get(var_name, None),
+        is_normal = hasattr(distribution, "dist") and isinstance(
+            distribution.dist, distributions.Normal
         )
-
+        if is_normal:
+            # in this case, we do not need a qenuine qq-transform, the normal
+            # inverse Z transform suffices, AND is immune to producing nans
+            # for "extreme" values in the standard-normal world!
+            mus, sigmas = distribution.trig2pars(solution, doys=doys)
+            if mean_shift:
+                data[var_i] = (var - var.mean()) * sigmas + mus
+                data[var_i] += mean_shift
+            else:
+                data[var_i] = var * sigmas + mus
+        else:
+            quantiles = distributions.norm.cdf(var)
+            doys_ = doys if pass_doys else None
+            data[var_i] = distribution.ppf(
+                solution,
+                quantiles,
+                doys=doys_,
+                mean_shift=mean_shifts.get(var_name, None),
+            )
     return data
 
 
