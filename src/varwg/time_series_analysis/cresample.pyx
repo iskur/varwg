@@ -307,7 +307,7 @@ cpdef resample(data, dtimes, p=3, n_sim_steps=None, theta_incr=0.0,
     # start with something present in the data
     doy_neighbors = np.where(varwg.ctimes.doy_distance(doys[0], doys[:-p]) <=
                              doy_tolerance)[0]
-    start_i = varwg.rng.choice(doy_neighbors)
+    start_i = varwg.get_rng().choice(doy_neighbors)
     sim[:, :p] = data[:, start_i : start_i + p]
     candidate_series[:, :p] = sim[:, :p, None]
     chosen_indices[:p] = list(range(start_i, start_i + p))
@@ -342,7 +342,7 @@ cpdef resample(data, dtimes, p=3, n_sim_steps=None, theta_incr=0.0,
             candidate_series[:, t, :] = data[:, neighbors + p]
         # candidates = get_candidates(data_chunked[..., doy_neighbors],
         #                             now - bias, n_candidates)
-        doy_neighbor_i = varwg.rng.choice(candidates_i, p=k_ji)
+        doy_neighbor_i = varwg.get_rng().choice(candidates_i, p=k_ji)
         neighbor_i = doy_neighbors[doy_neighbor_i]
         # save the origin for outside analysis
         chosen_indices[t] = neighbor_i
