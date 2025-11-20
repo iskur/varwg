@@ -1,11 +1,9 @@
 from pathlib import Path
-import os
 import tempfile
 
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.testing as npt
-import pytest
 
 import varwg
 from varwg import helpers as my
@@ -29,10 +27,6 @@ var_names = (
     "v",
 )
 disagg_varnames = [name for name in var_names if name != "R"]
-# script_home = os.path.dirname(varwg.__file__)
-# met_file = os.path.join(script_home, "sample.met")
-# data_dir = os.path.join(os.path.dirname(varwg.core.__file__), "tests", "data")
-# sim_file = os.path.join(data_dir, "test_out_sample.met")
 script_home = Path(varwg.__file__).parent
 met_file = script_home / "sample.met"
 data_dir = Path(varwg.core.__file__).parent / "tests" / "data"
