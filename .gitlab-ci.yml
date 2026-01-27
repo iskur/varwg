@@ -1,0 +1,105 @@
+stages:
+  - test
+  - build
+  - publish
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+cache:
+  paths:
+    - .cache/pip
+    - .venv/
+
+.python_setup: &python_setup
+  image: ubuntu:22.04
+  before_script:
+    - apt-get update && apt-get install -y python3-venv python3-pip
+    - python3 -m venv .venv || python3 -m venv --clear .venv
+    - source .venv/bin/activate
+    - pip install --upgrade pip setuptools wheel
+    - pip install uv
+
+test-build:
+  <<: *python_setup
+  stage: test
+  tags:
+    - r9x
+  script:
+    - source .venv/bin/activate
+    - uv sync --group test
+
+    # Build package
+    - uv build
+
+    # List built artifacts
+    - ls -lh dist/
+
+    # Install built wheel
+    - uv pip install dist/*.whl
+
+    # Run tests (skip network tests)
+    - pytest --pyargs varwg -v -m "not network"
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 week
+  only:
+    - main
+    - merge_requests
+
+build-wheels:
+  stage: build
+  tags:
+    - r9x
+  image: ubuntu:22.04
+  before_script:
+    - apt-get update && apt-get install -y python3-pip
+  script:
+    - pip install cibuildwheel twine
+    - cibuildwheel --output-dir wheelhouse
+    - ls -lh wheelhouse/
+    - twine check wheelhouse/*.whl
+  artifacts:
+    paths:
+      - wheelhouse/
+    expire_in: 1 week
+  only:
+    - tags
+  allow_failure: true
+
+build-sdist:
+  <<: *python_setup
+  stage: build
+  tags:
+    - r9x
+  script:
+    - source .venv/bin/activate
+    - uv pip install --system cython numpy setuptools build
+    - uv build --sdist
+    - ls -lh dist/
+  artifacts:
+    paths:
+      - dist/*.tar.gz
+    expire_in: 1 week
+  only:
+    - tags
+
+publish:
+  image: ubuntu:22.04
+  stage: publish
+  tags:
+    - r9x
+  before_script:
+    - apt-get update && apt-get install -y python3-pip
+    - pip install twine
+  script:
+    - ls -lh dist/
+    - twine check dist/*.whl dist/*.tar.gz
+    - echo "Ready to publish to PyPI (skipping auto-publish for safety)"
+  artifacts:
+    paths:
+      - dist/
+  only:
+    - tags
+  allow_failure: true
