@@ -13,7 +13,7 @@ from varwg.time_series_analysis import (
 from varwg.meteo import meteox2y
 import dwd_opendata
 from varwg import helpers as my
-from varwg import shelve
+from varwg.locking import shelve_open
 import varwg
 
 # script_home = os.path.dirname(varwg.__file__)
@@ -64,11 +64,10 @@ class Test(npt.TestCase):
         sdist_orig = sdists.SlidingDist(
             sp_dists.exponnorm, self.theta_data, self.dt, verbose=self.verbose
         )
-        sh = shelve.open(str(self.cache_dir / "seasonal_cache_file"), "c")
-        sh["theta"] = sdist_orig
-        sh.close()
-        sh = shelve.open(str(self.cache_dir / "seasonal_cache_file"), "c")
-        sdist_shelve = sh["theta"]
+        with shelve_open(str(self.cache_dir / "seasonal_cache_file")) as sh:
+            sh["theta"] = sdist_orig
+        with shelve_open(str(self.cache_dir / "seasonal_cache_file")) as sh:
+            sdist_shelve = sh["theta"]
         assert not my.recursive_diff(
             None,
             sdist_orig,
@@ -295,11 +294,10 @@ def test_serialization_fixture(konstanz_temperature, tmp_path):
     sdist_orig = sdists.SlidingDist(
         sp_dists.exponnorm, theta_data, dt, verbose=verbose
     )
-    sh = shelve.open(str(tmp_path / "seasonal_cache_file"), "c")
-    sh["theta"] = sdist_orig
-    sh.close()
-    sh = shelve.open(str(tmp_path / "seasonal_cache_file"), "c")
-    sdist_shelve = sh["theta"]
+    with shelve_open(str(tmp_path / "seasonal_cache_file")) as sh:
+        sh["theta"] = sdist_orig
+    with shelve_open(str(tmp_path / "seasonal_cache_file")) as sh:
+        sdist_shelve = sh["theta"]
     assert not my.recursive_diff(
         None,
         sdist_orig,

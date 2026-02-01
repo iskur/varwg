@@ -3,7 +3,7 @@ line-length = 79
 
 [project]
 name = "varwg"
-version = "1.4.6"
+version = "1.4.7"
 description = "A Vector Autoregressive Weather Generator"
 readme = "README.md"
 authors = [
