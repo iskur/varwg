@@ -39,7 +39,7 @@ where = ["src"]
 include = ["varwg*"]
 
 [tool.setuptools.package-data]
-varwg = ["*.met", "test_data/*.nc"]
+varwg = ["*.met"]
 
 [tool.setuptools.exclude-package-data]
 "*" = ["*.c", "*.h", "*.pyx"]
