@@ -234,7 +234,7 @@ def interannual_variability(T, mean_arrival=30, disturbance_std=0.1):
         return abs(
             distributions.norm.ppf(
                 varwg.get_rng().random(),
-                sigma=float(disturbance_std),
+                sigma=float(np.squeeze(disturbance_std)),
             )
         )
 
