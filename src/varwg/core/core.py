@@ -234,7 +234,7 @@ def interannual_variability(T, mean_arrival=30, disturbance_std=0.1):
         return abs(
             distributions.norm.ppf(
                 varwg.get_rng().random(),
-                sigma=float(disturbance_std),
+                sigma=float(np.squeeze(disturbance_std)),
             )
         )
 
@@ -2264,7 +2264,9 @@ class VarWG(plotting.Plotting):
         summer_ii = np.where((months >= month_start) & (months <= month_end))[
             0
         ]
-        durations = varwg.get_rng().integers(duration_min, duration_max + 1, n_events)
+        durations = varwg.get_rng().integers(
+            duration_min, duration_max + 1, n_events
+        )
         for event_i in range(n_events):
             i = varwg.get_rng().choice(summer_ii)
             duration = durations[event_i]

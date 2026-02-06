@@ -4,7 +4,6 @@ import os
 import re
 import shlex
 import sys
-import threading
 import warnings
 from pickle import UnpicklingError
 
@@ -16,7 +15,8 @@ from tqdm import tqdm
 
 import varwg
 import varwg.time_series_analysis.seasonal_kde as skde
-from varwg import helpers as my, shelve
+from varwg import helpers as my
+from varwg.locking import shelve_open
 from varwg.meteo import avrwind, meteox2y
 from varwg.time_series_analysis import (
     distributions,
@@ -44,9 +44,6 @@ PY2 = sys.version_info.major == 2
 cache_filename = "seasonal_solutions_{version}.sh".format(
     version="py2" if PY2 else "py3"
 )
-
-# Thread-safe cache file access lock
-_cache_lock = threading.Lock()
 
 
 def detrend(values):
@@ -996,8 +993,7 @@ class Base(object):
     def _prepare_fixed_data(self):
         """Convert the data to standard-normal an put it into (K,T)-array form."""
         if self.fixed_variables:
-            with _cache_lock:
-                sh = shelve.open(self.seasonal_cache_file, "c")
+            with shelve_open(self.seasonal_cache_file) as sh:
                 fixed_data = np.nan * np.empty((self.K, self.T_sim))
                 for var_name, values in list(self.fixed_variables.items()):
                     var_ii = self.var_names.index(var_name)
@@ -1021,7 +1017,6 @@ class Base(object):
                     quantiles = np.squeeze(dist.cdf(solution))
                     transformed = distributions.norm.ppf(quantiles)
                     fixed_data[var_ii] = transformed
-                sh.close()
             return fixed_data
         else:
             return None
@@ -1151,14 +1146,12 @@ class Base(object):
             refit = tuple()
         elif refit == "all" or refit is True:
             refit = self.var_names
-        with _cache_lock:
-            sh = shelve.open(str(self.seasonal_cache_file), "c")
+        with shelve_open(str(self.seasonal_cache_file)) as sh:
             try:
                 keys = list(sh.keys())
             except Exception:
                 print("Cache file corrupted, refitting...")
                 os.remove(self.seasonal_cache_file)
-                sh = shelve.open(str(self.seasonal_cache_file), "c")
                 keys = []
             if values is None:
                 values = self.data_raw
@@ -1264,7 +1257,6 @@ class Base(object):
                 assert len(quantiles) == len(var)
                 data_trans[var_ii] = distributions.norm.ppf(quantiles)
                 dist_sol[var_name] = dist, solution
-            sh.close()
 
         if filter_nans:
             # we have outrageous outliers from time to time
@@ -1286,8 +1278,7 @@ class Base(object):
         # Fit hourly distributions to the data, if necesarry, and
         # qq-transform it to standard-norm.
         data_hourly_trans = []
-        with _cache_lock:
-            sh = shelve.open(str(self.seasonal_cache_file), "c")
+        with shelve_open(str(self.seasonal_cache_file)) as sh:
             # sh.keys() is very slow
             fft_order = 20
             for var_name in self.var_names:
@@ -1355,7 +1346,6 @@ class Base(object):
                 values_trans = distributions.norm.ppf(qq)
                 data_hourly_trans += [values_trans]
                 self.dist_sol[solution_key] = hourly_dist, solution
-            sh.close()
         return data_hourly_trans
 
     def dist_sol_hourly(self, var_name):
@@ -1379,7 +1369,7 @@ class Base(object):
         wet_means_by_doy = pd.DataFrame(
             wet_means_by_doy, index=np.arange(1, doy_i + 2)
         )
-        return wet_means_by_doy.reindex(dry_doys).values.T
+        return wet_means_by_doy.reindex(dry_doys).values.T.copy()
 
     def _wet_stds_by_doy(
         self, non_rain_finite, rain_mask, doy_mask, fft_order
@@ -1399,7 +1389,7 @@ class Base(object):
         wet_stds_by_doy = pd.DataFrame(
             wet_stds_by_doy, index=np.arange(1, doy_i + 2)
         )
-        return wet_stds_by_doy.reindex(dry_doys).values.T
+        return wet_stds_by_doy.reindex(dry_doys).values.T.copy()
 
     def _betas_by_doy(self, X, y, rain_mask, doy_mask, fft_order):
         betas_by_doy = np.empty((doy_mask.shape[0], X.shape[1]))
@@ -1418,7 +1408,7 @@ class Base(object):
         betas_by_doy = pd.DataFrame(
             betas_by_doy, index=np.arange(1, doy_i + 2)
         )
-        return betas_by_doy.reindex(dry_doys).values.T
+        return betas_by_doy.reindex(dry_doys).values.T.copy()
 
     def _negative_rain(
         self,

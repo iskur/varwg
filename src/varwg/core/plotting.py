@@ -547,7 +547,7 @@ class Plotting(base.Base):
         if axss is None:
             axss = 2 * [None]
         if figsize is None:
-            figsize = (8, len(var_names))
+            figsize = (8, 1.5 * len(var_names))
         if figsize is not None:
             f_kwds["figsize"] = figsize
         # elif isinstance(axss, np.ndarray):

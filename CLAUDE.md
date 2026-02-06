@@ -171,6 +171,11 @@ Extensions are built via `setup.py` which handles platform-specific compilation 
 
 5. **Backward compatibility**: Old class names (`VG`, `VGBase`, `VGPlotting`) are aliased to new names (`VarWG`, etc.) in `__init__.py`.
 
+6. **Deprecation warnings**: Currently have NumPy/SciPy deprecation warnings to address:
+   - `core/core.py:237`: NumPy scalar conversion deprecation (ensure single element before `float()` conversion)
+   - `helpers.py:327`: SciPy import path deprecation (import `interp1d` from `scipy.interpolate` directly)
+   - These are non-blocking but should be fixed in a future maintenance release to maintain compatibility with NumPy 2.0+ and SciPy 2.0+
+
 ## Release Process
 
 1. Update version in `pyproject.toml`

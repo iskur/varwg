@@ -113,7 +113,7 @@ def kernel_density(kernel_width, data, eval_points=None, *args, **kwds):
     density = np.sum(kernel_table, axis=1) / len(data)
     if density.ndim > 1:
         density = np.sum(density, axis=1) / len(data)
-    return density
+    return np.squeeze(density)
 
 
 def sum_log_density(kernel_width, data):

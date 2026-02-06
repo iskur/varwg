@@ -1,9 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
-import shelve
 import sys
 from tqdm import tqdm
-from contextlib import closing
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,6 +10,7 @@ from scipy import optimize
 import varwg
 from varwg import helpers as my
 from varwg import times
+from varwg.locking import shelve_open
 
 
 PY2 = sys.version_info.major == 2
@@ -116,7 +115,7 @@ def _transform_theta_incr(
         shelve_filepath = os.path.join(cache_dir, shelve_filename)
     else:
         shelve_filepath = shelve_filename
-    with closing(shelve.open(shelve_filepath, "c")) as sh:
+    with shelve_open(shelve_filepath) as sh:
         par_key = "{p}_{n_candidates}_{doy_tolerance}".format(**res_kwds)
         par_key_pos = par_key + "pos"
         if not recalibrate and par_key_pos in sh:

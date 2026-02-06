@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.7] - 2026-02-01
+
+### Added
+- GitLab CI/CD pipeline configuration for additional CI/CD integration
+
+### Fixed
+- Cross-process file-based locking for shelve database access to prevent race conditions during concurrent simulations
+- Handle relative paths in `shelve_open()` without directory component
+- Exclude test data files (test_data/*.nc) from published wheels to fix ARM64 validation errors and reduce wheel size
+
+### Infrastructure
+- PyPI publication now passes validation for all platforms including macOS ARM64
+
+## [1.4.6] - 2026-01-29
+
+### Added
+- Detailed logging for wheel repacking issues for CI debugging
+
+### Fixed
+- Add missing `pytz` transitive dependency (required by timezonefinder)
+- Exclude Cython-generated .c/.h files from binary wheels to resolve PyPI validation errors
+- Improve macOS wheel repacking to eliminate trailing ZIP data
+- Remove unnecessary zipfile-deflate64 dependency
+
+### Changed
+- Update macOS wheel build workflow for better delocate artifact handling and reproducibility
+
+## [1.4.5] - 2026-01-23
+
+### Added
+- `obs_title_str` and `sim_title_str` parameters to `plot_meteogram_daily()` for customizable plot titles
+
 ## [1.4.4] - 2026-01-13
 
 ### Fixed

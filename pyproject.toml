@@ -3,7 +3,7 @@ line-length = 79
 
 [project]
 name = "varwg"
-version = "1.4.4"
+version = "1.4.7"
 description = "A Vector Autoregressive Weather Generator"
 readme = "README.md"
 authors = [
@@ -19,6 +19,7 @@ dependencies = [
     "matplotlib>=3.10.3",
     "numexpr>=2.11.0",
     "pandas>=2.3.0",
+    "pytz>=2025.2",
     "scipy>=1.15.3",
     "timezonefinder>=6.5.9",
     "tqdm>=4.67.1",
@@ -38,7 +39,7 @@ where = ["src"]
 include = ["varwg*"]
 
 [tool.setuptools.package-data]
-varwg = ["*.met", "test_data/*.nc"]
+varwg = ["*.met"]
 
 [tool.setuptools.exclude-package-data]
 "*" = ["*.c", "*.h", "*.pyx"]
