@@ -35,7 +35,7 @@ test-build:
   tags:
     - r9x
   script:
-    - uv pip install --group test
+    - uv sync --group test
 
     # Build package
     - uv build
@@ -66,7 +66,7 @@ build-wheels:
   tags:
     - r9x
   script:
-    - uv pip install cython numpy setuptools build
+    - uv sync
     - uv build --wheel
     - mkdir -p wheelhouse
     - mv dist/*.whl wheelhouse/
@@ -87,7 +87,7 @@ build-sdist:
   tags:
     - r9x
   script:
-    - uv pip install cython numpy setuptools build
+    - uv sync
     - uv build --sdist
     - ls -lh dist/
   artifacts:

@@ -1369,7 +1369,7 @@ class Base(object):
         wet_means_by_doy = pd.DataFrame(
             wet_means_by_doy, index=np.arange(1, doy_i + 2)
         )
-        return wet_means_by_doy.reindex(dry_doys).values.T
+        return wet_means_by_doy.reindex(dry_doys).values.T.copy()
 
     def _wet_stds_by_doy(
         self, non_rain_finite, rain_mask, doy_mask, fft_order
@@ -1389,7 +1389,7 @@ class Base(object):
         wet_stds_by_doy = pd.DataFrame(
             wet_stds_by_doy, index=np.arange(1, doy_i + 2)
         )
-        return wet_stds_by_doy.reindex(dry_doys).values.T
+        return wet_stds_by_doy.reindex(dry_doys).values.T.copy()
 
     def _betas_by_doy(self, X, y, rain_mask, doy_mask, fft_order):
         betas_by_doy = np.empty((doy_mask.shape[0], X.shape[1]))
@@ -1408,7 +1408,7 @@ class Base(object):
         betas_by_doy = pd.DataFrame(
             betas_by_doy, index=np.arange(1, doy_i + 2)
         )
-        return betas_by_doy.reindex(dry_doys).values.T
+        return betas_by_doy.reindex(dry_doys).values.T.copy()
 
     def _negative_rain(
         self,

@@ -26,5 +26,5 @@ RUN uv venv --python 3.13 .venv
 # "activate" the venv
 ENV PATH=".venv/bin:$PATH"
 
-# Install scientific python stack
-RUN uv pip install cython numpy setuptools build scipy sympy matplotlib
+# Plain venv ready for project-specific dependencies
+# Projects manage their own dependencies via uv and pyproject.toml
