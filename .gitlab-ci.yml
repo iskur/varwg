@@ -85,7 +85,7 @@ build-sdist:
     - when: manual
 
 publish:
-  image: $CI_REGISTRY_IMAGE/python-3.13:latest
+  image: $SHARED_IMAGE
   stage: publish
   tags:
     - r9x
