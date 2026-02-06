@@ -2264,7 +2264,9 @@ class VarWG(plotting.Plotting):
         summer_ii = np.where((months >= month_start) & (months <= month_end))[
             0
         ]
-        durations = varwg.get_rng().integers(duration_min, duration_max + 1, n_events)
+        durations = varwg.get_rng().integers(
+            duration_min, duration_max + 1, n_events
+        )
         for event_i in range(n_events):
             i = varwg.get_rng().choice(summer_ii)
             duration = durations[event_i]
