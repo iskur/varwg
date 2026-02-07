@@ -342,6 +342,7 @@ class Base(object):
         neg_kwds=None,
         infill=False,
         fit_kwds=None,
+        seasonal_fitting=False,
         **met_kwds,
     ):
         # external_var_names=None,
@@ -349,6 +350,7 @@ class Base(object):
         #     Must be present in the met-file.
         self.var_names = var_names
         self.verbose = verbose
+        self.seasonal_fitting = seasonal_fitting
         self.met_file = conf.met_file if met_file is None else met_file
         self.data_dir = conf.data_dir if data_dir is None else data_dir
         self.fit_kwds = {} if fit_kwds is None else fit_kwds

@@ -111,6 +111,7 @@ def var_names_greek(var_names):
 # -----------------------------------------------------------------------------#
 
 import numpy as np
+from typing import Union, Type
 from varwg.time_series_analysis import distributions
 from varwg.time_series_analysis import seasonal_distributions as sd
 from varwg.time_series_analysis import seasonal_kde as skde
@@ -131,7 +132,9 @@ dists = {
     "v": "empirical",
     "nao": distributions.norm,
 }
-seasonal_classes = dict.fromkeys(dists, sd.SlidingDist)
+# seasonal_classes maps variable names to their seasonal distribution classes
+# Both SlidingDist and SeasonalKDE inherit from seasonal.Seasonal
+seasonal_classes: dict[str, Union[Type[sd.SlidingDist], Type[skde.SeasonalKDE]]] = dict.fromkeys(dists, sd.SlidingDist)
 seasonal_classes["Qsw"] = skde.SeasonalKDE
 seasonal_classes["u"] = seasonal_classes["v"] = skde.SeasonalKDE
 

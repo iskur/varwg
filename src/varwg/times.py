@@ -772,7 +772,9 @@ def time_part(timestamps_or_datetimes, sub_format_str):
             ]
         )
     except TypeError:
-        return single_time_part(np.asscalar(times_), sub_format_str)
+        # Handle scalar or 0-d array case
+        scalar_val = times_.item() if hasattr(times_, 'item') else times_
+        return single_time_part(scalar_val, sub_format_str)
 
 
 def time_part_(datetimes, date_part):
@@ -847,7 +849,7 @@ def regularize(values, dtimes, nan=False, main_diff=None):
         main_diff_seconds = main_diff
         main_diff = timedelta(seconds=main_diff_seconds)
     n_diff = int(np.ceil((in_unix[-1] - in_unix[0]) / main_diff_seconds)) + 1
-    out_dtimes = dtimes[0] + main_diff * np.arange(n_diff)
+    out_dtimes = np.array([dtimes[0] + main_diff * i for i in range(n_diff)])
     out_unix = datetime2unix(out_dtimes)
     out_values = np.interp(out_unix, in_unix, values)
     if nan:

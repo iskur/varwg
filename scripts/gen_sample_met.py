@@ -10,8 +10,12 @@ filepath = Path(varwg.__file__).parent / "core/tests/test_varwg.py"
 # filepath = Path("../varwg/core/tests/test_varwg.py").absolute()
 module_name = "test_varwg"
 spec = importlib.util.spec_from_file_location(module_name, filepath)
+if spec is None:
+    raise RuntimeError(f"Could not load module spec from {filepath}")
 test_varwg = importlib.util.module_from_spec(spec)
 sys.modules[module_name] = test_varwg
+if spec.loader is None:
+    raise RuntimeError(f"Module loader is None for {filepath}")
 spec.loader.exec_module(test_varwg)
 
 # config_template = varwg.config_template

@@ -1,15 +1,18 @@
 __all__ = [
-    "meteo",
-    "time_series_analysis",
     "helpers",
     "smoothing",
     "times",
-    "ctimes",
-    "ecdf",
     "sample_met",
     "get_rng",
     "reseed",
     "rng",
+    "VarWG",
+    "VG",
+    "VGBase",
+    "VGPlotting",
+    "read_met",
+    "set_conf",
+    "conf",
 ]
 
 from pathlib import Path
@@ -18,10 +21,17 @@ import shelve
 from numpy.random import default_rng
 import matplotlib.pyplot as plt
 import threading
+from typing import Any
 
 from .core.core import VarWG, read_met
 from .core import core, base, plotting
-from . import times, ctimes
+from . import times
+
+# Try to import ctimes (compiled Cython extension)
+try:
+    from . import ctimes
+except ImportError:
+    ctimes = None
 
 # Backward compatibility aliases
 VG = VarWG
@@ -31,11 +41,17 @@ VGPlotting = plotting.VGPlotting
 # Path to sample meteorological data file
 sample_met = Path(__file__).parent / "sample.met"
 
-shelve.Pickler = Pickler
-shelve.Unpickler = Unpickler
+# Monkeypatch shelve to use dill for better serialization
+if not hasattr(shelve, 'Pickler'):
+    shelve.Pickler = Pickler  # type: ignore
+if not hasattr(shelve, 'Unpickler'):
+    shelve.Unpickler = Unpickler  # type: ignore
 
 # Thread-local storage for RNG
 _thread_rng = threading.local()
+
+# Global configuration (module-level variable)
+conf: Any = None
 
 # Keep old rng for backwards compatibility (deprecated)
 # WARNING: Direct use of varwg.rng is deprecated and not thread-safe.
