@@ -2030,13 +2030,13 @@ class _Rain(Dist):
             for name, vals in kwds.items()
         }
 
-    def _pdf(self, meta, *args, **kwds):
+    def _pdf(self, *args, **kwds):
         pass
 
-    def _cdf(self, meta, *args, **kwds):
+    def _cdf(self, *args, **kwds):
         pass
 
-    def _ppf(self, meta, *args, **kwds):
+    def _ppf(self, *args, **kwds):
         pass
 
 
@@ -2596,9 +2596,10 @@ class RainMix(_KDE, _Rain):
         )
         return self.fitted_pars
 
-    def fit_ml(self, x, x0=None, bounds=None, *args, **kwds):
+    def fit_ml(self, values, x0=None, *args, **kwds):
         """This is a lie, we don't fit rainmix with ML."""
-        params = self._fit(x, x0, bounds=bounds, *args, **kwds)
+        bounds = kwds.pop('bounds', None)
+        params = self._fit(values, x0, bounds=bounds, *args, **kwds)
         params = list(params)
         supplements = {
             name: params[self.parameter_names.index(name)]
