@@ -542,21 +542,21 @@ def timestamps2slice(startts=None, endts=None, dt=None, refts=None, step=None):
 
     if startts is None:
         tstart = None
-    if type(startts) == str:
+    if isinstance(startts, str):
         tstart = datetimefromisoformat(startts)
     else:
         tstart = startts
 
     if endts is None:
         tend = None
-    if type(endts) == str:
+    if isinstance(endts, str):
         tend = datetimefromisoformat(endts)
     else:
         tend = endts
 
     if refts is None:
         tref = tstart
-    elif type(refts) == str:
+    elif isinstance(refts, str):
         tref = datetimefromisoformat(refts)
     else:
         tref = refts

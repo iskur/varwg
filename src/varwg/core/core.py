@@ -2287,7 +2287,7 @@ if __name__ == "__main__":
     from varwg.core import plotting
 
     base.conf = plotting.conf = conf
-    met_vg = VG(
+    met_vg = VarWG(
         ("R", "theta", "ILWR", "Qsw", "rh", "u", "v"),
         # non_rain=("theta", "Qsw", "rh"),
         rain_method="regression",

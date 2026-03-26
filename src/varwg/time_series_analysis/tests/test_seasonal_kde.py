@@ -5,11 +5,7 @@ import numpy.testing as npt
 from numpy.testing import TestCase
 
 from varwg import times
-from varwg.time_series_analysis import (
-    _kde as kde,
-    distributions,
-    seasonal_kde as skde,
-)
+from varwg.time_series_analysis import seasonal_kde as skde
 
 
 class Test(TestCase):

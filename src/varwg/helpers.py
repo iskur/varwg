@@ -346,7 +346,7 @@ def recursive_diff(
     if plot and recursive_diff.fig_axs is None:
         recursive_diff.fig_axs = {}
 
-    if type(obj1) != type(obj2):
+    if type(obj1) is not type(obj2):
         if verbose:
             print(f"{name}: {type(obj1)} != {type(obj2)}")
         diff[name.lstrip()] = obj1, obj2
@@ -1083,7 +1083,7 @@ def kde_gauss(
 
         optMatrix = residual_matrix(dataset, dataset)
         if NE:
-            pi = np.pi
+            pi = np.pi  # noqa: F841 - used in ne.evaluate() string
             ne_str = (
                 "1.0 / (sqrt(2 * pi) * kernel_width) / "
                 "exp(optMatrix ** 2 / (2 * kernel_width ** 2))"

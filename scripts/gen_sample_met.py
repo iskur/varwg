@@ -1,10 +1,11 @@
-import os
-import sys
 import shutil
+import sys
+import warnings
 from pathlib import Path
 import importlib.util
 
 import varwg
+import config_konstanz as conf
 
 filepath = Path(varwg.__file__).parent / "core/tests/test_varwg.py"
 # filepath = Path("../varwg/core/tests/test_varwg.py").absolute()
@@ -17,11 +18,6 @@ sys.modules[module_name] = test_varwg
 if spec.loader is None:
     raise RuntimeError(f"Module loader is None for {filepath}")
 spec.loader.exec_module(test_varwg)
-
-# config_template = varwg.config_template
-# varwg.set_conf(config_template)
-
-import config_konstanz as conf
 
 varwg.set_conf(conf)
 
@@ -76,8 +72,6 @@ def main(T=None):
 # dtimes, sim = test_varwg.simulate()
 
 if __name__ == "__main__":
-    import warnings
-
     warnings.simplefilter("error", RuntimeWarning)
 
     outfilepath, met_varwg = main(3 * 365)

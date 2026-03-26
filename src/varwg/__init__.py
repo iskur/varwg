@@ -19,7 +19,6 @@ from pathlib import Path
 from dill import Pickler, Unpickler
 import shelve
 from numpy.random import default_rng
-import matplotlib.pyplot as plt
 import threading
 from typing import Any
 

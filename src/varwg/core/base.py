@@ -1203,9 +1203,8 @@ class Base(object):
                         )
                         dist, dist_class, solution = sh[solution_key]
                     try:
-                        supplements = sh[solution_key + "suppl"]
+                        _ = sh[solution_key + "suppl"]
                     except KeyError:
-                        supplements = None
                         sh[solution_key + "suppl"] = None
                     if kwds.get("tabulate_cdf", False):
                         if isinstance(dist_class, tuple):
@@ -1214,11 +1213,9 @@ class Base(object):
                             solution_key + f"cdf_table_{dist_class.name}"
                         )
                         try:
-                            cdf_table = sh[cdf_table_key]
+                            _ = sh[cdf_table_key]
                         except KeyError:
-                            cdf_table = None
-                    else:
-                        cdf_table = None
+                            pass
 
                     # var_ = var
                     # if (

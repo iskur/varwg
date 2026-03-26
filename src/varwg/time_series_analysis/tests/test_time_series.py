@@ -4,7 +4,6 @@ Created on 06.09.2012
 @author: dirk
 """
 
-import matplotlib.pyplot as plt
 import numpy as np
 from numpy.testing import TestCase, assert_almost_equal
 
