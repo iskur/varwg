@@ -1,7 +1,11 @@
 """written by Raphael Lutz 2010"""
 
-import numpy as np
 import datetime
+
+import numpy as np
+
+import varwg
+from varwg import times
 
 
 def angle2component(angle, norm, wind=True):
@@ -45,7 +49,7 @@ def angle2component(angle, norm, wind=True):
     try:  # look if single value or vector
         _ = angle[0]
         angle, norm = np.array(angle), np.array(norm)
-    except:
+    except TypeError:
         pass
     angle = angle / 360.0 * 2 * np.pi
     u = np.sin(angle) * norm
@@ -90,7 +94,7 @@ def component2angle(u, v, wind=True):
     try:
         _ = u[0]  # test if input is single value or vector
         u, v = np.array(u), np.array(v)
-    except:
+    except TypeError:
         pass
 
     try:
@@ -236,18 +240,18 @@ def avrwind_sec(
     # test if there is sector with equal hits as maxsec
     test = hits_averages[0].copy()
     test.sort()
-    if test[-1] == test[-2] and verbose == True:
+    if test[-1] == test[-2] and verbose:
         try:
             print(timeinfo + "  Caution multiple sectors with equal hits \n")
             return_secdata = True
-        except:
+        except TypeError:
             pass  # if no timeinfo?
 
     elif test[-2] / test[-1] > 0.75 and verbose:
         try:
             print(timeinfo + "  2nd most direction alike numerous as first \n")
             return_secdata = True
-        except:
+        except TypeError:
             pass
 
     average_speed_maxsector = hits_averages[1][max_sec] / float(max_hits)
@@ -380,7 +384,7 @@ def avrwind(
         print("Error: different length in vectors u, v")
         return
     # if only time span is given: create a time vector beginning 1.1.1900 0:0:0
-    if type(date_time) == type(1):
+    if isinstance(date_time, int):
         date_time = [
             datetime.datetime(1900, 1, 1)
             + i * datetime.timedelta(0, date_time)
@@ -389,10 +393,10 @@ def avrwind(
         format_ = "datetime"
 
     else:
-        if type(date_time[0]) == type(""):
+        if isinstance(date_time[0], str):
             date_time = varwg.times.str2datetime(date_time)
             format_ = "string"
-        elif type(date_time[0]) == type(datetime.datetime(1900, 1, 1)):
+        elif isinstance(date_time[0], datetime.datetime):
             format_ = "datetime"
         else:
             print(
@@ -420,7 +424,7 @@ def avrwind(
         print("ERROR: arg(5) is not a valid method")
         return None
 
-    if type(new_timeres) != type(1):
+    if not isinstance(new_timeres, int):
         print("ERROR arg(4) is not a valid timeresolution [s]")
         return None
 
@@ -488,7 +492,7 @@ def avrwind(
         return_wind[3].append(tmp_wind[3])
         return_time.append(return_time_act)
 
-    elif verbose == True:
+    elif verbose:
         print(
             "  Caution: last value(s) lost, didn't cover a full time span \n"
         )

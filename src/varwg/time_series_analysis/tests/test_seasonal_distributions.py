@@ -345,8 +345,6 @@ def test_rainmix_fixture(freiburg_precipitation):
 
 def test_rainmix_sun_fixture(konstanz_sun):
     """Test rainmix sun with fixture data (no network required)."""
-    import xarray as xr
-
     sun_xr = konstanz_sun
     sun_data = np.squeeze(sun_xr.values)
     dt = sun_xr.time.to_dataframe().index.to_pydatetime()

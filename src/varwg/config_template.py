@@ -5,8 +5,17 @@ suggestions for their values in the form of comments
 Adjust this file for your needs and rename it to "config.py".
 """
 
+import collections
 import os
 import tempfile
+from typing import Union, Type
+
+import numpy as np
+
+from varwg.time_series_analysis import distributions
+from varwg.time_series_analysis import seasonal_distributions as sd
+from varwg.time_series_analysis import seasonal_kde as skde
+from varwg.meteo import meteox2y
 
 # -----------------------------------------------------------------------------#
 # coordinates of measurement station
@@ -43,8 +52,6 @@ seasonal_cache_file = os.path.join(cache_dir, "seasonal_solutions.she")
 # -----------------------------------------------------------------------------#
 # Configuration of how we call things
 # -----------------------------------------------------------------------------#
-
-import collections
 
 long_var_names = {
     "R": "Precipitation",
@@ -110,13 +117,6 @@ def var_names_greek(var_names):
 # These are internals of the fitting / deseasonalization process
 # -----------------------------------------------------------------------------#
 
-import numpy as np
-from varwg.time_series_analysis import distributions
-from varwg.time_series_analysis import seasonal_distributions as sd
-from varwg.time_series_analysis import seasonal_kde as skde
-from varwg.meteo import meteox2y
-from varwg import helpers as my
-
 # theoretical distributions for each variable.
 dists = {
     "ILWR": distributions.norm,
@@ -131,7 +131,9 @@ dists = {
     "v": "empirical",
     "nao": distributions.norm,
 }
-seasonal_classes = dict.fromkeys(dists, sd.SlidingDist)
+# seasonal_classes maps variable names to their seasonal distribution classes
+# Both SlidingDist and SeasonalKDE inherit from seasonal.Seasonal
+seasonal_classes: dict[str, Union[Type[sd.SlidingDist], Type[skde.SeasonalKDE]]] = dict.fromkeys(dists, sd.SlidingDist)
 seasonal_classes["Qsw"] = skde.SeasonalKDE
 seasonal_classes["u"] = seasonal_classes["v"] = skde.SeasonalKDE
 

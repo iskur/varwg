@@ -1,7 +1,7 @@
 """Download DWD test fixtures for offline testing."""
 
 from pathlib import Path
-import xarray as xr
+
 import dwd_opendata
 
 FIXTURE_DIR = Path(__file__).parent

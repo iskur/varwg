@@ -346,8 +346,8 @@ def equal_num_bins(values, n_bins, round=True):
 
 # -----------------------------------------------------------------------------#
 def scatter(wind_dirs, speed):
-    fig = plt.figure()
-    ax = plt.subplot(111, polar=True)
+    _ = plt.figure()
+    _ = plt.subplot(111, polar=True)
     wind_dirs = wind_dirs[np.isfinite(wind_dirs)]
     wind_dirs = -1 * wind_dirs + 450
     plt.scatter(

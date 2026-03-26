@@ -342,6 +342,7 @@ class Base(object):
         neg_kwds=None,
         infill=False,
         fit_kwds=None,
+        seasonal_fitting=False,
         **met_kwds,
     ):
         # external_var_names=None,
@@ -349,6 +350,7 @@ class Base(object):
         #     Must be present in the met-file.
         self.var_names = var_names
         self.verbose = verbose
+        self.seasonal_fitting = seasonal_fitting
         self.met_file = conf.met_file if met_file is None else met_file
         self.data_dir = conf.data_dir if data_dir is None else data_dir
         self.fit_kwds = {} if fit_kwds is None else fit_kwds
@@ -1201,9 +1203,8 @@ class Base(object):
                         )
                         dist, dist_class, solution = sh[solution_key]
                     try:
-                        supplements = sh[solution_key + "suppl"]
+                        _ = sh[solution_key + "suppl"]
                     except KeyError:
-                        supplements = None
                         sh[solution_key + "suppl"] = None
                     if kwds.get("tabulate_cdf", False):
                         if isinstance(dist_class, tuple):
@@ -1212,11 +1213,9 @@ class Base(object):
                             solution_key + f"cdf_table_{dist_class.name}"
                         )
                         try:
-                            cdf_table = sh[cdf_table_key]
+                            _ = sh[cdf_table_key]
                         except KeyError:
-                            cdf_table = None
-                    else:
-                        cdf_table = None
+                            pass
 
                     # var_ = var
                     # if (
