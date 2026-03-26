@@ -93,6 +93,7 @@ class Plotting(base.Base):
             rain_method=rain_method,
             max_nans=max_nans,
             fit_kwds=fit_kwds,
+            seasonal_fitting=seasonal_fitting,
             **met_kwds,
         )
 

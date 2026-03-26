@@ -8,13 +8,18 @@ from pytest_examples import find_examples
 
 
 def find_project_root(marker_files=(".git", "pyproject.toml", "setup.py")):
+    """Find project root by looking for marker files.
+
+    Returns None if running from an installed package (e.g., via pytest --pyargs),
+    where source-tree markers don't exist.
+    """
     current = Path(__file__).resolve().parent
 
     for parent in [current, *current.parents]:
         if any((parent / marker).exists() for marker in marker_files):
             return parent
 
-    raise FileNotFoundError("Project root not found")
+    return None
 
 
 PROJECT_ROOT = find_project_root()
@@ -73,7 +78,14 @@ def air_temperature_tutorial(fixture_dir):
 
 @pytest.fixture
 def plot_output_dir():
-    """Path to save generated plots during example execution."""
+    """Path to save generated plots during example execution.
+
+    When running from installed package (--pyargs), uses temp directory.
+    """
+    if PROJECT_ROOT is None:
+        import tempfile
+        return Path(tempfile.gettempdir()) / "varwg_plots"
+
     output_dir = PROJECT_ROOT / "docs" / "plots"
     output_dir.mkdir(parents=True, exist_ok=True)
     return output_dir
@@ -99,7 +111,17 @@ def save_example_plots(plot_output_dir):
 
 
 def pytest_generate_tests(metafunc):
-    """Generate parametrized tests for README examples."""
+    """Generate parametrized tests for README examples.
+
+    Skips when running from installed package (--pyargs) where README.md
+    is not available.
+    """
     if "readme_example" in metafunc.fixturenames:
-        examples = list(find_examples(PROJECT_ROOT / "README.md"))
+        if PROJECT_ROOT is None:
+            pytest.skip(
+                "README examples require source tree (not available in --pyargs mode)"
+            )
+        # Type guard: PROJECT_ROOT is not None if we reach here
+        readme_path: Path = PROJECT_ROOT / "README.md"
+        examples = list(find_examples(readme_path))
         metafunc.parametrize("readme_example", examples, ids=str)

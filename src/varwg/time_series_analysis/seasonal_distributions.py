@@ -2,14 +2,12 @@
 distribution parameters with triangular functions."""
 
 from collections import abc
-import hashlib
 import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy as sp
 from scipy import stats
-import scipy.optimize as sp_optimize
 
 from varwg import helpers as my
 from varwg import smoothing, times
@@ -17,7 +15,6 @@ from varwg.time_series_analysis import (
     distributions,
     optimize,
     seasonal,
-    phase_randomization,
 )
 from tqdm import tqdm
 

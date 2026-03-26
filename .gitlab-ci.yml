@@ -5,20 +5,15 @@ stages:
 
 variables:
   PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-
-cache:
-  paths:
-    - .cache/pip
-    - .venv/
+  # Shared Docker image from weather-generation/docker-images
+  SHARED_IMAGE: "$CI_REGISTRY/weather-generation/docker-images/python-3.13:latest"
 
 .python_setup: &python_setup
-  image: ubuntu:22.04
+  image: $SHARED_IMAGE
   before_script:
-    - apt-get update && apt-get install -y python3-venv python3-pip
-    - python3 -m venv .venv || python3 -m venv --clear .venv
-    - source .venv/bin/activate
-    - pip install --upgrade pip setuptools wheel
-    - pip install uv
+    - export PATH="/root/.local/bin:/app/.venv/bin:$PATH"
+    # Upgrade pip and build tools
+    - uv pip install --upgrade pip setuptools wheel
 
 test-build:
   <<: *python_setup
@@ -26,7 +21,6 @@ test-build:
   tags:
     - r9x
   script:
-    - source .venv/bin/activate
     - uv sync --group test
 
     # Build package
@@ -44,28 +38,34 @@ test-build:
     paths:
       - dist/
     expire_in: 1 week
-  only:
-    - main
-    - merge_requests
+  rules:
+    - if: '$CI_COMMIT_MESSAGE =~ /\*\*\.md/'
+      when: never
+    - if: '$CI_COMMIT_MESSAGE =~ /docs\//'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_MERGE_REQUEST_IID'
+    - if: '$CI_COMMIT_TAG != null'
 
 build-wheels:
+  <<: *python_setup
   stage: build
   tags:
     - r9x
-  image: ubuntu:22.04
-  before_script:
-    - apt-get update && apt-get install -y python3-pip
   script:
-    - pip install cibuildwheel twine
-    - cibuildwheel --output-dir wheelhouse
+    - uv sync
+    - uv build --wheel
+    - mkdir -p wheelhouse
+    - mv dist/*.whl wheelhouse/
     - ls -lh wheelhouse/
-    - twine check wheelhouse/*.whl
+    - uv tool run twine check wheelhouse/*.whl
   artifacts:
     paths:
       - wheelhouse/
     expire_in: 1 week
-  only:
-    - tags
+  rules:
+    - if: '$CI_COMMIT_TAG != null'
+    - when: manual
   allow_failure: true
 
 build-sdist:
@@ -74,32 +74,39 @@ build-sdist:
   tags:
     - r9x
   script:
-    - source .venv/bin/activate
-    - uv pip install --system cython numpy setuptools build
+    - uv sync
     - uv build --sdist
     - ls -lh dist/
   artifacts:
     paths:
       - dist/*.tar.gz
     expire_in: 1 week
-  only:
-    - tags
+  rules:
+    - if: '$CI_COMMIT_TAG != null'
+    - when: manual
 
 publish:
-  image: ubuntu:22.04
+  image: $SHARED_IMAGE
   stage: publish
+  needs:
+    - job: build-wheels
+      artifacts: true
+    - job: build-sdist
+      artifacts: true
   tags:
     - r9x
   before_script:
-    - apt-get update && apt-get install -y python3-pip
-    - pip install twine
+    - export PATH="/root/.local/bin:/app/.venv/bin:$PATH"
   script:
+    - mkdir -p dist
+    - mv wheelhouse/*.whl dist/ || true
     - ls -lh dist/
-    - twine check dist/*.whl dist/*.tar.gz
-    - echo "Ready to publish to PyPI (skipping auto-publish for safety)"
+    - uv tool run twine check dist/*.whl dist/*.tar.gz
+    - uv tool run twine upload dist/*.whl dist/*.tar.gz --username __token__ --password $PYPI_TOKEN --skip-existing
   artifacts:
     paths:
       - dist/
-  only:
-    - tags
+  rules:
+    - if: '$CI_COMMIT_TAG != null'
+    - when: manual
   allow_failure: true

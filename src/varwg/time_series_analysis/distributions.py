@@ -260,7 +260,7 @@ class DistMeta(ABCMeta):
     # pylint does not let me call the first parameter meta :(
     def __new__(cls, name, bases, cls_dict):
         new_cls = super(DistMeta, cls).__new__(cls, name, bases, cls_dict)
-        new_cls.name = name.lower()
+        new_cls.name = name.lower()  # type: ignore
         # store the distribution parameter names as a class attribute
         # take the pdf as an example
         # could do some signature checks on cdf and ppf with that...
@@ -274,11 +274,11 @@ class DistMeta(ABCMeta):
         if "supplements_names" in cls_dict:
             n_pars -= len(cls_dict["supplements_names"])
         else:
-            new_cls.supplements_names = None
+            new_cls.supplements_names = None  # type: ignore
         if "_bounds" not in new_cls.__dict__:
-            new_cls._bounds = None
-        new_cls.parameter_names = tuple(varnames)
-        new_cls.n_pars = n_pars
+            new_cls._bounds = None  # type: ignore
+        new_cls.parameter_names = tuple(varnames)  # type: ignore
+        new_cls.n_pars = n_pars  # type: ignore
         return new_cls
 
 
@@ -293,19 +293,19 @@ class Dist(metaclass=DistMeta):
     isscipy = False
 
     @abstractmethod
-    def _pdf(self):
+    def _pdf(self, *args, **kwds):
         pass
 
     @abstractmethod
-    def _cdf(self):
+    def _cdf(self, *args, **kwds):
         pass
 
     @abstractmethod
-    def _ppf(self):
+    def _ppf(self, *args, **kwds):
         pass
 
     @abstractmethod
-    def _fit(self):
+    def _fit(self, *args, **kwds):
         pass
 
     @property
@@ -2030,13 +2030,13 @@ class _Rain(Dist):
             for name, vals in kwds.items()
         }
 
-    def _pdf(self, meta, *args, **kwds):
+    def _pdf(self, *args, **kwds):
         pass
 
-    def _cdf(self, meta, *args, **kwds):
+    def _cdf(self, *args, **kwds):
         pass
 
-    def _ppf(self, meta, *args, **kwds):
+    def _ppf(self, *args, **kwds):
         pass
 
 
@@ -2596,9 +2596,10 @@ class RainMix(_KDE, _Rain):
         )
         return self.fitted_pars
 
-    def fit_ml(self, x, x0=None, bounds=None, *args, **kwds):
+    def fit_ml(self, values, x0=None, *args, **kwds):
         """This is a lie, we don't fit rainmix with ML."""
-        params = self._fit(x, x0, bounds=bounds, *args, **kwds)
+        bounds = kwds.pop('bounds', None)
+        params = self._fit(values, x0, bounds=bounds, *args, **kwds)
         params = list(params)
         supplements = {
             name: params[self.parameter_names.index(name)]
@@ -2768,7 +2769,6 @@ if __name__ == "__main__":
     import config_konstanz as conf
 
     import varwg
-    from varwg.core import base, plotting
 
     varwg.set_conf(conf)
     # times_hourly, met = varwg.read_met(varwg.conf.met_file)

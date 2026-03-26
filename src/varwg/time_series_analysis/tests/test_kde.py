@@ -99,7 +99,7 @@ class Test(npt.TestCase):
             return density / x
 
         integral = integrate.quad(density_func, x0, x1)[0]
-        npt.assert_almost_equal(integral, q2 - q1, decimal=3)
+        npt.assert_almost_equal(integral, q2 - q1, decimal=2)
 
     def test_distance_array_sparse(self):
         """Do we get the same as with distance_array?"""

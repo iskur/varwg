@@ -231,7 +231,9 @@ class SpectralND(Spectral):
             self.ifft_func = np.fft.ifftn
 
         if crange is None:
-            root_func = lambda h: cthresh - cov(h)
+            def root_func(h):
+                return cthresh - cov(h)
+
             maxdist = np.sqrt(
                 sum(
                     (dim * dim_scale) ** 2
@@ -331,9 +333,15 @@ class MultiSpectral(Spectral):
         self.sigma = sigma
         if type(autocovs) is np.ndarray and not callable(autocovs[0]):
             data = autocovs
+
             # the 'i=0' prevents i from being set to K for all iterations in
             # the list comprehension below
-            ac = lambda i=0: lambda lag: time_series.auto_cov(data[i], lag)
+            def ac(i=0):
+                def func(lag):
+                    return time_series.auto_cov(data[i], lag)
+
+                return func
+
             autocovs = [ac(i) for i in range(K)]
         if cov.shape[1] > K:
             cov = np.cov(cov)
@@ -383,7 +391,9 @@ class MultiSpectral(Spectral):
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
-    cov_model = lambda h: np.exp(-h)
+    def cov_model(h):
+        return np.exp(-h)
+
     domainshape = 100, 100
     spec = SpectralND(cov_model, domainshape)
     plt.matshow(spec.sim)

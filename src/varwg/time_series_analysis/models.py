@@ -1949,8 +1949,6 @@ if __name__ == "__main__":
 
     doctest.testmod()
 
-    import tempfile
-    import os
     import varwg
 
     varwg.conf = varwg.base.conf = varwg.config_template
