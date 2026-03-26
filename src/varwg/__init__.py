@@ -40,11 +40,10 @@ VGPlotting = plotting.VGPlotting
 # Path to sample meteorological data file
 sample_met = Path(__file__).parent / "sample.met"
 
-# Monkeypatch shelve to use dill for better serialization
-if not hasattr(shelve, 'Pickler'):
-    shelve.Pickler = Pickler  # type: ignore
-if not hasattr(shelve, 'Unpickler'):
-    shelve.Unpickler = Unpickler  # type: ignore
+# Monkeypatch shelve to use dill for better serialization (e.g. lambdas,
+# closures). Always override since shelve already has Pickler in Python 3.x.
+shelve.Pickler = Pickler  # type: ignore
+shelve.Unpickler = Unpickler  # type: ignore
 
 # Thread-local storage for RNG
 _thread_rng = threading.local()
